@@ -108,11 +108,6 @@ enableGitInfo = true
       url = "https://github.com/ricardocabral/ajq"
       icon = "fab fa-github"
       desc = "Source, issues, and releases on GitHub"
-    [[params.links.developer]]
-      name = "GitHub"
-      url = "https://github.com/ricardocabral/ajq"
-      icon = "fab fa-github"
-      desc = "Development takes place here!"
 
 # ---------------------------------------------------------------------------
 # Top navigation
