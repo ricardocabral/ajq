@@ -38,6 +38,14 @@ func ExtractArchive(archivePath, dest string, maxBytes int64) ([]string, error) 
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, fmt.Errorf("create extraction root: %w", err)
 	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return nil, fmt.Errorf("resolve extraction root symlinks: %w", err)
+	}
+	root, err = filepath.Abs(root)
+	if err != nil {
+		return nil, fmt.Errorf("resolve extraction root absolute path: %w", err)
+	}
 	if err := rejectExistingSymlinks(root); err != nil {
 		return nil, err
 	}
