@@ -1,0 +1,131 @@
+{
+  "name": "all-ops-function-args",
+  "query": "select(sem_match(.text; \"select-angry\")) | sort_by(sem_match(.text; \"sort-by-angry\"), sem_classify(.text; \"sort-by-pos\"; \"sort-by-neg\"), sem_extract(.text; \"sort-by-id\"), sem_score(.text; \"sort-by-severity\"), sem_norm(.name; \"sort-by-company\"), sem_redact(.body; \"sort-by-pii\")) | group_by(sem_match(.text; \"group-by-angry\"), sem_classify(.text; \"group-by-pos\"; \"group-by-neg\"), sem_extract(.text; \"group-by-id\"), sem_score(.text; \"group-by-severity\"), sem_norm(.name; \"group-by-company\"), sem_redact(.body; \"group-by-pii\"))",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "select-angry"
+      ]
+    },
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "sort-by-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "sort-by-pos",
+        "sort-by-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "sort-by-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "sort-by-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "sort-by-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "sort-by-pii"
+      ]
+    },
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "group-by-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "group-by-pos",
+        "group-by-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "group-by-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "group-by-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "group-by-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "group-by-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 13,
+    "predicateCount": 3,
+    "valueCount": 10,
+    "modelCallsEstimate": 13
+  }
+}

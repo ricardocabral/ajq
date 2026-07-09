@@ -1,0 +1,605 @@
+{
+  "fixtures": [
+    {
+      "name": "identity_pretty_object",
+      "query": ".",
+      "args": [],
+      "stdin": "{\"b\":2,\"a\":1}\n",
+      "want_stdout": "{\n  \"a\": 1,\n  \"b\": 2\n}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "identity_compact_object",
+      "query": ".",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"b\":2,\"a\":1}\n",
+      "want_stdout": "{\"a\":1,\"b\":2}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "path_raw_string",
+      "query": ".user.name",
+      "args": [
+        "-r"
+      ],
+      "stdin": "{\"user\":{\"name\":\"Ada\"}}\n",
+      "want_stdout": "Ada\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "nested_array_index",
+      "query": ".users[1].name",
+      "args": [
+        "-r"
+      ],
+      "stdin": "{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}]}\n",
+      "want_stdout": "Grace\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "array_slice",
+      "query": ".[1:4]",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[0,1,2,3,4]\n",
+      "want_stdout": "[1,2,3]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "array_iterator",
+      "query": ".[]",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[1,2,3]\n",
+      "want_stdout": "1\n2\n3\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "object_array_iterator_field",
+      "query": ".items[] | .id",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"items\":[{\"id\":1},{\"id\":2}]}\n",
+      "want_stdout": "1\n2\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "select_map_field",
+      "query": ".items[] | select(.active) | .id",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"items\":[{\"id\":1,\"active\":true},{\"id\":2,\"active\":false}]}\n",
+      "want_stdout": "1\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "map_ids",
+      "query": ".items | map(.id)",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"items\":[{\"id\":1},{\"id\":2}]}\n",
+      "want_stdout": "[1,2]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "object_construction",
+      "query": "{id:.id,label:(.name | ascii_upcase)}",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"id\":7,\"name\":\"ada\"}\n",
+      "want_stdout": "{\"id\":7,\"label\":\"ADA\"}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "array_construction",
+      "query": "[.a, .b, .a + .b]",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"a\":2,\"b\":3}\n",
+      "want_stdout": "[2,3,5]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "update_multiply",
+      "query": ".count |= . * 2",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"count\":4}\n",
+      "want_stdout": "{\"count\":8}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "update_append",
+      "query": ".items += [3]",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"items\":[1,2]}\n",
+      "want_stdout": "{\"items\":[1,2,3]}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "group_by_kind",
+      "query": "group_by(.kind)",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[{\"kind\":\"b\",\"n\":2},{\"kind\":\"a\",\"n\":1},{\"kind\":\"b\",\"n\":3}]\n",
+      "want_stdout": "[[{\"kind\":\"a\",\"n\":1}],[{\"kind\":\"b\",\"n\":2},{\"kind\":\"b\",\"n\":3}]]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "sort_by_number",
+      "query": "sort_by(.n)",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[{\"n\":3},{\"n\":1},{\"n\":2}]\n",
+      "want_stdout": "[{\"n\":1},{\"n\":2},{\"n\":3}]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "unique_by_kind",
+      "query": "unique_by(.kind)",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[{\"kind\":\"b\",\"n\":2},{\"kind\":\"a\",\"n\":1},{\"kind\":\"b\",\"n\":3}]\n",
+      "want_stdout": "[{\"kind\":\"a\",\"n\":1},{\"kind\":\"b\",\"n\":2}]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "reduce_sum",
+      "query": "reduce .[] as $n (0; . + $n)",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[1,2,3,4]\n",
+      "want_stdout": "10\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "foreach_running_sum",
+      "query": "foreach .[] as $n (0; . + $n; .)",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[1,2,3]\n",
+      "want_stdout": "1\n3\n6\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "interpolation_raw",
+      "query": "\"id-\\(.id)-\\(.name)\"",
+      "args": [
+        "-r"
+      ],
+      "stdin": "{\"id\":5,\"name\":\"Ada\"}\n",
+      "want_stdout": "id-5-Ada\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "default_operator",
+      "query": ".missing // \"fallback\"",
+      "args": [
+        "-r"
+      ],
+      "stdin": "{\"present\":true}\n",
+      "want_stdout": "fallback\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "optional_access",
+      "query": ".items[]? | .missing?",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"items\":[{\"x\":1},{}]}\n",
+      "want_stdout": "null\nnull\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "arithmetic_precedence",
+      "query": "(.a + .b) * .c / 2",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"a\":2,\"b\":4,\"c\":3}\n",
+      "want_stdout": "9\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "regex_test_true",
+      "query": ".name | test(\"^A.+a$\")",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"name\":\"Ada\"}\n",
+      "want_stdout": "true\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "regex_match_object",
+      "query": ".text | match(\"(?<word>[a-z]+)-(?<num>[0-9]+)\")",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"text\":\"abc-123\"}\n",
+      "want_stdout": "{\"captures\":[{\"length\":3,\"name\":\"word\",\"offset\":0,\"string\":\"abc\"},{\"length\":3,\"name\":\"num\",\"offset\":4,\"string\":\"123\"}],\"length\":7,\"offset\":0,\"string\":\"abc-123\"}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "contains_array",
+      "query": "contains([2,3])",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[1,2,3,4]\n",
+      "want_stdout": "true\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "keys_sorted",
+      "query": "keys",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"z\":0,\"a\":1}\n",
+      "want_stdout": "[\"a\",\"z\"]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "length_string",
+      "query": ". | length",
+      "args": [
+        "-c"
+      ],
+      "stdin": "\"hello\"\n",
+      "want_stdout": "5\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "has_key",
+      "query": "has(\"id\")",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"id\":1}\n",
+      "want_stdout": "true\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "to_entries",
+      "query": "to_entries",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"a\":1,\"b\":2}\n",
+      "want_stdout": "[{\"key\":\"a\",\"value\":1},{\"key\":\"b\",\"value\":2}]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "from_entries",
+      "query": "from_entries",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[{\"key\":\"a\",\"value\":1},{\"key\":\"b\",\"value\":2}]\n",
+      "want_stdout": "{\"a\":1,\"b\":2}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "flatten_nested",
+      "query": "flatten",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[1,[2,[3]],4]\n",
+      "want_stdout": "[1,2,3,4]\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "add_numbers",
+      "query": "add",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[1,2,3]\n",
+      "want_stdout": "6\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "min_max_object",
+      "query": "{min:min, max:max}",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[3,1,2]\n",
+      "want_stdout": "{\"max\":3,\"min\":1}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "tostring_raw",
+      "query": ".id | tostring",
+      "args": [
+        "-r"
+      ],
+      "stdin": "{\"id\":42}\n",
+      "want_stdout": "42\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "tonumber",
+      "query": ".id | tonumber + 1",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"id\":\"41\"}\n",
+      "want_stdout": "42\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "if_then_else",
+      "query": "if .score >= 10 then \"high\" else \"low\" end",
+      "args": [
+        "-r"
+      ],
+      "stdin": "{\"score\":12}\n",
+      "want_stdout": "high\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "try_catch",
+      "query": "try .missing[] catch \"handled\"",
+      "args": [
+        "-r"
+      ],
+      "stdin": "{}\n",
+      "want_stdout": "handled\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "jq_string_escaping",
+      "query": ".",
+      "args": [
+        "-c"
+      ],
+      "stdin": "\"<tag>&\\b\\f\"\n",
+      "want_stdout": "\"<tag>&\\b\\f\"\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "raw_output_string",
+      "query": ".message",
+      "args": [
+        "-r"
+      ],
+      "stdin": "{\"message\":\"hello world\"}\n",
+      "want_stdout": "hello world\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "raw_output_non_string",
+      "query": ".value",
+      "args": [
+        "-r",
+        "-c"
+      ],
+      "stdin": "{\"value\":{\"a\":1}}\n",
+      "want_stdout": "{\"a\":1}\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "ndjson_field_compact",
+      "query": ".n",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"n\":1}\n{\"n\":2}\n",
+      "want_stdout": "1\n2\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "ndjson_multi_result_per_frame",
+      "query": ".n, (.n + 10)",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{\"n\":1}\n{\"n\":2}\n",
+      "want_stdout": "1\n11\n2\n12\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "raw_input_identity_json_strings",
+      "query": ".",
+      "args": [
+        "-R",
+        "-c"
+      ],
+      "stdin": "alpha\nbeta\n",
+      "want_stdout": "\"alpha\"\n\"beta\"\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "raw_input_raw_output_transform",
+      "query": "ascii_upcase",
+      "args": [
+        "-R",
+        "-r"
+      ],
+      "stdin": "alpha\nbeta\n",
+      "want_stdout": "ALPHA\nBETA\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "null_input_constant",
+      "query": "1",
+      "args": [
+        "-n",
+        "-c"
+      ],
+      "stdin": "ignored",
+      "want_stdout": "1\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "null_input_empty",
+      "query": "empty",
+      "args": [
+        "-n",
+        "-c"
+      ],
+      "stdin": "ignored",
+      "want_stdout": "",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "exit_status_true",
+      "query": ".",
+      "args": [
+        "-e",
+        "-c"
+      ],
+      "stdin": "true\n",
+      "want_stdout": "true\n",
+      "want_stderr": "",
+      "want_exit": 0
+    },
+    {
+      "name": "exit_status_false",
+      "query": ".",
+      "args": [
+        "-e",
+        "-c"
+      ],
+      "stdin": "false\n",
+      "want_stdout": "false\n",
+      "want_stderr": "",
+      "want_exit": 1
+    },
+    {
+      "name": "exit_status_null",
+      "query": ".",
+      "args": [
+        "-e",
+        "-c"
+      ],
+      "stdin": "null\n",
+      "want_stdout": "null\n",
+      "want_stderr": "",
+      "want_exit": 1
+    },
+    {
+      "name": "exit_status_empty",
+      "query": ".[]",
+      "args": [
+        "-e",
+        "-c"
+      ],
+      "stdin": "[]\n",
+      "want_stdout": "",
+      "want_stderr": "",
+      "want_exit": 4
+    },
+    {
+      "name": "compile_error",
+      "query": ".[",
+      "args": [
+        "-c"
+      ],
+      "stdin": "{}\n",
+      "want_stdout": "",
+      "want_stderr": "ajq: error: query \".[\" compile error: unexpected EOF\n",
+      "want_exit": 3
+    },
+    {
+      "name": "runtime_error",
+      "query": ".[10]",
+      "args": [
+        "-c"
+      ],
+      "stdin": "1\n",
+      "want_stdout": "",
+      "want_stderr": "ajq: error: query \".[10]\" runtime error in frame 1: expected an array but got: number (1)\n",
+      "want_exit": 5
+    },
+    {
+      "name": "partial_output_then_runtime_error",
+      "query": ".[], error(\"boom\")",
+      "args": [
+        "-c"
+      ],
+      "stdin": "[1,2]\n",
+      "want_stdout": "1\n2\n",
+      "want_stderr": "ajq: error: query \".[], error(\\\"boom\\\")\" runtime error in frame 1: error: boom\n",
+      "want_exit": 5
+    },
+    {
+      "name": "explain_purejq_deterministic",
+      "query": ".items[] | select(.active) | .id",
+      "args": [
+        "--explain"
+      ],
+      "stdin": "{\"items\":[{\"id\":1,\"active\":true},{\"id\":2,\"active\":false}]}\n",
+      "want_stdout": "ajq explain v1\nquery: \".items[] | select(.active) | .id\"\nexecution: pure-jq deterministic\ndeterministic: yes\nmodel_calls: 0\nbackend_calls: 0\nbyte_reproducible: yes\nstdin: ignored\n",
+      "want_stderr": "",
+      "want_exit": 0
+    }
+  ]
+}

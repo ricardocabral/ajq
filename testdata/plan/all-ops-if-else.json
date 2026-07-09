@@ -1,0 +1,67 @@
+{
+  "name": "all-ops-if-else",
+  "query": "if false then . else (sem_match(.text; \"if-else-angry\"), sem_classify(.text; \"if-else-pos\"; \"if-else-neg\"), sem_extract(.text; \"if-else-id\"), sem_score(.text; \"if-else-severity\"), sem_norm(.name; \"if-else-company\"), sem_redact(.body; \"if-else-pii\")) end",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "if-else-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "if-else-pos",
+        "if-else-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "if-else-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "if-else-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "if-else-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "if-else-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 6,
+    "predicateCount": 1,
+    "valueCount": 5,
+    "modelCallsEstimate": 6
+  }
+}

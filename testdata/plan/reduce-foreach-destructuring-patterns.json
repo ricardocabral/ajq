@@ -1,0 +1,67 @@
+{
+  "name": "reduce-foreach-destructuring-patterns",
+  "query": "reduce .[] as {(sem_match(.text; \"angry\")): $a, (sem_classify(.text; \"pos\"; \"neg\")): $b, (sem_extract(.text; \"id\")): $c} (sem_score(.text; \"severity\"); sem_norm(.name; \"company\")) | foreach .[] as {(sem_redact(.body; \"pii\")): $d} (.; .; .)",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "pos",
+        "neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 6,
+    "predicateCount": 1,
+    "valueCount": 5,
+    "modelCallsEstimate": 6
+  }
+}

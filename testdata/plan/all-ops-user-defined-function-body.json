@@ -1,0 +1,67 @@
+{
+  "name": "all-ops-user-defined-function-body",
+  "query": "def f: (sem_match(.text; \"def-body-angry\"), sem_classify(.text; \"def-body-pos\"; \"def-body-neg\"), sem_extract(.text; \"def-body-id\"), sem_score(.text; \"def-body-severity\"), sem_norm(.name; \"def-body-company\"), sem_redact(.body; \"def-body-pii\")); f",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "def-body-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "def-body-pos",
+        "def-body-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "def-body-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "def-body-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "def-body-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "def-body-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 6,
+    "predicateCount": 1,
+    "valueCount": 5,
+    "modelCallsEstimate": 6
+  }
+}

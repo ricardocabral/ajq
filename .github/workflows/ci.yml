@@ -1,0 +1,198 @@
+---
+name: CI
+
+"on":
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COVERAGE_THRESHOLD: "70.0"
+  GOFLAGS: -trimpath
+
+jobs:
+  hygiene:
+    name: Module, format, and vet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Verify module graph
+        run: go mod verify
+
+      - name: Check go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Check gofmt
+        shell: bash
+        run: |
+          mapfile -t files < <(find . \
+            -path './.git' -prune -o \
+            -path './prototype' -prune -o \
+            -name '*.go' -print)
+          if [ "${#files[@]}" -eq 0 ]; then
+            exit 0
+          fi
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [ -n "$unformatted" ]; then
+            echo "The following files need gofmt:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+        with:
+          version: v2.9.0
+          args: ./...
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Check install scripts
+        run: |
+          shellcheck scripts/install.sh scripts/install_test.sh
+          scripts/install_test.sh
+
+  test:
+    name: Unit tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # jq is preinstalled on all GitHub-hosted runners (ubuntu/macos/windows),
+      # so the live jq differential tests (TestPureJQLiveDifferentialAgainstJQ)
+      # execute here. If jq is ever absent, those tests skip cleanly rather than
+      # failing, so no explicit install step is required.
+      - name: Run unit tests
+        run: go test -count=1 -shuffle=on ./...
+
+      - name: Run race detector
+        if: runner.os == 'Linux'
+        run: go test -race -count=1 ./...
+
+      - name: Generate coverage profile
+        if: runner.os == 'Linux'
+        run: go test -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Enforce coverage threshold
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          total="$({
+            go tool cover -func=coverage.out \
+              | awk '/^total:/ { sub(/%/, "", $3); print $3 }'
+          })"
+          echo "Total coverage: ${total}%"
+          awk \
+            -v total="$total" \
+            -v threshold="$COVERAGE_THRESHOLD" \
+            'BEGIN { exit(total + 0 >= threshold + 0 ? 0 : 1) }'
+
+      - name: Upload coverage profile
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage.out
+          path: coverage.out
+          if-no-files-found: error
+
+  security:
+    name: Security checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1
+        with:
+          go-version-file: go.mod
+          go-package: ./...
+
+  build:
+    name: Build snapshot binaries
+    runs-on: ubuntu-latest
+    needs:
+      - hygiene
+      - test
+      - security
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build release snapshot
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean
+
+      - name: Upload snapshot artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ajq-snapshot-dist
+          path: dist/*
+          if-no-files-found: error

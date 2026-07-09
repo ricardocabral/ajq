@@ -1,0 +1,135 @@
+---
+name: Release
+
+"on":
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - .goreleaser.yaml
+      - .github/workflows/release.yml
+      - Makefile
+      - scripts/install.sh
+      - scripts/install_test.sh
+      - go.mod
+      - go.sum
+      - cmd/ajq/**
+      - internal/version/**
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish, for example v1.2.3
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Test and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: make test
+
+      - name: Install golangci-lint
+        shell: bash
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+            | sh -s -- -b "${GITHUB_WORKSPACE}/.bin" latest
+          echo "${GITHUB_WORKSPACE}/.bin" >> "${GITHUB_PATH}"
+
+      - name: Run lint
+        run: make lint
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Check install scripts
+        run: |
+          shellcheck scripts/install.sh scripts/install_test.sh
+          scripts/install_test.sh
+
+  release-dry-run:
+    name: GoReleaser snapshot dry-run
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs:
+      - quality
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build release snapshot
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean
+
+  publish:
+    name: Publish GitHub release
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs:
+      - quality
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+      - name: Attest release provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt

@@ -1,0 +1,67 @@
+{
+  "name": "all-ops-as-pattern",
+  "query": ". as {(sem_match(.text; \"as-pattern-angry\")): $v0, (sem_classify(.text; \"as-pattern-pos\"; \"as-pattern-neg\")): $v1, (sem_extract(.text; \"as-pattern-id\")): $v2, (sem_score(.text; \"as-pattern-severity\")): $v3, (sem_norm(.name; \"as-pattern-company\")): $v4, (sem_redact(.body; \"as-pattern-pii\")): $v5} | .",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "as-pattern-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "as-pattern-pos",
+        "as-pattern-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "as-pattern-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "as-pattern-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "as-pattern-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "as-pattern-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 6,
+    "predicateCount": 1,
+    "valueCount": 5,
+    "modelCallsEstimate": 6
+  }
+}

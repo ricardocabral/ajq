@@ -1,0 +1,67 @@
+{
+  "name": "all-ops-label-body",
+  "query": "label $out | (sem_match(.text; \"label-body-angry\"), sem_classify(.text; \"label-body-pos\"; \"label-body-neg\"), sem_extract(.text; \"label-body-id\"), sem_score(.text; \"label-body-severity\"), sem_norm(.name; \"label-body-company\"), sem_redact(.body; \"label-body-pii\"))",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "label-body-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "label-body-pos",
+        "label-body-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "label-body-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "label-body-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "label-body-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "label-body-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 6,
+    "predicateCount": 1,
+    "valueCount": 5,
+    "modelCallsEstimate": 6
+  }
+}

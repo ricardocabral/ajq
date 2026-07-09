@@ -1,0 +1,19 @@
+{
+  "fixtures": [
+    {
+      "name": "enum classify gate",
+      "query": ".[] | select(sem_classify(.msg; \"urgent\"; \"normal\") == \"normal\") | .id",
+      "input": [{"id": 1, "msg": "anything"}]
+    },
+    {
+      "name": "unbounded score inequality fallback",
+      "query": ".[] | select(sem_score(.msg; \"urgent\") > 0.5) | .id",
+      "input": [{"id": 1, "msg": "urgent"}]
+    },
+    {
+      "name": "unbounded extract equality fallback",
+      "query": ".[] | select(sem_extract(.msg; \"case\") == \"case\") | .id",
+      "input": [{"id": 1, "msg": "case"}]
+    }
+  ]
+}

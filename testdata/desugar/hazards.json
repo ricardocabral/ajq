@@ -1,0 +1,38 @@
+[
+  {
+    "name": "plain string literal operators are not rewritten",
+    "source": "\"literal =~ and !~ stay\"",
+    "want": "\"literal =~ and !~ stay\"",
+    "compile": true
+  },
+  {
+    "name": "interpolation string literal text is not rewritten",
+    "source": "\"prefix \\(\"inner =~ literal\")\"",
+    "want": "\"prefix \\(\"inner =~ literal\")\"",
+    "compile": true
+  },
+  {
+    "name": "interpolation expression is rewritten",
+    "source": "\"prefix \\(.msg =~ \"urgent\")\"",
+    "want": "\"prefix \\(sem_match(.msg; \"urgent\"))\"",
+    "compile": true
+  },
+  {
+    "name": "parenthesized piped left operand",
+    "source": "(.msg | ascii_downcase) =~ \"auth failure\"",
+    "want": "sem_match((.msg | ascii_downcase); \"auth failure\")",
+    "compile": true
+  },
+  {
+    "name": "bracket index left operand",
+    "source": ".users[0].feedback =~ \"angry\"",
+    "want": "sem_match(.users[0].feedback; \"angry\")",
+    "compile": true
+  },
+  {
+    "name": "escaped quotes in spec string",
+    "source": ".msg =~ \"said \\\"hello\\\"\"",
+    "want": "sem_match(.msg; \"said \\\"hello\\\"\")",
+    "compile": true
+  }
+]

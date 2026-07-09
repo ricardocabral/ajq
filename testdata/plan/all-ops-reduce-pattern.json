@@ -1,0 +1,67 @@
+{
+  "name": "all-ops-reduce-pattern",
+  "query": "reduce .[] as {(sem_match(.text; \"reduce-pattern-angry\")): $v0, (sem_classify(.text; \"reduce-pattern-pos\"; \"reduce-pattern-neg\")): $v1, (sem_extract(.text; \"reduce-pattern-id\")): $v2, (sem_score(.text; \"reduce-pattern-severity\")): $v3, (sem_norm(.name; \"reduce-pattern-company\")): $v4, (sem_redact(.body; \"reduce-pattern-pii\")): $v5} (0; .)",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-pattern-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-pattern-pos",
+        "reduce-pattern-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-pattern-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-pattern-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "reduce-pattern-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "reduce-pattern-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 6,
+    "predicateCount": 1,
+    "valueCount": 5,
+    "modelCallsEstimate": 6
+  }
+}

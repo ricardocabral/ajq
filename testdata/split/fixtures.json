@@ -1,0 +1,36 @@
+{
+  "fixtures": [
+    {
+      "name": "predicate_select",
+      "query": ".[] | select(sem_match(.msg; \"urgent\")) | .id",
+      "stdin": "[{\"id\":1,\"msg\":\"urgent billing issue\"},{\"id\":2,\"msg\":\"routine update\"},{\"id\":3,\"msg\":\"urgent support issue\"}]",
+      "want_stdout": "1\n3\n",
+      "want_batch_size": 3,
+      "want_ops": ["sem_match", "sem_match", "sem_match"]
+    },
+    {
+      "name": "classify_enrichment",
+      "query": ".[] | sem_classify(.msg; \"billing\"; \"support\"; \"other\")",
+      "stdin": "[{\"id\":1,\"msg\":\"billing refund request\"},{\"id\":2,\"msg\":\"support outage\"},{\"id\":3,\"msg\":\"other miscellaneous note\"}]",
+      "want_stdout": "\"billing\"\n\"support\"\n\"other\"\n",
+      "want_batch_size": 3,
+      "want_ops": ["sem_classify", "sem_classify", "sem_classify"]
+    },
+    {
+      "name": "score_sort_by",
+      "query": "sort_by(sem_score(.msg; \"urgent\")) | .[] | .id",
+      "stdin": "[{\"id\":1,\"msg\":\"urgent billing issue\"},{\"id\":2,\"msg\":\"routine update\"},{\"id\":3,\"msg\":\"urgent support issue\"}]",
+      "want_stdout": "2\n1\n3\n",
+      "want_batch_size": 3,
+      "want_ops": ["sem_score", "sem_score", "sem_score"]
+    },
+    {
+      "name": "norm_group_by",
+      "query": "group_by(sem_norm(.company; \"acme\")) | map(map(.id))",
+      "stdin": "[{\"id\":1,\"company\":\"Acme, Inc.\"},{\"id\":2,\"company\":\"Globex LLC\"},{\"id\":3,\"company\":\"ACME\"}]",
+      "want_stdout": "[[1,3],[2]]\n",
+      "want_batch_size": 3,
+      "want_ops": ["sem_norm", "sem_norm", "sem_norm"]
+    }
+  ]
+}

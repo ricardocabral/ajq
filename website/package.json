@@ -1,0 +1,16 @@
+{
+  "name": "ajq-website",
+  "version": "0.1.0",
+  "description": "Documentation and marketing site for ajq, built with Hugo + Docsy.",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "hugo --gc --minify",
+    "serve": "hugo server"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "postcss-cli": "^11.0.0"
+  }
+}

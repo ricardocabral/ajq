@@ -1,0 +1,63 @@
+- name: bug
+  color: d73a4a
+  description: Something is not working.
+- name: enhancement
+  color: a2eeef
+  description: New feature or improvement.
+- name: documentation
+  color: 0075ca
+  description: Documentation-only change.
+- name: good first issue
+  color: 7057ff
+  description: Good for new contributors.
+- name: help wanted
+  color: 008672
+  description: Maintainer is looking for help.
+- name: needs-triage
+  color: fbca04
+  description: Needs initial maintainer review.
+- name: question
+  color: d876e3
+  description: Further information is requested.
+- name: duplicate
+  color: cfd3d7
+  description: This issue or pull request already exists.
+- name: invalid
+  color: e4e669
+  description: This does not seem actionable.
+- name: wontfix
+  color: ffffff
+  description: This will not be worked on.
+- name: dependencies
+  color: 0366d6
+  description: Dependency updates.
+- name: ci
+  color: 5319e7
+  description: Continuous integration and automation.
+- name: prototype
+  color: 1d76db
+  description: Prototype implementation work.
+- name: syntax
+  color: c5def5
+  description: Query syntax and parser behavior.
+- name: planner
+  color: f9d0c4
+  description: Static planning and AST walking.
+- name: executor
+  color: bfdadc
+  description: Runtime execution, harvesting, caching, or backends.
+- name: security
+  color: ee0701
+  description: Security-sensitive work.
+- name: breaking-change
+  color: b60205
+  description: Changes compatibility or public behavior.
+- name: priority: high
+  color: b60205
+  description: Important and time-sensitive.
+- name: priority: medium
+  color: fbca04
+  description: Normal priority.
+- name: priority: low
+  color: c2e0c6
+  description: Low priority or nice to have.

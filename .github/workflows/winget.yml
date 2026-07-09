@@ -1,0 +1,40 @@
+---
+name: WinGet package
+
+"on":
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release tag to submit, for example v1.2.3
+        required: true
+        type: string
+      version:
+        description: Optional package version override, without leading v
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: winget-package-${{ github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    name: Submit WinGet manifest update
+    runs-on: windows-latest
+    steps:
+      - name: Submit to winget-pkgs
+        uses: vedantmgoyal9/winget-releaser@7bd472be23763def6e16bd06cc8b1cdfab0e2fd5 # main
+        with:
+          identifier: Ricardocabral.ajq
+          token: ${{ secrets.WINGET_TOKEN }}
+          release-repository: ajq
+          release-tag: >-
+            ${{ github.event.release.tag_name || github.event.inputs.tag }}
+          version: ${{ github.event.inputs.version }}
+          installers-regex: 'ajq_.*Windows_x86_64\.zip$'

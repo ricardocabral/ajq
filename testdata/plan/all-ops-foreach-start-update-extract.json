@@ -1,0 +1,177 @@
+{
+  "name": "all-ops-foreach-start-update-extract",
+  "query": "foreach .[] as $x ((sem_match(.text; \"foreach-start-angry\"), sem_classify(.text; \"foreach-start-pos\"; \"foreach-start-neg\"), sem_extract(.text; \"foreach-start-id\"), sem_score(.text; \"foreach-start-severity\"), sem_norm(.name; \"foreach-start-company\"), sem_redact(.body; \"foreach-start-pii\")); (sem_match(.text; \"foreach-update-angry\"), sem_classify(.text; \"foreach-update-pos\"; \"foreach-update-neg\"), sem_extract(.text; \"foreach-update-id\"), sem_score(.text; \"foreach-update-severity\"), sem_norm(.name; \"foreach-update-company\"), sem_redact(.body; \"foreach-update-pii\")); (sem_match(.text; \"foreach-extract-angry\"), sem_classify(.text; \"foreach-extract-pos\"; \"foreach-extract-neg\"), sem_extract(.text; \"foreach-extract-id\"), sem_score(.text; \"foreach-extract-severity\"), sem_norm(.name; \"foreach-extract-company\"), sem_redact(.body; \"foreach-extract-pii\")))",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-start-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-start-pos",
+        "foreach-start-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-start-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-start-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "foreach-start-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "foreach-start-pii"
+      ]
+    },
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-update-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-update-pos",
+        "foreach-update-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-update-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-update-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "foreach-update-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "foreach-update-pii"
+      ]
+    },
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-extract-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-extract-pos",
+        "foreach-extract-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-extract-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "foreach-extract-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "foreach-extract-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "foreach-extract-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 18,
+    "predicateCount": 3,
+    "valueCount": 15,
+    "modelCallsEstimate": 18
+  }
+}

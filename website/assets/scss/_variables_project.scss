@@ -1,0 +1,43 @@
+/*
+  ajq brand overrides for Docsy — reconciled with the "ajq Design System"
+  (Claude Design project). Icy / glacial tech palette: Ice cyan signal,
+  Aurora periwinkle accent, cool Slate neutrals. Space Grotesk + JetBrains Mono.
+*/
+
+// ---- Brand colors (mapped from design tokens) ----
+// Ice (primary signal). ice-700 for AA-contrast links/buttons; brighter ice
+// used for accents/glow in _styles_project.scss.
+$primary: #0e7190; // ice-700
+$secondary: #5563d6; // aurora-600
+$dark: #0a111a; // slate-950 — the cover / footer ground
+
+$info: #0a8fb2; // ice-600
+$success: #12a97a; // mint-600
+$warning: #c4851a; // amber-600
+$danger: #d43862; // rose-600
+
+// Cool blue-tinted neutral for body copy
+$body-color: #354254; // slate-700
+$gray-100: #eaeff5; // slate-100
+$gray-200: #d6dfe9; // slate-200
+$gray-500: #5f6e83; // slate-500
+
+// Crisp, technical radii (design: not pillowy)
+$border-radius: 8px;
+$border-radius-sm: 5px;
+$border-radius-lg: 12px;
+
+// ---- Typography ----
+// Space Grotesk for UI/display, JetBrains Mono for code & data.
+// Fonts are loaded via a <link> in layouts/_partials/hooks/head-end.html (v2
+// Google Fonts API), not Docsy's $td-enable-google-fonts machinery — that path
+// uses the v1 API and forces a serif fallback stack. We set the Bootstrap font
+// variables directly here instead (they win over Docsy's `!default`).
+$font-family-sans-serif: "Space Grotesk", ui-sans-serif, system-ui, -apple-system,
+  "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji",
+  "Segoe UI Emoji";
+$font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
+  "Cascadia Code", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+// Slightly tighter display headings, matching the design's negative tracking
+$headings-font-weight: 600;

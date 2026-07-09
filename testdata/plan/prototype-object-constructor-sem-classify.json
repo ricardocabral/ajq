@@ -1,0 +1,22 @@
+{
+  "name": "prototype-object-constructor-sem-classify",
+  "query": "{mood: sem_classify(.text; \"pos\"; \"neg\")}",
+  "expect": [
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "pos",
+        "neg"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 1,
+    "predicateCount": 0,
+    "valueCount": 1,
+    "modelCallsEstimate": 1
+  }
+}

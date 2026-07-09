@@ -1,0 +1,290 @@
+/*
+  ajq site styles — reconciled with the ajq Design System.
+  Design tokens (subset used here) are declared as CSS custom properties so the
+  components below read the same values as the source design system.
+  (Colors use rgba() comma syntax so Dart Sass compiles them cleanly.)
+*/
+
+:root {
+  /* Ice (primary signal) */
+  --ice-50: #ecfeff;
+  --ice-300: #6fe2f9;
+  --ice-400: #34cdea;
+  --ice-500: #12b2d4;
+  --ice-600: #0a8fb2;
+  --ice-700: #0e7190;
+  --ice-900: #144b61;
+  /* Aurora (accent) */
+  --aurora-300: #b8c4ff;
+  --aurora-400: #8ea2ff;
+  --aurora-500: #6f83f5;
+  /* Slate (neutrals) */
+  --slate-0: #ffffff;
+  --slate-50: #f5f8fb;
+  --slate-100: #eaeff5;
+  --slate-200: #d6dfe9;
+  --slate-300: #b4c1d1;
+  --slate-500: #5f6e83;
+  --slate-700: #354254;
+  --slate-800: #212c3b;
+  --slate-900: #131b27;
+  --slate-950: #0a111a;
+  /* Status */
+  --mint-500: #21cf95;
+  --mint-600: #12a97a;
+  --amber-500: #eaa72a;
+
+  /* Signature effects */
+  --glow-ice: 0 0 0 1px rgba(18, 178, 212, 0.35), 0 0 24px rgba(18, 178, 212, 0.25);
+  --glow-ice-soft: 0 0 20px rgba(52, 205, 234, 0.30);
+  --shadow-lg: 0 12px 32px rgba(10, 17, 26, 0.14), 0 4px 8px rgba(10, 17, 26, 0.06);
+  --grid-line: rgba(95, 110, 131, 0.12);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Semantic (light) */
+  --surface-card: var(--slate-0);
+  --border-subtle: var(--slate-200);
+  --accent: var(--ice-600);
+  --accent-text: var(--ice-700);
+}
+
+.dark {
+  --surface-card: var(--slate-900);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --accent: var(--ice-400);
+  --accent-text: var(--ice-300);
+  --grid-line: rgba(255, 255, 255, 0.05);
+}
+
+/* JetBrains Mono for all code/data — mono is first-class in ajq */
+code,
+pre,
+kbd,
+.td-content code {
+  font-family: $font-family-monospace;
+}
+
+/* -----------------------------------------------------------------------
+   Navbar brand — the wordmark IS the logo, so hide the duplicate title.
+   ----------------------------------------------------------------------- */
+.navbar-brand__name {
+  display: none;
+}
+.navbar-brand__logo svg {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
+/* -----------------------------------------------------------------------
+   Cover — dark slate ground with the signature icy grid + aurora wash.
+   ----------------------------------------------------------------------- */
+.td-cover-block {
+  background-color: var(--slate-950);
+  background-image:
+    radial-gradient(120% 90% at 100% 0%, rgba(142, 162, 255, 0.16), transparent 55%),
+    radial-gradient(120% 90% at 0% 5%, rgba(18, 178, 212, 0.18), transparent 55%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(160deg, #0a111a 0%, #0d1622 60%, #070d15 100%);
+  background-size: auto, auto, 44px 44px, 44px 44px, auto;
+  color: var(--slate-100);
+}
+.td-cover-block .lead {
+  color: rgba(180, 193, 209, 0.95); /* slate-300 */
+}
+
+/* Hero "grep for meaning." accent line */
+.cover-tagline {
+  font-family: $font-family-monospace;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ice-300);
+  text-shadow: var(--glow-ice-soft);
+}
+
+/* Inline code sample shown on the cover — glass card */
+.cover-code {
+  display: inline-block;
+  margin: 1.5rem auto 0;
+  padding: 0.9rem 1.2rem;
+  text-align: left;
+  font-family: $font-family-monospace;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #dbe4ef;
+  background: rgba(10, 17, 26, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+  backdrop-filter: blur(14px);
+  box-shadow: var(--glow-ice), var(--shadow-lg);
+}
+.cover-code .tok-op { color: var(--aurora-400); }
+.cover-code .tok-sem { color: var(--ice-300); font-weight: 700; }
+.cover-code .tok-comment { color: var(--slate-500); }
+
+/* Cover buttons — bright ice primary with dark text (design's dark-accent rule) */
+.td-cover-block .btn-primary {
+  background: var(--ice-400);
+  border-color: var(--ice-400);
+  color: var(--slate-950);
+  font-weight: 600;
+  box-shadow: var(--glow-ice-soft);
+  transition: transform var(--ease-out) 200ms, box-shadow var(--ease-out) 200ms;
+}
+.td-cover-block .btn-primary:hover {
+  background: var(--ice-300);
+  border-color: var(--ice-300);
+  transform: translateY(-1px);
+  box-shadow: var(--glow-ice);
+}
+.td-cover-block .btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #eaf1f8;
+  backdrop-filter: blur(8px);
+}
+.td-cover-block .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--ice-400);
+}
+
+/* -----------------------------------------------------------------------
+   Lead block — aurora/ice band instead of a flat brand fill.
+   ----------------------------------------------------------------------- */
+.td-box--primary {
+  background: linear-gradient(135deg, #0e7190 0%, #0a8fb2 45%, #5563d6 130%) !important;
+}
+
+/* Section headings use tight display tracking */
+.td-content h2,
+.td-box h2 {
+  letter-spacing: -0.02em;
+}
+
+/* Feature blocks: crisp cards with a frost-glow lift on hover */
+.td-box .card,
+.td-content .card {
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  transition: transform var(--ease-out) 200ms, box-shadow var(--ease-out) 200ms;
+}
+.td-box a.card:hover,
+.td-content a.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glow-ice-soft), var(--shadow-lg);
+}
+
+/* -----------------------------------------------------------------------
+   Comparison table
+   ----------------------------------------------------------------------- */
+.compare-table-wrap { overflow-x: auto; }
+table.compare {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.95rem;
+}
+table.compare th,
+table.compare td {
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+table.compare thead th {
+  border-bottom: 2px solid var(--ice-500);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+table.compare tbody tr:first-child td { font-weight: 600; }
+table.compare .yes { color: var(--mint-600); font-weight: 600; }
+.dark table.compare .yes { color: var(--mint-500); }
+table.compare .no { color: var(--slate-500); opacity: 0.75; }
+table.compare .col-ajq {
+  background: rgba(18, 178, 212, 0.07);
+  box-shadow: inset 2px 0 0 var(--ice-500), inset -2px 0 0 var(--ice-500);
+}
+table.compare thead th.col-ajq {
+  color: var(--accent-text);
+}
+
+/* -----------------------------------------------------------------------
+   Benchmark cards
+   ----------------------------------------------------------------------- */
+.bench-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.75rem 0 0.5rem;
+}
+.bench-card {
+  padding: 1.3rem 1.4rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-card);
+  box-shadow: var(--shadow-lg);
+  transition: transform var(--ease-out) 200ms, box-shadow var(--ease-out) 200ms;
+}
+.bench-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glow-ice-soft), var(--shadow-lg);
+}
+.bench-card .bench-num {
+  font-family: $font-family-monospace;
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent-text);
+  line-height: 1.1;
+}
+.bench-card .bench-label {
+  margin-top: 0.4rem;
+  font-size: 0.92rem;
+  color: var(--slate-500);
+}
+.dark .bench-card .bench-label { color: var(--slate-300); }
+
+.bench-note {
+  margin-top: 1.1rem;
+  padding: 0.8rem 1.05rem;
+  border-left: 3px solid var(--amber-500);
+  background: rgba(234, 167, 42, 0.08);
+  border-radius: 0 8px 8px 0;
+  font-size: 0.9rem;
+}
+
+.td-content .lead-tight { max-width: 46rem; margin-left: auto; margin-right: auto; }
+
+/* -----------------------------------------------------------------------
+   Mobile refinements. The page itself never scrolls horizontally; wide
+   content (the ASCII diagram, the comparison table) scrolls inside its own
+   box via overflow-x, with momentum scrolling on touch.
+   ----------------------------------------------------------------------- */
+.compare-table-wrap,
+.td-content pre {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 576px) {
+  .cover-code {
+    font-size: 0.8rem;
+    line-height: 1.6;
+    padding: 0.75rem 0.9rem;
+    max-width: 100%;
+  }
+  .cover-tagline {
+    font-size: 1.4rem;
+  }
+  .bench-card {
+    padding: 1.1rem 1.15rem;
+  }
+  .bench-card .bench-num {
+    font-size: 1.85rem;
+  }
+  table.compare th,
+  table.compare td {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.9rem;
+  }
+}

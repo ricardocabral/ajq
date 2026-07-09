@@ -1,0 +1,122 @@
+{
+  "name": "all-ops-try-body-catch",
+  "query": "try (sem_match(.text; \"try-body-angry\"), sem_classify(.text; \"try-body-pos\"; \"try-body-neg\"), sem_extract(.text; \"try-body-id\"), sem_score(.text; \"try-body-severity\"), sem_norm(.name; \"try-body-company\"), sem_redact(.body; \"try-body-pii\")) catch (sem_match(.text; \"try-catch-angry\"), sem_classify(.text; \"try-catch-pos\"; \"try-catch-neg\"), sem_extract(.text; \"try-catch-id\"), sem_score(.text; \"try-catch-severity\"), sem_norm(.name; \"try-catch-company\"), sem_redact(.body; \"try-catch-pii\"))",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "try-body-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "try-body-pos",
+        "try-body-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "try-body-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "try-body-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "try-body-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "try-body-pii"
+      ]
+    },
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "try-catch-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "try-catch-pos",
+        "try-catch-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "try-catch-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "try-catch-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "try-catch-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "try-catch-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 12,
+    "predicateCount": 2,
+    "valueCount": 10,
+    "modelCallsEstimate": 12
+  }
+}

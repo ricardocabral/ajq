@@ -1,0 +1,67 @@
+{
+  "name": "all-ops-recursive-destructuring-pattern",
+  "query": ". as {outer: {(sem_match(.text; \"recursive-pattern-angry\")): $v0, (sem_classify(.text; \"recursive-pattern-pos\"; \"recursive-pattern-neg\")): $v1, (sem_extract(.text; \"recursive-pattern-id\")): $v2, (sem_score(.text; \"recursive-pattern-severity\")): $v3, (sem_norm(.name; \"recursive-pattern-company\")): $v4, (sem_redact(.body; \"recursive-pattern-pii\")): $v5}} | .",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "recursive-pattern-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "recursive-pattern-pos",
+        "recursive-pattern-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "recursive-pattern-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "recursive-pattern-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "recursive-pattern-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "recursive-pattern-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 6,
+    "predicateCount": 1,
+    "valueCount": 5,
+    "modelCallsEstimate": 6
+  }
+}

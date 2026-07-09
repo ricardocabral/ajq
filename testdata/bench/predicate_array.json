@@ -1,0 +1,8 @@
+[
+  {"id": 1, "msg": "urgent: production is down, please respond", "company": "Acme Corp"},
+  {"id": 2, "msg": "weekly newsletter and product updates", "company": "acme corporation"},
+  {"id": 3, "msg": "critical security alert on your account", "company": "Globex, Inc."},
+  {"id": 4, "msg": "low priority: office snacks restocked", "company": "Initech LLC"},
+  {"id": 5, "msg": "payment failed, action required immediately", "company": "Umbrella Co"},
+  {"id": 6, "msg": "urgent: production is down, please respond", "company": "Acme Corp"}
+]

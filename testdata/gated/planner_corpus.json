@@ -1,0 +1,172 @@
+{
+  "fixtures": [
+    {
+      "name": "enum classify comparison in select is gated",
+      "query": ".[] | select(sem_classify(.msg; \"angry\"; \"happy\") == \"angry\") | .id",
+      "want_gated": true,
+      "want_mode": "3-phase-generator-superset"
+    },
+    {
+      "name": "enum classify truthy select condition is gated",
+      "query": ".[] | select(sem_classify(.msg; \"angry\"; \"happy\")) | .id",
+      "want_gated": true,
+      "want_mode": "3-phase-generator-superset"
+    },
+    {
+      "name": "score comparison in if condition is gated interleaved",
+      "query": "if sem_score(.review; \"positivity\") > 0.8 then .id else empty end",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "extract equality in select is gated interleaved",
+      "query": ".[] | select(sem_extract(.raw; \"case id\") == \"A-1\") | .id",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "sort_by score is non gated",
+      "query": "sort_by(sem_score(.review; \"positivity\"))",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    },
+    {
+      "name": "group_by norm is non gated",
+      "query": "group_by(sem_norm(.company; \"canonical\"))",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    },
+    {
+      "name": "object merge classify enrichment is non gated",
+      "query": ". + {mood: sem_classify(.text; \"pos\"; \"neg\")}",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    },
+    {
+      "name": "object enrichment extract is non gated",
+      "query": "{summary: sem_extract(.raw; \"summary\")}",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    },
+    {
+      "name": "user function score used in select comparison is conservatively gated",
+      "query": "def score: sem_score(.review; \"positivity\"); select(score > 0.8)",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "user function score used in both sort and gate is conservatively gated",
+      "query": "def score: sem_score(.review; \"positivity\"); [sort_by(score), (.[] | select(score > 0.8))]",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "pipe carries score into comparison gate",
+      "query": "sem_score(.review; \"positivity\") | . > 0.8",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "as binding carries score into select gate",
+      "query": "sem_score(.review; \"positivity\") as $s | select($s > 0.8)",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "object field carries score into select gate",
+      "query": "{score: sem_score(.review; \"positivity\")} | select(.score > 0.8)",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "helper comparison consumes piped score",
+      "query": "def high: . > 0.8; sem_score(.review; \"positivity\") | high",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "helper select consumes piped score",
+      "query": "def keep: select(. > 0.8); sem_score(.review; \"positivity\") | keep",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "helper if consumes piped score",
+      "query": "def keep: if . > 0.8 then . else empty end; sem_score(.review; \"positivity\") | keep",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "discarded score enrichment before unrelated id gate is non gated",
+      "query": "{score: sem_score(.review; \"positivity\"), id: .id} | .id | select(. > 0)",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    },
+    {
+      "name": "score field projection flows into select gate",
+      "query": "{score: sem_score(.review; \"positivity\")} | .score | select(. > 0.8)",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "score field projection flows into comparison gate",
+      "query": "{score: sem_score(.review; \"positivity\")} | .score | . > 0.8",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "score transform flows into select gate",
+      "query": "sem_score(.review; \"positivity\") | tostring | select(. == \"1\")",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "score helper used only for sorting is non gated",
+      "query": "def score: sem_score(.review; \"positivity\"); sort_by(score)",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    },
+    {
+      "name": "score field projection transform flows into select gate",
+      "query": "{score: sem_score(.review; \"positivity\")} | .score | tostring | select(. == \"1\")",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "later-defined semantic helper called by gate helper is gated",
+      "query": "def outer: select(inner > 0.8); def inner: sem_score(.review; \"positivity\"); outer",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "unused as binding before id gate is non gated",
+      "query": "sem_score(.review; \"positivity\") as $s | select(.id > 0)",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    },
+    {
+      "name": "parameterized select helper gates semantic argument",
+      "query": "def keep(x): select(x > 0.8); keep(sem_score(.review; \"positivity\"))",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "parameterized comparison helper gates semantic argument",
+      "query": "def high(x): x > 0.8; high(sem_score(.review; \"positivity\"))",
+      "want_gated": true,
+      "want_mode": "interleaved-fallback"
+    },
+    {
+      "name": "object enrichment before direct id gate is non gated",
+      "query": "{score: sem_score(.review; \"positivity\"), id: .id} | select(.id > 0)",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    },
+    {
+      "name": "as binding name in string literal is non gated",
+      "query": "sem_score(.review; \"positivity\") as $s | select(.msg == \"$s\")",
+      "want_gated": false,
+      "want_mode": "3-phase"
+    }
+  ]
+}

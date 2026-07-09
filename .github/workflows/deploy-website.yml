@@ -1,0 +1,90 @@
+# Build the Hugo + Docsy site in website/ and deploy it to GitHub Pages.
+#
+# One-time setup (repo Settings → Pages): set "Build and deployment" → Source to
+# "GitHub Actions". No branch or gh-pages branch is needed.
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "Makefile"
+      - ".github/workflows/deploy-website.yml"
+  pull_request:
+    paths:
+      - "website/**"
+      - "Makefile"
+      - ".github/workflows/deploy-website.yml"
+  workflow_dispatch:
+
+# Allow the deploy job to publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One concurrent deploy; don't cancel an in-progress production deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  HUGO_VERSION: "0.163.3"
+  # Fail the build (instead of warning) on broken refs, etc.
+  HUGO_ENV: production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0 # for .GitInfo / lastmod
+
+      - name: Setup Go (for Hugo modules)
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "stable"
+
+      - name: Setup Node (for PostCSS / autoprefixer)
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+
+      - name: Install Hugo Extended
+        run: |
+          curl -sSL -o /tmp/hugo.deb \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.deb"
+          echo "6e972f1e270ec202f35a717dbcf1c59b9fe24ac8967e391f3580f170a276ade7  /tmp/hugo.deb" | sha256sum -c -
+          sudo dpkg -i /tmp/hugo.deb
+          hugo version
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Build website
+        run: make website-ci-build
+        env:
+          WEBSITE_BUILD_CMD: >-
+            hugo --gc --minify --baseURL "${{ steps.pages.outputs.base_url }}/"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: website/public
+
+  deploy:
+    # Only publish from the default branch, not on pull requests.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

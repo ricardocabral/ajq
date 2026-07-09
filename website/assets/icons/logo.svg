@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="48" viewBox="0 0 140 48" fill="none">
+  <text x="0" y="34" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="34" font-weight="700" letter-spacing="-1" fill="currentColor">ajq</text>
+  <g stroke="#12b2d4" stroke-width="3" stroke-linecap="round">
+    <line x1="98" y1="12" x2="98" y2="36"></line>
+    <path d="M108 16 L118 24 L108 32" fill="none"></path>
+  </g>
+</svg>

@@ -1,0 +1,122 @@
+{
+  "name": "all-ops-if-elif-cond-then",
+  "query": "if false then . elif (sem_match(.text; \"elif-cond-angry\"), sem_classify(.text; \"elif-cond-pos\"; \"elif-cond-neg\"), sem_extract(.text; \"elif-cond-id\"), sem_score(.text; \"elif-cond-severity\"), sem_norm(.name; \"elif-cond-company\"), sem_redact(.body; \"elif-cond-pii\")) then (sem_match(.text; \"elif-then-angry\"), sem_classify(.text; \"elif-then-pos\"; \"elif-then-neg\"), sem_extract(.text; \"elif-then-id\"), sem_score(.text; \"elif-then-severity\"), sem_norm(.name; \"elif-then-company\"), sem_redact(.body; \"elif-then-pii\")) else . end",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "elif-cond-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "elif-cond-pos",
+        "elif-cond-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "elif-cond-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "elif-cond-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "elif-cond-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "elif-cond-pii"
+      ]
+    },
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "elif-then-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "elif-then-pos",
+        "elif-then-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "elif-then-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "elif-then-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "elif-then-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "elif-then-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 12,
+    "predicateCount": 2,
+    "valueCount": 10,
+    "modelCallsEstimate": 12
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "name": "all-ops-reduce-query",
+  "query": "reduce (sem_match(.text; \"reduce-query-angry\"), sem_classify(.text; \"reduce-query-pos\"; \"reduce-query-neg\"), sem_extract(.text; \"reduce-query-id\"), sem_score(.text; \"reduce-query-severity\"), sem_norm(.name; \"reduce-query-company\"), sem_redact(.body; \"reduce-query-pii\")) as $x (0; .)",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-query-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-query-pos",
+        "reduce-query-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-query-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-query-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "reduce-query-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "reduce-query-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 6,
+    "predicateCount": 1,
+    "valueCount": 5,
+    "modelCallsEstimate": 6
+  }
+}

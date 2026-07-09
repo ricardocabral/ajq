@@ -1,0 +1,29 @@
+.DS_Store
+*.log
+*.tmp
+tmp/
+dist/
+build/
+bin/
+coverage.out
+*.test
+*.prof
+prototype/
+/docs
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Editor state
+.idea/
+.vscode/
+
+# Local assistant/tool state
+.claude/
+.pi/
+
+# Pi project-local packages (if using pi install -l)
+.pi/npm/
+/ajq

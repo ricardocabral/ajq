@@ -1,0 +1,19 @@
+# golangci-lint version: v2.9.0
+# Keep this in sync with the golangci/golangci-lint-action version in CI.
+version: "2"
+
+linters:
+  # The reproducible baseline used by golangci-lint v2, plus the security and
+  # correctness linters required for this repository's SAST gate.
+  default: standard
+  enable:
+    - bodyclose
+    - errcheck
+    - gosec
+    - govet
+    - noctx
+    - staticcheck
+  exclusions:
+    generated: lax
+    paths:
+      - ^prototype/

@@ -1,0 +1,122 @@
+{
+  "name": "all-ops-reduce-start-update",
+  "query": "reduce .[] as $x ((sem_match(.text; \"reduce-start-angry\"), sem_classify(.text; \"reduce-start-pos\"; \"reduce-start-neg\"), sem_extract(.text; \"reduce-start-id\"), sem_score(.text; \"reduce-start-severity\"), sem_norm(.name; \"reduce-start-company\"), sem_redact(.body; \"reduce-start-pii\")); (sem_match(.text; \"reduce-update-angry\"), sem_classify(.text; \"reduce-update-pos\"; \"reduce-update-neg\"), sem_extract(.text; \"reduce-update-id\"), sem_score(.text; \"reduce-update-severity\"), sem_norm(.name; \"reduce-update-company\"), sem_redact(.body; \"reduce-update-pii\")))",
+  "expect": [
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-start-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-start-pos",
+        "reduce-start-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-start-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-start-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "reduce-start-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "reduce-start-pii"
+      ]
+    },
+    {
+      "op": "sem_match",
+      "kind": "predicate",
+      "return": "bool",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-update-angry"
+      ]
+    },
+    {
+      "op": "sem_classify",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-update-pos",
+        "reduce-update-neg"
+      ]
+    },
+    {
+      "op": "sem_extract",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-update-id"
+      ]
+    },
+    {
+      "op": "sem_score",
+      "kind": "value",
+      "return": "number",
+      "valueExpr": ".text",
+      "specs": [
+        "reduce-update-severity"
+      ]
+    },
+    {
+      "op": "sem_norm",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".name",
+      "specs": [
+        "reduce-update-company"
+      ]
+    },
+    {
+      "op": "sem_redact",
+      "kind": "value",
+      "return": "string",
+      "valueExpr": ".body",
+      "specs": [
+        "reduce-update-pii"
+      ]
+    }
+  ],
+  "summary": {
+    "semanticCount": 12,
+    "predicateCount": 2,
+    "valueCount": 10,
+    "modelCallsEstimate": 12
+  }
+}
