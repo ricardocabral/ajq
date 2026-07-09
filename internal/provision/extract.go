@@ -17,12 +17,12 @@ const defaultExtractMaxBytes int64 = 1 << 30 // 1 GiB decompressed regular-file 
 // ExtractArchive extracts a .tar.gz/.tgz or .zip archive into dest and returns
 // the regular files written, relative to dest using slash-separated paths. It is
 // deliberately strict because engine archives are downloaded from the network:
-// archive names must be relative clean slash paths, symlinks/hardlinks/special
-// files are rejected, destination path components must not be symlinks, and the
-// cumulative decompressed bytes copied for regular files must not exceed
-// maxBytes. Symlinks are allowed only when their resolved target stays inside
-// dest; later writes through symlink path components are still rejected. A
-// maxBytes value <= 0 uses a conservative default cap.
+// archive names must be relative clean slash paths, hardlinks/special files are
+// rejected, destination path components must not be symlinks, and the cumulative
+// decompressed bytes copied for regular files must not exceed maxBytes. Symlinks
+// are deferred until regular entries have been extracted, then allowed only when
+// their resolved target stays inside dest; writes through symlink path components
+// are still rejected. A maxBytes value <= 0 uses a conservative default cap.
 func ExtractArchive(archivePath, dest string, maxBytes int64) ([]string, error) {
 	if maxBytes <= 0 {
 		maxBytes = defaultExtractMaxBytes
@@ -68,6 +68,7 @@ func extractTarGzArchive(archivePath, root string, budget *extractBudget) ([]str
 
 	tr := tar.NewReader(gz)
 	var files []string
+	var symlinks []deferredSymlink
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -92,17 +93,14 @@ func extractTarGzArchive(archivePath, root string, budget *extractBudget) ([]str
 			}
 			files = append(files, rel)
 		case tar.TypeSymlink:
-			if err := createExtractSymlink(root, target, hdr.Linkname); err != nil {
-				return nil, fmt.Errorf("extract symlink %q: %w", rel, err)
-			}
-			files = append(files, rel)
+			symlinks = append(symlinks, deferredSymlink{rel: rel, target: target, linkname: hdr.Linkname})
 		case tar.TypeLink:
 			return nil, fmt.Errorf("tar entry %q: hardlinks are not allowed", hdr.Name)
 		default:
 			return nil, fmt.Errorf("tar entry %q: unsupported file type %q", hdr.Name, string([]byte{hdr.Typeflag}))
 		}
 	}
-	return files, nil
+	return createDeferredSymlinks(root, files, symlinks)
 }
 
 func extractZipArchive(archivePath, root string, budget *extractBudget) ([]string, error) {
@@ -113,6 +111,7 @@ func extractZipArchive(archivePath, root string, budget *extractBudget) ([]strin
 	defer func() { _ = zr.Close() }()
 
 	var files []string
+	var symlinks []deferredSymlink
 	for _, zf := range zr.File {
 		rel, target, err := resolveArchiveTarget(root, zf.Name)
 		if err != nil {
@@ -132,10 +131,7 @@ func extractZipArchive(archivePath, root string, budget *extractBudget) ([]strin
 			if len(linkBytes) > 4096 {
 				return nil, fmt.Errorf("zip symlink %q target is too long", zf.Name)
 			}
-			if err := createExtractSymlink(root, target, string(linkBytes)); err != nil {
-				return nil, fmt.Errorf("extract symlink %q: %w", rel, err)
-			}
-			files = append(files, rel)
+			symlinks = append(symlinks, deferredSymlink{rel: rel, target: target, linkname: string(linkBytes)})
 			continue
 		}
 		if zf.FileInfo().IsDir() {
@@ -157,6 +153,22 @@ func extractZipArchive(archivePath, root string, budget *extractBudget) ([]strin
 			return nil, fmt.Errorf("extract file %q: %w", rel, err)
 		}
 		files = append(files, rel)
+	}
+	return createDeferredSymlinks(root, files, symlinks)
+}
+
+type deferredSymlink struct {
+	rel      string
+	target   string
+	linkname string
+}
+
+func createDeferredSymlinks(root string, files []string, symlinks []deferredSymlink) ([]string, error) {
+	for _, link := range symlinks {
+		if err := createExtractSymlink(root, link.target, link.linkname); err != nil {
+			return nil, fmt.Errorf("extract symlink %q: %w", link.rel, err)
+		}
+		files = append(files, link.rel)
 	}
 	return files, nil
 }
@@ -246,10 +258,6 @@ func createExtractSymlink(root, target, linkname string) error {
 	if slashpath.IsAbs(linkname) || filepath.IsAbs(linkname) {
 		return fmt.Errorf("absolute symlink target %q is not allowed", linkname)
 	}
-	resolved := filepath.Clean(filepath.Join(filepath.Dir(target), filepath.FromSlash(linkname)))
-	if !pathWithin(root, resolved) {
-		return fmt.Errorf("symlink target %q escapes extraction root", linkname)
-	}
 	parent := filepath.Dir(target)
 	if err := rejectSymlinkPath(root, parent); err != nil {
 		return err
@@ -260,6 +268,29 @@ func createExtractSymlink(root, target, linkname string) error {
 	if err := rejectSymlinkPath(root, parent); err != nil {
 		return err
 	}
+	parentReal, err := filepath.EvalSymlinks(parent)
+	if err != nil {
+		return fmt.Errorf("resolve symlink parent: %w", err)
+	}
+	parentReal, err = filepath.Abs(parentReal)
+	if err != nil {
+		return fmt.Errorf("resolve symlink parent absolute path: %w", err)
+	}
+	if err := ensureUnderRoot(root, parentReal); err != nil {
+		return err
+	}
+	resolvedLinkTarget, err := resolveExtractSymlinkTarget(root, parentReal, linkname)
+	if err != nil {
+		return err
+	}
+	symlinkTarget, err := filepath.Rel(parentReal, resolvedLinkTarget)
+	if err != nil {
+		return fmt.Errorf("resolve relative symlink target: %w", err)
+	}
+	target = filepath.Join(parentReal, filepath.Base(target))
+	if err := ensureUnderRoot(root, target); err != nil {
+		return err
+	}
 	if err := rejectSymlinkPath(root, target); err != nil {
 		return err
 	}
@@ -268,7 +299,33 @@ func createExtractSymlink(root, target, linkname string) error {
 	} else if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	return os.Symlink(linkname, target)
+	return os.Symlink(symlinkTarget, target)
+}
+
+func resolveExtractSymlinkTarget(root, linkDir, linkname string) (string, error) {
+	candidate := joinPathPreservingRel(linkDir, filepath.FromSlash(linkname))
+	resolved, err := filepath.EvalSymlinks(candidate)
+	if err != nil {
+		return "", fmt.Errorf("resolve symlink target %q: %w", linkname, err)
+	}
+	resolved, err = filepath.Abs(resolved)
+	if err != nil {
+		return "", fmt.Errorf("resolve symlink target absolute path: %w", err)
+	}
+	if err := ensureUnderRoot(root, resolved); err != nil {
+		return "", fmt.Errorf("symlink target %q escapes extraction root", linkname)
+	}
+	return resolved, nil
+}
+
+func joinPathPreservingRel(base, rel string) string {
+	if rel == "" {
+		return base
+	}
+	if strings.HasSuffix(base, string(filepath.Separator)) {
+		return base + rel
+	}
+	return base + string(filepath.Separator) + rel
 }
 
 func writeExtractFile(root, target string, mode os.FileMode, src io.Reader, budget *extractBudget) error {

@@ -190,6 +190,29 @@ func TestExtractAllowsSafeInBundleSymlinks(t *testing.T) {
 	}
 }
 
+func TestExtractAllowsSafeDeferredSymlinkTargets(t *testing.T) {
+	archive := writeTarGzFixture(t,
+		tarEntry{name: "bundle/libalias.dylib", typeflag: tar.TypeSymlink, linkname: "libreal.dylib"},
+		tarEntry{name: "bundle/libreal.dylib", body: []byte("lib"), mode: 0o644},
+	)
+	dest := t.TempDir()
+	files, err := ExtractArchive(archive, dest, 1024)
+	if err != nil {
+		t.Fatalf("ExtractArchive: %v", err)
+	}
+	if strings.Join(files, ",") != "bundle/libreal.dylib,bundle/libalias.dylib" {
+		t.Fatalf("files = %+v", files)
+	}
+	link := filepath.Join(dest, "bundle", "libalias.dylib")
+	target, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("expected symlink: %v", err)
+	}
+	if target != "libreal.dylib" {
+		t.Fatalf("symlink target = %q", target)
+	}
+}
+
 func TestExtractRejectsSymlinksHardlinksAndSpecialFiles(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -254,6 +277,41 @@ func TestExtractArchiveSymlinkEntryDoesNotWriteOutsideRoot(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outside, "pwned")); !os.IsNotExist(err) {
 		t.Fatalf("outside-root file should not exist: %v", err)
+	}
+}
+
+func TestExtractRejectsSymlinkTargetEscapingThroughEarlierSymlink(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		archive string
+	}{
+		{
+			name: "tar",
+			archive: writeTarGzFixture(t,
+				tarEntry{name: "dir/", typeflag: tar.TypeDir, mode: 0o755},
+				tarEntry{name: "dir/parent", typeflag: tar.TypeSymlink, linkname: ".."},
+				tarEntry{name: "escape", typeflag: tar.TypeSymlink, linkname: "dir/parent/.."},
+			),
+		},
+		{
+			name: "zip",
+			archive: writeZipFixture(t,
+				zipEntry{name: "dir/", mode: os.ModeDir | 0o755},
+				zipEntry{name: "dir/parent", body: []byte(".."), mode: os.ModeSymlink | 0o777},
+				zipEntry{name: "escape", body: []byte("dir/parent/.."), mode: os.ModeSymlink | 0o777},
+			),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dest := t.TempDir()
+			_, err := ExtractArchive(tc.archive, dest, 1024)
+			if err == nil || !strings.Contains(err.Error(), "escapes extraction root") {
+				t.Fatalf("expected symlink escape rejection, got %v", err)
+			}
+			if _, err := os.Lstat(filepath.Join(dest, "escape")); !os.IsNotExist(err) {
+				t.Fatalf("escape symlink should not exist: %v", err)
+			}
+		})
 	}
 }
 
