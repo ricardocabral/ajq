@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -172,7 +173,7 @@ func (m *Manager) readAPIKeyFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		return "", fmt.Errorf("daemon API key file has permissions %v, want 0600", info.Mode().Perm())
 	}
 	data, err := os.ReadFile(path) //nolint:gosec // path is the daemon API key file under the configured cache directory.
