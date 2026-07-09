@@ -23,6 +23,10 @@ prototype/
 # Local assistant/tool state
 .claude/
 .pi/
+AGENTS.md
+agents.md
+CLAUDE.md
+claude.md
 
 # Pi project-local packages (if using pi install -l)
 .pi/npm/
