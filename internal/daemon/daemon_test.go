@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -85,8 +87,9 @@ func (f *fakeProcess) wasKilled() bool {
 // a per-test temp dir so PID files never touch the real filesystem.
 func newTestManager(t *testing.T) *Manager {
 	t.Helper()
+	port := freeTCPPort(t)
 	m := &Manager{
-		Config: Config{Host: "127.0.0.1", Port: 8099, IdleTimeout: time.Minute, CacheDir: t.TempDir()},
+		Config: Config{Host: "127.0.0.1", Port: port, IdleTimeout: time.Minute, CacheDir: t.TempDir()},
 		Discoverer: Discoverer{
 			LookPath:   func(name string) (string, error) { return "/fake/" + name, nil },
 			FileExists: func(string) bool { return true },
@@ -102,6 +105,20 @@ func newTestManager(t *testing.T) *Manager {
 	return m
 }
 
+func freeTCPPort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen for free TCP port: %v", err)
+	}
+	defer func() { _ = ln.Close() }()
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("listener address = %T, want *net.TCPAddr", ln.Addr())
+	}
+	return addr.Port
+}
+
 func TestEnsureRunningSpawnsWhenNotHealthy(t *testing.T) {
 	m := newTestManager(t)
 	var spawnCount int32
@@ -112,8 +129,8 @@ func TestEnsureRunningSpawnsWhenNotHealthy(t *testing.T) {
 		if !containsPair(args, "--host", "127.0.0.1") {
 			t.Errorf("expected --host 127.0.0.1 in args %v", args)
 		}
-		if !containsPair(args, "--port", "8099") {
-			t.Errorf("expected --port 8099 in args %v", args)
+		if !containsPair(args, "--port", strconv.Itoa(m.Config.Port)) {
+			t.Errorf("expected --port %d in args %v", m.Config.Port, args)
 		}
 		if !containsPair(args, "--parallel", "4") {
 			t.Errorf("expected --parallel 4 in args %v", args)
@@ -628,8 +645,10 @@ func TestEnsureRunningCreatesFreshAPIKeyFile0600AndRemovesWithPID(t *testing.T) 
 	if err != nil {
 		t.Fatalf("stat API key file: %v", err)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Fatalf("API key file mode = %v, want 0600", got)
+	if runtime.GOOS != "windows" {
+		if got := info.Mode().Perm(); got != 0o600 {
+			t.Fatalf("API key file mode = %v, want 0600", got)
+		}
 	}
 	stopped, err := m.Stop(context.Background())
 	if err != nil || !stopped {
@@ -708,8 +727,10 @@ func TestEnsureRunningReplacesStaleAPIKeyFileBeforeSpawn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat API key file: %v", err)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Fatalf("API key file mode = %v, want 0600", got)
+	if runtime.GOOS != "windows" {
+		if got := info.Mode().Perm(); got != 0o600 {
+			t.Fatalf("API key file mode = %v, want 0600", got)
+		}
 	}
 }
 

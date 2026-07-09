@@ -112,25 +112,25 @@ func TestLoadMetadataRejectsMalformed(t *testing.T) {
 
 func TestLayoutPaths(t *testing.T) {
 	l := NewLayout("/base")
-	if l.BinDir() != "/base/bin" {
+	if l.BinDir() != filepath.Join("/base", "bin") {
 		t.Fatalf("BinDir = %q", l.BinDir())
 	}
-	if l.EngineBinaryPath("") != "/base/bin/llama-server" {
+	if l.EngineBinaryPath("") != filepath.Join("/base", "bin", "llama-server") {
 		t.Fatalf("EngineBinaryPath = %q", l.EngineBinaryPath(""))
 	}
-	if l.EngineBundleDir("b9917") != "/base/engine/b9917" {
+	if l.EngineBundleDir("b9917") != filepath.Join("/base", "engine", "b9917") {
 		t.Fatalf("EngineBundleDir = %q", l.EngineBundleDir("b9917"))
 	}
-	if l.EngineBundleBinaryPath("b9917", "llama-b9917/llama-server") != "/base/engine/b9917/llama-b9917/llama-server" {
+	if l.EngineBundleBinaryPath("b9917", "llama-b9917/llama-server") != filepath.Join("/base", "engine", "b9917", "llama-b9917", "llama-server") {
 		t.Fatalf("EngineBundleBinaryPath = %q", l.EngineBundleBinaryPath("b9917", "llama-b9917/llama-server"))
 	}
-	if l.ModelPath("m.gguf") != "/base/models/m.gguf" {
+	if l.ModelPath("m.gguf") != filepath.Join("/base", "models", "m.gguf") {
 		t.Fatalf("ModelPath = %q", l.ModelPath("m.gguf"))
 	}
-	if l.TempDir() != "/base/tmp" {
+	if l.TempDir() != filepath.Join("/base", "tmp") {
 		t.Fatalf("TempDir = %q", l.TempDir())
 	}
-	if l.MetadataPath() != "/base/provision.json" {
+	if l.MetadataPath() != filepath.Join("/base", "provision.json") {
 		t.Fatalf("MetadataPath = %q", l.MetadataPath())
 	}
 }

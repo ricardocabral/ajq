@@ -77,7 +77,7 @@ func TestInstallDownloadSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm()&0o100 == 0 {
+	if !executableFile(plan.Engine.Path) {
 		t.Fatalf("engine binary not executable: %v", info.Mode())
 	}
 	gotModel, err := os.ReadFile(plan.Model.Path)

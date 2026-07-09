@@ -15,6 +15,7 @@ permissions:
 jobs:
   scorecard:
     name: OpenSSF Scorecard
+    if: github.event.repository.private == false
     runs-on: ubuntu-latest
     steps:
       - name: Run Scorecard

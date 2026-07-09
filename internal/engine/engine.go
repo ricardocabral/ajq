@@ -105,7 +105,7 @@ func (e *RuntimeError) Unwrap() error { return e.Err }
 func Execute(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Options) (result Result, err error) {
 	start := time.Now()
 	defer func() {
-		result.RunStats.Elapsed = time.Since(start)
+		result.RunStats.Elapsed = positiveDurationSince(start)
 	}()
 
 	rewrittenQuery, err := rewriteQuery(opts.Query)
@@ -262,4 +262,12 @@ func ctxErr(ctx context.Context) error {
 	default:
 		return nil
 	}
+}
+
+func positiveDurationSince(start time.Time) time.Duration {
+	elapsed := time.Since(start)
+	if elapsed <= 0 {
+		return time.Nanosecond
+	}
+	return elapsed
 }

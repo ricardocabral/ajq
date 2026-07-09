@@ -274,7 +274,7 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 	if err := mgr.EnsureRunning(ctx); err != nil {
 		return report, fmt.Errorf("cold start: %w", err)
 	}
-	report.ColdStart = time.Since(coldStart)
+	report.ColdStart = positiveDurationSince(coldStart)
 	defer func() {
 		if _, stopErr := mgr.Stop(context.Background()); stopErr != nil {
 			cleanupErr := fmt.Errorf("cleanup stop: %w", stopErr)
@@ -307,7 +307,7 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 	if _, err := sequentialBE.Judge(ctx, single); err != nil {
 		return report, fmt.Errorf("warm judgement: %w", err)
 	}
-	report.WarmLatency = time.Since(warmStart)
+	report.WarmLatency = positiveDurationSince(warmStart)
 
 	// Sequential and bounded-parallel throughput over the same distinct values.
 	batch := distinctBatch(w)
@@ -316,7 +316,7 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 	if _, err := sequentialBE.Judge(ctx, batch); err != nil {
 		return report, fmt.Errorf("sequential batch judge: %w", err)
 	}
-	report.SequentialBatchLatency = time.Since(sequentialStart)
+	report.SequentialBatchLatency = positiveDurationSince(sequentialStart)
 	if report.SequentialBatchLatency > 0 {
 		report.SequentialThroughput = float64(report.BatchJudgements) / report.SequentialBatchLatency.Seconds()
 	}
@@ -327,7 +327,7 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 	if _, err := parallelBE.Judge(ctx, batch); err != nil {
 		return report, fmt.Errorf("parallel batch judge: %w", err)
 	}
-	report.ParallelBatchLatency = time.Since(parallelStart)
+	report.ParallelBatchLatency = positiveDurationSince(parallelStart)
 	if report.ParallelBatchLatency > 0 {
 		report.ParallelThroughput = float64(report.BatchJudgements) / report.ParallelBatchLatency.Seconds()
 	}
@@ -343,7 +343,7 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 	if err := resolveThroughCache(ctx, parallelBE, store, batch); err != nil {
 		return report, fmt.Errorf("cache replay: %w", err)
 	}
-	report.CachedBatchLatency = time.Since(cacheStart)
+	report.CachedBatchLatency = positiveDurationSince(cacheStart)
 
 	return report, nil
 }

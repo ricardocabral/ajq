@@ -121,7 +121,9 @@ func TestPureJQLiveDifferentialAgainstJQ(t *testing.T) {
 		t.Run(fixture.Name, func(t *testing.T) {
 			ajq := runAJQFixture(t, fixture)
 			live := runLiveJQFixture(t, jqPath, fixture)
-			if ajq.stdout != live.stdout {
+			ajqStdout := normalizeProcessLineEndings(ajq.stdout)
+			liveStdout := normalizeProcessLineEndings(live.stdout)
+			if ajqStdout != liveStdout {
 				t.Errorf("stdout differs from live jq for %s\nquery: %s\nargs: %v\n--- ajq\n%q\n+++ jq\n%q", fixture.Name, fixture.Query, fixture.Args, ajq.stdout, live.stdout)
 			}
 			if ajq.exit != live.exit {
@@ -164,6 +166,10 @@ func runAJQFixture(t *testing.T, fixture testharness.Fixture) cliResult {
 		Stderr: &stderr,
 	}, args)
 	return cliResult{stdout: stdout.String(), exit: cli.ExitCode(err)}
+}
+
+func normalizeProcessLineEndings(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
 }
 
 // runLiveJQFixture executes the installed jq CLI for a fixture using the same

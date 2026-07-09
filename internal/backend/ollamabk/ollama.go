@@ -268,10 +268,15 @@ func actionableTransportError(err error) error {
 
 func isConnectionRefused(err error) bool {
 	var opErr *net.OpError
-	if errors.As(err, &opErr) && strings.Contains(strings.ToLower(opErr.Err.Error()), "connection refused") {
+	if errors.As(err, &opErr) && connectionRefusedText(opErr.Err.Error()) {
 		return true
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "connection refused")
+	return connectionRefusedText(err.Error())
+}
+
+func connectionRefusedText(text string) bool {
+	lower := strings.ToLower(text)
+	return strings.Contains(lower, "connection refused") || strings.Contains(lower, "actively refused")
 }
 
 func actionableStatusError(st *statusError, model string) error {

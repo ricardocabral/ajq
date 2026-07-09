@@ -91,7 +91,7 @@ func timeExecute(ctx context.Context, w Workload) (time.Duration, error) {
 	}
 	start := time.Now()
 	_, err := engine.Execute(ctx, bytes.NewReader(w.Input), io.Discard, opts)
-	elapsed := time.Since(start)
+	elapsed := positiveDurationSince(start)
 	if err != nil {
 		return 0, fmt.Errorf("bench workload %q: %w", w.Name, err)
 	}
@@ -109,4 +109,12 @@ func RunFakeSet(ctx context.Context, workloads []Workload) ([]Metrics, error) {
 		out = append(out, m)
 	}
 	return out, nil
+}
+
+func positiveDurationSince(start time.Time) time.Duration {
+	elapsed := time.Since(start)
+	if elapsed <= 0 {
+		return time.Nanosecond
+	}
+	return elapsed
 }

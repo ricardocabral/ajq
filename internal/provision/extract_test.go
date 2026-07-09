@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -125,7 +126,7 @@ func TestExtractTarGzHappyPathPreservesExecutableBit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o755 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o755 {
 		t.Fatalf("mode = %v, want 0755", info.Mode().Perm())
 	}
 }
@@ -248,7 +249,7 @@ func TestExtractArchiveSymlinkEntryDoesNotWriteOutsideRoot(t *testing.T) {
 		tarEntry{name: "dir", typeflag: tar.TypeSymlink, linkname: outside},
 		tarEntry{name: "dir/pwned", body: []byte("owned")},
 	)
-	if _, err := ExtractArchive(archive, dest, 1024); err == nil || !strings.Contains(err.Error(), "absolute symlink") {
+	if _, err := ExtractArchive(archive, dest, 1024); err == nil || !strings.Contains(err.Error(), "symlink") {
 		t.Fatalf("expected symlink rejection, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(outside, "pwned")); !os.IsNotExist(err) {
