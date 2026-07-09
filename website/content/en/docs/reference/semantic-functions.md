@@ -15,10 +15,10 @@ constructs. ajq adds only the `=~` and `!~` surface sugar before parsing.
 |---|---|---|---|---|
 | `sem_match` | `sem_match(value; "spec")` | predicate | boolean | Shipped |
 | `sem_classify` | `sem_classify(value; "a"; "b"; …)` | bounded value | one label from the given labels | Shipped |
-| `sem_extract` | `sem_extract(value; "what")` | unbounded value | string | Registered/planned; current execution errors until safe unbounded fallback ships |
-| `sem_score` | `sem_score(value; "spec")` | unbounded value | number | Registered/planned; current execution errors until safe unbounded fallback ships |
-| `sem_norm` | `sem_norm(value; "canonicalization spec")` | unbounded value | string | Registered/planned; current execution support is limited; avoid in user workflows |
-| `sem_redact` | `sem_redact(value; "redaction spec")` | unbounded value | string | Registered/planned; current execution errors until safe unbounded fallback ships |
+| `sem_extract` | `sem_extract(value; "what")` | unbounded value | string | Registered, but standalone three-phase execution currently reports unsupported |
+| `sem_score` | `sem_score(value; "spec")` | unbounded value | number | Limited: supported in `sort_by(...)` three-phase placeholder mode and in gated/interleaved fallback contexts |
+| `sem_norm` | `sem_norm(value; "canonicalization spec")` | unbounded value | string | Limited: supported in `group_by(...)` three-phase placeholder mode and in gated/interleaved fallback contexts |
+| `sem_redact` | `sem_redact(value; "redaction spec")` | unbounded value | string | Registered, but standalone three-phase execution currently reports unsupported |
 
 The **spec** is a literal string in the query. Stream **data** is structurally fenced by
 the selected backend's output constraints.
@@ -29,7 +29,7 @@ the selected backend's output constraints.
 |---|---|
 | Predicate | Returns `true` or `false`; typically used in `select` or `if`. |
 | Bounded value | Returns one of a finite set declared at the call site. |
-| Unbounded value | Returns a string or number with no finite output set. These are the shapes still limited in the current executor. |
+| Unbounded value | Returns a string or number with no finite output set. These shapes need bounded executor contexts or interleaved fallback; unsupported forms fail loudly. |
 
 ## Variadic implicit `.`
 
@@ -79,9 +79,19 @@ That expression returns one of `"billing"`, `"bug"`, or `"feature"`.
 | Fuzzy filter | `select(.msg =~ "auth failure")` | Shipped |
 | Raw-line fuzzy filter | `select(. =~ "stack trace")` with `-R` | Shipped |
 | Routing / labeling | `{route: sem_classify(.text; "billing"; "bug"; "feature")}` | Shipped |
-| Typed extraction | `sem_extract(.raw; "years")` | Planned execution support; currently errors |
-| Semantic scoring | `sem_score(.review; "positivity 0-1")` | Planned execution support; currently errors |
-| Semantic redaction | `.notes |= sem_redact(.; "PII")` | Planned execution support; currently errors |
+| Semantic sort key | `sort_by(sem_score(.review; "positivity"))` | Limited, supported three-phase placeholder mode |
+| Semantic grouping key | `group_by(sem_norm(.company; "canonical name"))` | Limited, supported three-phase placeholder mode |
+| Gated semantic score | `select(sem_score(.review; "positivity") > 0.8)` | Limited, uses interleaved fallback |
+| Typed extraction | `sem_extract(.raw; "years")` | Registered but currently unsupported in standalone three-phase execution |
+| Semantic redaction | `.notes |= sem_redact(.; "PII")` | Registered but currently unsupported in standalone three-phase execution |
+
+`sem_score` and `sem_norm` are not general-purpose enrichment operators in 0.0.1. Use
+`sem_score` as a `sort_by(...)` key and `sem_norm` as a `group_by(...)` key when you want
+the three-phase executor. When an unbounded value result is used to prune control flow,
+such as a score comparison inside `select` or `if`, ajq may choose an interleaved fallback
+instead of the harvest/resolve/execute path. That fallback is bounded by the same backend,
+cache, and `--max-calls` controls, but its call count is not available as a three-phase
+harvest estimate.
 
 ## Current grammar scope
 

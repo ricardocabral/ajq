@@ -112,9 +112,14 @@ Present when valid stdin was supplied and the mock harvest path can estimate the
 
 If stdin is empty or invalid, or the query uses a semantic execution shape the current
 executor cannot safely estimate/execute, the static plan is still printed and
-`estimate_status` is marked unavailable with a reason. Unbounded value operators such as
-`sem_extract`, `sem_score`, and `sem_redact` are examples of shapes with current execution
-limits.
+`estimate_status` is marked unavailable with a reason.
+
+The important distinction is execution mode. `sem_score` in `sort_by(...)` and `sem_norm`
+in `group_by(...)` can use the three-phase placeholder path. Gated unbounded value shapes,
+such as `select(sem_score(.review; "positivity") > 0.8)`, can use interleaved fallback;
+their estimate status is unavailable because ajq resolves values as execution reaches
+them rather than harvesting a complete up-front set. Standalone `sem_extract` and
+`sem_redact` are registered but currently fail as unsupported in three-phase execution.
 
 ## Related
 

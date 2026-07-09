@@ -18,7 +18,48 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-07-09
+
 ### Added
 
-- Added this changelog so future release notes follow Keep a Changelog and
-  Semantic Versioning conventions.
+- Initial public release of `ajq`, a jq-like CLI that keeps ordinary jq
+  execution byte-deterministic and calls model backends only for explicit
+  semantic operations.
+- Deterministic JSON, NDJSON, raw-input, and null-input execution through
+  `gojq`, including jq-style output modes and exit-status behavior.
+- Semantic planning, split execution, `--explain` output, model-call estimates,
+  deduplicated judgements, persistent judgement caching, and `--stats` runtime
+  counters.
+- `sem_match` and bounded `sem_classify`, plus jq-aware `=~` and `!~` sugar for
+  fuzzy filters.
+- Limited unbounded value support for `sem_score` in `sort_by(...)`, `sem_norm`
+  in `group_by(...)`, and gated unbounded value operations through interleaved
+  fallback.
+- Semantic backends for deterministic mock runs, managed local llama.cpp,
+  Ollama, OpenAI, OpenRouter, and Anthropic.
+- Cost controls for semantic work, including `--max-calls`, `--no-cache`,
+  cache-aware planning, and a default 100-call cap for paid/cloud backends.
+- Local provisioning with `ajq provision` for the llama.cpp engine and default
+  GGUF model, plus `ajq models list|pull|use` for checksum-pinned catalog
+  models.
+- Checksummed release archives, a checksum-verifying install script, Homebrew
+  cask publishing to `ricardocabral/tap`, and public website
+  documentation for install, quick-start, CLI, semantic functions, split
+  execution, cache, provisioning, and backends.
+
+### Changed
+
+- Pure jq paths are intentionally separate from semantic execution: they do not
+  construct backends, make network calls, or spawn the local daemon.
+- `sem_extract` and `sem_redact` are registered and visible to the planner, but
+  standalone three-phase execution currently fails loudly as unsupported instead
+  of producing unsafe placeholder output.
+- Scale-out windowing and a top-level `--stream` mode remain planned for later
+  releases.
+
+### Security
+
+- Install and provisioning flows verify checksums and reject unsafe archive paths
+  before extracting local assets.
+- API keys for paid/cloud providers are environment-only and are not required for
+  pure jq or mock-backend runs.

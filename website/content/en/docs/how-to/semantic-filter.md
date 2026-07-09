@@ -68,9 +68,18 @@ Use a fixed label set when downstream jq should route records deterministically 
 ## Stay with shipped execution shapes
 
 The current executor fully supports predicate matching (`=~` / `sem_match`) and bounded
-classification (`sem_classify`). Unbounded value operators such as `sem_extract`,
-`sem_score`, and `sem_redact` are visible in the planner but still have execution limits;
-avoid them in production recipes until their fallback support ships.
+classification (`sem_classify`). Unbounded value operators have narrower contracts in
+0.0.1:
+
+- Use `sort_by(sem_score(...))` when you need a semantic score as a sort key.
+- Use `group_by(sem_norm(...))` when you need semantic normalization as a grouping key.
+- Score or normalization values that feed a pruning gate may run through interleaved
+  fallback instead of the three-phase harvest path.
+- Standalone `sem_extract(...)` and `sem_redact(...)` currently report unsupported in
+  three-phase execution.
+
+For production filters, prefer `sem_match` or `sem_classify` unless you specifically need
+one of the limited score/normalization shapes above.
 
 ## Check the plan first
 

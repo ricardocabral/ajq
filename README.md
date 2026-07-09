@@ -1,18 +1,20 @@
 # ajq
 
-`ajq` is `jq` for the AI era: a stream processor that keeps ordinary jq byte-deterministic and calls a language model only for fuzzy matching, classification, scoring, or extraction.
+`ajq` is `jq` for the AI era: a stream processor that keeps ordinary jq byte-deterministic and calls a language model only for explicit semantic operations such as fuzzy matching, classification, scoring, and normalization.
 
 ## Install
 
-Use the release script for prebuilt archives, or install from Go source:
+Use Homebrew, the release script for prebuilt archives, or Go source:
 
 ```bash
+brew install --cask ricardocabral/tap/ajq
 curl -fsSL https://raw.githubusercontent.com/ricardocabral/ajq/main/scripts/install.sh | sh
 # manual download: https://github.com/ricardocabral/ajq/releases/latest
 go install github.com/ricardocabral/ajq/cmd/ajq@latest
 ```
 
-A Homebrew formula is generated at release time, but the public tap is not live yet; use the release script, manual download, or Go source until `ricardocabral/homebrew-ajq` is published.
+The Homebrew cask is published to the public `ricardocabral/tap` tap by the
+release workflow.
 
 ## Status
 
@@ -66,7 +68,7 @@ make build
 make website-build
 ```
 
-`make bench-phase2-fake` runs the CI-safe benchmark harness with the deterministic mock backend. Real local-inference benchmarks are opt-in and require provisioned assets; see the website docs and `internal/bench` package for details.
+`make bench-phase2` runs the CI-safe benchmark harness with the deterministic mock backend. Real local-inference benchmarks are opt-in and require provisioned assets; see the website docs and `internal/bench` package for details.
 
 ## License
 

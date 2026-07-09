@@ -36,11 +36,36 @@ normalize_arch() {
   esac
 }
 
-archive_name() {
-  version=$1
+archive_name_from_checksums() {
+  checksums=$1
   os=$2
   arch=$3
-  printf 'ajq_%s_%s_%s.tar.gz' "$version" "$os" "$arch"
+  suffix="_${os}_${arch}.tar.gz"
+  if archive=$(awk -v suffix="$suffix" '
+    $2 ~ /^ajq_/ && substr($2, length($2) - length(suffix) + 1) == suffix {
+      print $2
+      count++
+    }
+    END {
+      if (count == 0) exit 1
+      if (count > 1) exit 2
+    }
+  ' "$checksums"); then
+    printf '%s' "$archive"
+  else
+    status=$?
+    if [ "$status" -eq 2 ]; then
+      fail "multiple checksum entries found for ajq_*_${os}_${arch}.tar.gz"
+    fi
+    fail "checksum entry not found for ajq_*_${os}_${arch}.tar.gz"
+  fi
+}
+
+release_ref() {
+  case "$AJQ_VERSION" in
+    latest | v*) printf '%s' "$AJQ_VERSION" ;;
+    *) printf 'v%s' "$AJQ_VERSION" ;;
+  esac
 }
 
 need_cmd() {
@@ -91,7 +116,7 @@ asset_url() {
   elif [ "$AJQ_VERSION" = "latest" ]; then
     printf 'https://github.com/%s/releases/latest/download/%s' "$AJQ_REPO" "$name"
   else
-    printf 'https://github.com/%s/releases/download/%s/%s' "$AJQ_REPO" "$AJQ_VERSION" "$name"
+    printf 'https://github.com/%s/releases/download/%s/%s' "$AJQ_REPO" "$(release_ref)" "$name"
   fi
 }
 
@@ -122,19 +147,15 @@ main() {
   os=$(normalize_os "${AJQ_TEST_OS:-}")
   arch=$(normalize_arch "${AJQ_TEST_ARCH:-}")
 
-  if [ "$AJQ_VERSION" = "latest" ] && [ -n "$AJQ_DOWNLOAD_BASE_URL" ]; then
-    fail "AJQ_VERSION must be set when AJQ_DOWNLOAD_BASE_URL is used"
-  fi
-
-  version=$AJQ_VERSION
-  archive=$(archive_name "$version" "$os" "$arch")
   tmp=${TMPDIR:-/tmp}/ajq-install.$$
   trap 'rm -rf "$tmp"' EXIT INT TERM
   mkdir -p "$tmp"
 
+  fetch "$(asset_url checksums.txt)" "$tmp/checksums.txt"
+  archive=$(archive_name_from_checksums "$tmp/checksums.txt" "$os" "$arch")
+
   log "Downloading $archive"
   fetch "$(asset_url "$archive")" "$tmp/$archive"
-  fetch "$(asset_url checksums.txt)" "$tmp/checksums.txt"
   verify_checksum "$tmp/checksums.txt" "$archive" "$tmp/$archive"
   install_archive "$tmp/$archive" "$AJQ_INSTALL_DIR" "$tmp"
   log "Installed ajq to $AJQ_INSTALL_DIR/ajq"

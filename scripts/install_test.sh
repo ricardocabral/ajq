@@ -36,6 +36,16 @@ assert_eq x86_64 "$(normalize_arch amd64)" "amd64 arch mapping"
 assert_eq arm64 "$(normalize_arch arm64)" "arm64 arch mapping"
 assert_eq arm64 "$(normalize_arch aarch64)" "aarch64 arch mapping"
 
+assert_eq "https://github.com/owner/repo/releases/download/v0.1.2/checksums.txt" \
+  "$(AJQ_REPO=owner/repo AJQ_DOWNLOAD_BASE_URL='' AJQ_VERSION=0.1.2 asset_url checksums.txt)" \
+  "bare explicit version URL mapping"
+assert_eq "https://github.com/owner/repo/releases/download/v0.1.2/checksums.txt" \
+  "$(AJQ_REPO=owner/repo AJQ_DOWNLOAD_BASE_URL='' AJQ_VERSION=v0.1.2 asset_url checksums.txt)" \
+  "tag explicit version URL mapping"
+assert_eq "https://github.com/owner/repo/releases/latest/download/checksums.txt" \
+  "$(AJQ_REPO=owner/repo AJQ_DOWNLOAD_BASE_URL='' AJQ_VERSION=latest asset_url checksums.txt)" \
+  "latest URL mapping"
+
 VERSION=9.9.9-next
 OS_NAME=Darwin
 ARCH_NAME=arm64
@@ -62,11 +72,35 @@ AJQ_TEST_ARCH=$ARCH_NAME \
 [[ -x "$INSTALL_DIR/ajq" ]] || fail "installer did not write executable"
 assert_eq "ajq 9.9.9-next" "$("$INSTALL_DIR/ajq")" "installed binary output"
 
+LATEST_VERSION=v10.0.0
+LATEST_ARCHIVE="ajq_${LATEST_VERSION}_${OS_NAME}_${ARCH_NAME}.tar.gz"
+LATEST_FIXTURE_DIR="$TMP_ROOT/latest-fixture"
+LATEST_DIST="$TMP_ROOT/latest-dist"
+LATEST_INSTALL_DIR="$TMP_ROOT/latest-install"
+mkdir -p "$LATEST_FIXTURE_DIR" "$LATEST_DIST" "$LATEST_INSTALL_DIR"
+cat >"$LATEST_FIXTURE_DIR/ajq" <<'SH'
+#!/usr/bin/env sh
+echo "ajq v10.0.0"
+SH
+chmod +x "$LATEST_FIXTURE_DIR/ajq"
+tar -C "$LATEST_FIXTURE_DIR" -czf "$LATEST_DIST/$LATEST_ARCHIVE" ajq
+sha256_write "$LATEST_DIST/$LATEST_ARCHIVE" "$LATEST_ARCHIVE" "$LATEST_DIST/checksums.txt"
+
+AJQ_VERSION=latest \
+AJQ_INSTALL_DIR=$LATEST_INSTALL_DIR \
+AJQ_DOWNLOAD_BASE_URL=$LATEST_DIST \
+AJQ_TEST_OS=$OS_NAME \
+AJQ_TEST_ARCH=$ARCH_NAME \
+  "$INSTALL_SH" >/"$TMP_ROOT/latest.out" 2>/"$TMP_ROOT/latest.err"
+
+[[ -x "$LATEST_INSTALL_DIR/ajq" ]] || fail "latest installer did not write executable"
+assert_eq "ajq v10.0.0" "$("$LATEST_INSTALL_DIR/ajq")" "latest installed binary output"
+
 BAD_DIST="$TMP_ROOT/bad-dist"
 mkdir -p "$BAD_DIST"
-cp "$DIST_DIR/$ARCHIVE" "$BAD_DIST/$ARCHIVE"
-printf '0000000000000000000000000000000000000000000000000000000000000000  %s\n' "$ARCHIVE" >"$BAD_DIST/checksums.txt"
-if AJQ_VERSION=$VERSION \
+cp "$LATEST_DIST/$LATEST_ARCHIVE" "$BAD_DIST/$LATEST_ARCHIVE"
+printf '0000000000000000000000000000000000000000000000000000000000000000  %s\n' "$LATEST_ARCHIVE" >"$BAD_DIST/checksums.txt"
+if AJQ_VERSION=latest \
   AJQ_INSTALL_DIR="$TMP_ROOT/bad-install" \
   AJQ_DOWNLOAD_BASE_URL=$BAD_DIST \
   AJQ_TEST_OS=$OS_NAME \

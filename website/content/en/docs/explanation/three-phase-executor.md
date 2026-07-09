@@ -58,9 +58,25 @@ values.
 
 A value-producing operator whose result feeds a pruning gate needs special care. Bounded
 enums such as `sem_classify` can harvest all possible labels, so downstream survivors are
-a safe superset. Unbounded values such as extraction, free-form redaction, and scoring do
-not have a finite safe set; the current executor reports unsupported shapes instead of
-silently producing wrong output.
+a safe superset. Unbounded values do not have a finite safe set, so ajq does not pretend
+every shape can be harvested safely.
+
+In 0.0.1, unbounded support is deliberately narrow:
+
+- `sem_score` is supported by the three-phase executor as a `sort_by(...)` key, where ajq
+  can harvest placeholder values for the sort key and then execute with resolved scores.
+- `sem_norm` is supported by the three-phase executor as a `group_by(...)` key, using the
+  same placeholder pattern for grouping.
+- When an unbounded value result feeds a gate, such as `select(sem_score(.review;
+  "positivity") > 0.8)`, ajq can choose an interleaved fallback. That mode resolves values
+  as the jq program reaches them instead of providing a harvest/dedup estimate up front.
+- Standalone `sem_extract` and `sem_redact` currently fail as unsupported in three-phase
+  execution.
+
+This means docs and scripts should distinguish "unsupported in three-phase harvest" from
+"always unsupported." Gated unbounded value operators are not all rejected; supported
+fallback shapes still obey backend selection, cache identity, and `--max-calls`, but they
+do not have the same up-front estimate as the three-phase path.
 
 An execute-phase cache miss is a loud error. That backstop turns planner or cache gaps into
 failures rather than silent data loss.

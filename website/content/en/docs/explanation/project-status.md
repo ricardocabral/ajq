@@ -25,8 +25,10 @@ script. Scale-out windowing/streaming remains planned.
 - **`=~` / `!~` desugaring** — a jq-aware lexer rewrites fuzzy match syntax into
   `sem_match(...)` calls.
 - **Supported semantic execution** — `sem_match` and bounded `sem_classify` run through the
-  split executor. Unbounded value operators are visible to the planner but remain limited
-  until safe fallback execution ships.
+  split executor. `sem_score` is supported as a `sort_by(...)` key, `sem_norm` is
+  supported as a `group_by(...)` key, and gated unbounded value use can run through
+  interleaved fallback. Standalone `sem_extract` and `sem_redact` are registered but
+  currently fail as unsupported in three-phase execution.
 - **Three-phase executor** — harvest / resolve / execute with deduplication and cache
   identity based on op, spec, model, and canonical value.
 - **Local inference** — a lazy `llama-server` daemon with idle timeout and
@@ -43,8 +45,8 @@ script. Scale-out windowing/streaming remains planned.
   `<cache>/judgements/`, can be bypassed with `--no-cache`, inspected with
   `ajq cache status`, and removed with `ajq cache clear`.
 - **Release packaging** — GoReleaser builds checksummed archives and the install script
-  verifies `checksums.txt`. A Homebrew formula is generated; public tap publishing is
-  pending external repository/token setup.
+  verifies `checksums.txt`. The release pipeline publishes a Homebrew cask to the
+  public `ricardocabral/tap` tap.
 
 ## Roadmap
 
@@ -55,11 +57,11 @@ polish.
 | Phase | Focus | Status |
 |---|---|---|
 | **0 — Deterministic spine** | CLI, framing, pure-jq wrapper, `--explain`, golden harness. | ✅ Shipped |
-| **1 — Split-execution core** | Planner, desugar, semantic predicates, bounded classification, guarded executor. | ✅ Shipped with unbounded value-op limits |
+| **1 — Split-execution core** | Planner, desugar, semantic predicates, bounded classification, guarded executor. | ✅ Shipped with explicit unbounded value-op limits |
 | **2 — Local inference** | `llama-server` backend, daemon lifecycle, GBNF/schema constraints, provisioning. | ✅ Shipped |
 | **3 — Backends & cloud** | Ollama, OpenAI/OpenRouter, Anthropic, config/env selection, cost controls. | ✅ Shipped |
 | **4 — Scale & chunking** | Windowed execution and richer streaming remain planned; persistent cache and bounded local parallelism are shipped. | 🟡 Partial |
-| **5 — Polish & distribution** | Models subcommand and release archives/install script are shipped; Homebrew tap, standalone build, GPU auto-detect, richer vocabulary, and additional package managers remain planned. | 🟡 Partial |
+| **5 — Polish & distribution** | Models subcommand, release archives/install script, and Homebrew tap publishing are shipped; standalone build, GPU auto-detect, richer vocabulary, and additional package managers remain planned. | 🟡 Partial |
 
 ## Follow along
 
