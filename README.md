@@ -6,9 +6,10 @@ Use it when you need to classify JSON streams, find records by meaning instead o
 
 ## Usage
 
-Start with `ajq --help` to see the same safe probe workflow in the CLI. For
-coding agents, `--backend mock` is the deterministic, no-network, no-model path
-to exercise semantic query syntax before selecting a real backend.
+Start with `ajq --help`, then run `ajq examples` for categorized, copy-pasteable
+safe workflows. For coding agents, `--backend mock` is the deterministic,
+no-network, no-model path to exercise semantic query syntax before selecting a
+real backend.
 
 ```bash
 # Help and version

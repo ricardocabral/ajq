@@ -46,8 +46,12 @@ precedence.
 
 ## Help-first agent probe
 
-Start with `ajq --help` when exploring the CLI. Its examples show the three
-safe first workflows:
+Start with `ajq --help`, then run `ajq examples` for categorized, copy-pasteable
+safe workflows. `ajq examples [topic]` can show one of `pure-jq`,
+`semantic-filter`, `explain`, `classification`, or `ndjson`; its semantic
+commands explicitly use `--backend mock` and therefore need no model, network,
+or API key. It is the source of the detailed snippets; this reference keeps
+only the workflow overview. The root help shows the same three safe first workflows:
 
 ```bash
 # Pure jq remains deterministic and does not construct a backend.
@@ -81,6 +85,7 @@ model.
 | `ajq cache status` | Print persistent judgement cache location, entry count, and bytes. |
 | `ajq cache clear` | Delete persistent judgement cache entries and report what was freed. |
 | `ajq daemon status` | Print the warm local daemon status. |
+| `ajq examples [topic]` | Print categorized safe examples; semantic examples explicitly use `--backend mock`. |
 | `ajq daemon stop` | Stop the local daemon if running; idempotent. |
 | `ajq models list` | Print the pinned local model catalog with active/installed markers, sizes, and RAM notes. |
 | `ajq models pull <name>` | Download a checksum-pinned catalog model into the ajq cache. |

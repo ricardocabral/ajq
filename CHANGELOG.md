@@ -20,6 +20,7 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added `ajq examples [topic]` for categorized, copy-pasteable safe CLI workflows; semantic snippets explicitly use the deterministic `--backend mock`.
 - Added copy-pasteable root and discovery-command help examples, including the
   deterministic `--backend mock` agent probe and `--explain` plan workflow.
 - Added problem-first how-to guides for filtering JSON by meaning, classifying

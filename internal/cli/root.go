@@ -244,6 +244,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "disable persistent on-disk judgement cache for this run")
 
 	cmd.AddCommand(newCacheCommand())
+	cmd.AddCommand(newExamplesCommand())
 	cmd.AddCommand(newDaemonCommand(opts))
 	cmd.AddCommand(newModelsCommand(opts))
 	cmd.AddCommand(newProvisionCommand(opts))
