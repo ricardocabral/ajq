@@ -19,6 +19,10 @@ tool yet.
 
 ## Start here
 
+After `ajq --help`, run `ajq examples` for safe copy-paste commands. Semantic
+examples explicitly use `--backend mock`, so they require no API key, network,
+provisioning, or local model.
+
 - [Website home](https://ricardocabral.github.io/ajq/): Product overview, split-execution summary, comparison, and performance notes.
 - [Documentation index](https://ricardocabral.github.io/ajq/docs/): Entry point for tutorials, how-to guides, reference pages, and design explanations.
 - [Install ajq](https://ricardocabral.github.io/ajq/docs/how-to/install/): Release install script, Go install fallback, and local backend provisioning.
