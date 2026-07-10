@@ -178,7 +178,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 				mode = input.ModeRaw
 			}
 
-			semanticBackend, semanticCache, semanticModel, resolvedMaxCalls, maxCallsDefaultPaid, paidBackend, maxOutputTokens, err := resolveBackendForQuery(cmd, query, flagValues, opts)
+			resolution, err := resolveBackendForQuery(cmd, query, flagValues, opts)
 			if err != nil {
 				return &ExitError{Code: 2, Err: err}
 			}
@@ -191,11 +191,11 @@ exercise semantic query syntax without a model, network access, or API key.`,
 					Raw:     rawOutput,
 				},
 				ExitStatus:          exitStatus,
-				Backend:             semanticBackend,
-				SemanticModelID:     semanticModel,
-				SemanticCache:       semanticCache,
-				MaxCalls:            resolvedMaxCalls,
-				MaxCallsDefaultPaid: maxCallsDefaultPaid,
+				Backend:             resolution.Backend,
+				SemanticModelID:     resolution.Model,
+				SemanticCache:       resolution.Cache,
+				MaxCalls:            resolution.MaxCalls,
+				MaxCallsDefaultPaid: resolution.MaxCallsDefaultPaid,
 			})
 			if err != nil {
 				code := 1
@@ -210,7 +210,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 				return &ExitError{Code: code, Err: fmt.Errorf("query %q %w", query, err)}
 			}
 			if statsMode {
-				if err := printRunStats(cmd.ErrOrStderr(), result.RunStats, paidBackend, semanticModel, len(query), maxOutputTokens); err != nil {
+				if err := printRunStats(cmd.ErrOrStderr(), result.RunStats, resolution.Paid, resolution.Model, len(query), resolution.DefaultMaxOutputTokens); err != nil {
 					return &ExitError{Code: 1, Err: err}
 				}
 			}
@@ -300,46 +300,64 @@ func validateExplicitBackend(flags config.Values) error {
 	return nil
 }
 
-func resolveBackendForQuery(cmd *cobra.Command, query string, flags config.Values, opts Options) (backend.Backend, *semanticcache.Store, string, int, bool, bool, int, error) {
+type backendResolution struct {
+	Backend                backend.Backend
+	Cache                  *semanticcache.Store
+	Model                  string
+	MaxCalls               int
+	MaxCallsDefaultPaid    bool
+	Paid                   bool
+	DefaultMaxOutputTokens int
+}
+
+func resolveBackendForQuery(cmd *cobra.Command, query string, flags config.Values, opts Options) (backendResolution, error) {
 	requiresBackend := queryRequiresBackend(query)
 	if !requiresBackend {
-		return nil, nil, "", 0, false, false, 0, nil
+		return backendResolution{}, nil
 	}
 
 	fileValues, err := config.LoadWithOptions(config.LoadOptions{Stderr: cmd.ErrOrStderr()})
 	if err != nil {
-		return nil, nil, "", 0, false, false, 0, err
+		return backendResolution{}, err
 	}
 	envValues, err := config.Env(os.Getenv)
 	if err != nil {
-		return nil, nil, "", 0, false, false, 0, err
+		return backendResolution{}, err
 	}
 	settings := config.Resolve(flags, envValues, fileValues, config.Values{})
 	if settings.Backend == "" {
-		return nil, nil, "", 0, false, false, 0, noBackendError()
+		return backendResolution{}, noBackendError()
 	}
 	registration, ok := lookupBackend(settings.Backend)
 	if !ok {
-		return nil, nil, "", 0, false, false, 0, unknownBackendError(settings.Backend)
+		return backendResolution{}, unknownBackendError(settings.Backend)
 	}
 	settings = config.Resolve(flags, envValues, fileValues, registration.defaults())
 	if settings.MaxCalls < 0 {
-		return nil, nil, "", 0, false, false, 0, fmt.Errorf("max_calls must be non-negative")
+		return backendResolution{}, fmt.Errorf("max_calls must be non-negative")
 	}
 	semanticBackend, _, err := registration.Construct(opts, settings)
 	if err != nil {
-		return nil, nil, "", 0, false, false, 0, err
+		return backendResolution{}, err
 	}
 	semanticCache := semanticStoreForSettings(settings)
 	semanticModel := settings.Model
 	if registration.ModelIdentity != nil {
 		semanticModel, err = registration.ModelIdentity(settings)
 		if err != nil {
-			return nil, nil, "", 0, false, false, 0, err
+			return backendResolution{}, err
 		}
 	}
 	defaultPaidCap := registration.Paid && registration.DefaultMaxCalls > 0 && !flags.MaxCallsSet && !envValues.MaxCallsSet && !fileValues.MaxCallsSet
-	return semanticBackend, semanticCache, semanticModel, settings.MaxCalls, defaultPaidCap, registration.Paid, registration.DefaultMaxOutputTokens, nil
+	return backendResolution{
+		Backend:                semanticBackend,
+		Cache:                  semanticCache,
+		Model:                  semanticModel,
+		MaxCalls:               settings.MaxCalls,
+		MaxCallsDefaultPaid:    defaultPaidCap,
+		Paid:                   registration.Paid,
+		DefaultMaxOutputTokens: registration.DefaultMaxOutputTokens,
+	}, nil
 }
 
 func queryRequiresBackend(query string) bool {
