@@ -42,9 +42,11 @@ func resolveProvisionController(opts Options) ProvisionController {
 func newProvisionCommand(opts Options) *cobra.Command {
 	var checkOnly bool
 	cmd := &cobra.Command{
-		Use:           "provision",
-		Short:         "download or locate the local llama-server engine and default model",
-		Long:          "Provision the local inference assets used by --backend local: a platform-appropriate llama-server engine and the default GGUF model, cached under ~/.cache/ajq. Already-present assets (including a Homebrew llama-server on PATH or a previously cached model) are detected and left untouched.",
+		Use:   "provision",
+		Short: "download or locate the local llama-server engine and default model",
+		Long:  "Provision the local inference assets used by --backend local: a platform-appropriate llama-server engine and the default GGUF model, cached under ~/.cache/ajq. Already-present assets (including a Homebrew llama-server on PATH or a previously cached model) are detected and left untouched.",
+		Example: `  # Safely inspect whether local assets are installed; does not download.
+  ajq provision --check`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,

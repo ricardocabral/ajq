@@ -44,6 +44,36 @@ See [Input and output modes](../io-modes/) for framing and formatting details, [
 for backend-specific defaults, and [Configuration](../configuration/) for env/config
 precedence.
 
+## Help-first agent probe
+
+Start with `ajq --help` when exploring the CLI. Its examples show the three
+safe first workflows:
+
+```bash
+# Pure jq remains deterministic and does not construct a backend.
+printf '{"users":[{"name":"Ada"}]}' | ajq -r '.users[].name'
+
+# --backend mock is the safe semantic-agent probe: deterministic, no model,
+# no network access, and no API key.
+printf '[{"id":1,"msg":"please keep this"}]' \
+  | ajq --backend mock -c '.[] | select(.msg =~ "keep") | .id'
+
+# Review the semantic plan and estimated backend calls before execution.
+printf '[{"msg":"refund demanded"}]' \
+  | ajq --backend mock --explain '.[] | select(.msg =~ "angry/frustrated") | .msg'
+```
+
+The `mock` backend is appropriate for checking query shape and split-execution
+behavior; it is not a substitute for evaluating a query's semantic quality on
+a production model. `--explain` exits before query execution and does not
+contact a model backend.
+
+Discovery command help also includes safe inspection examples: `ajq provision
+--check` reports missing local assets without downloading them, `ajq models
+list` shows local model availability, `ajq cache status` inspects the local
+judgement cache, and `ajq daemon status` checks daemon state without starting a
+model.
+
 ## Subcommands
 
 | Command | Description |
