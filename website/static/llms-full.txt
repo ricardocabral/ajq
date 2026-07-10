@@ -1,0 +1,137 @@
+# ajq — expanded public context
+
+> ajq is a Go CLI for semantic jq workflows. It keeps ordinary jq execution
+> byte-deterministic and makes semantic work explicit, bounded, and observable.
+
+This checked-in context artifact is curated only from public ajq repository
+material. It contains no private task, internal planning, credential, or model
+provider response data. For current source material, use the public links in
+the sections below.
+
+## README and quick start
+
+ajq is useful when literal jq filters are insufficient for JSON or NDJSON text,
+but structural selection and output must remain predictable. Pure jq queries do
+not initialize a backend or make model calls.
+
+```bash
+# Discover commands and safe agent workflows.
+ajq --help
+ajq capabilities --json
+ajq examples
+
+# Pure jq is deterministic and requires no semantic backend.
+printf '{"users":[{"name":"Ada"}]}' | ajq -r '.users[].name'
+
+# A deterministic, no-network semantic query shape check.
+printf '[{"id":1,"msg":"please keep this"}]' \
+  | ajq --backend mock -c '.[] | select(.msg =~ "keep") | .id'
+```
+
+- [README](https://raw.githubusercontent.com/ricardocabral/ajq/main/README.md)
+- [Install ajq](https://ricardocabral.github.io/ajq/docs/how-to/install/)
+- [First deterministic pipeline](https://ricardocabral.github.io/ajq/docs/tutorials/first-pipeline/)
+
+## Safe agent workflow and core execution concepts
+
+1. Run `ajq --help` for human command discovery and `ajq capabilities --json`
+   for the versioned machine-readable capability contract. Capabilities is static
+   introspection: it does not load credentials, construct a backend, provision
+   assets, or contact a network.
+2. Run `ajq examples` for categorized copy-pasteable workflows.
+3. Check a semantic query's jq shape with `--backend mock`. Mock is
+   deterministic and does not use a network, cloud credentials, or local model
+   assets. It cannot establish semantic quality on a production model.
+4. Use representative input with `--explain` to inspect semantic call sites and
+   estimated post-dedup judgements. `--explain` exits without executing against
+   a configured model/provider backend.
+5. Select a real backend explicitly only after review, and set a finite
+   `--max-calls` cap appropriate to the task.
+
+Semantic work is explicit in the jq query and is cache-keyed by backend, model,
+operation/spec, and canonical value. The pure jq path stays byte-reproducible.
+
+- [Agent-safe semantic workflow](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/)
+- [Split execution](https://ricardocabral.github.io/ajq/docs/explanation/split-execution/)
+- [Determinism contract](https://ricardocabral.github.io/ajq/docs/explanation/determinism/)
+- [Three-phase executor](https://ricardocabral.github.io/ajq/docs/explanation/three-phase-executor/)
+
+## CLI discovery, examples, and planning
+
+`ajq capabilities --json` is the stable machine contract. Consumers should use
+its `schema_version` as the contract discriminator and ignore unknown fields
+and future enum values for compatible v1 builds. `ajq examples [topic]` provides
+safe examples for `pure-jq`, `semantic-filter`, `explain`, `classification`,
+and `ndjson`; semantic examples explicitly select `--backend mock`.
+
+```bash
+# Explain a representative semantic query before a model run.
+printf '[{"msg":"refund requested"},{"msg":"profile updated"}]' \
+  | ajq --explain '.[] | select(.msg =~ "refund request") | .msg'
+
+# Explicit real backend execution: set a finite cap and observe the result.
+printf '[{"msg":"refund requested"}]' \
+  | ajq --backend local --max-calls 10 --stats \
+      -c '.[] | select(.msg =~ "refund request") | .msg'
+```
+
+`--max-calls` caps post-dedup backend judgements; paid backends default to 100
+but agents should set an explicit cap. `--stats` reports workload and cache
+observations after a successful run.
+
+- [CLI reference](https://ricardocabral.github.io/ajq/docs/reference/cli/)
+- [`--explain` output reference](https://ricardocabral.github.io/ajq/docs/reference/explain-output/)
+- [Estimate model calls](https://ricardocabral.github.io/ajq/docs/how-to/estimate-model-calls/)
+- [Control semantic costs](https://ricardocabral.github.io/ajq/docs/how-to/control-costs/)
+
+## Semantic functions and supported limits
+
+The shipped semantic surfaces are fuzzy matching (`=~`, `!~`, and `sem_match`)
+and bounded `sem_classify`. Use semantic filters to find JSON records by meaning
+and classification to route values into fixed labels.
+
+```bash
+printf '[{"id":1,"msg":"payment failed"}]' \
+  | ajq --backend mock -c '.[] | select(.msg =~ "payment failure") | {id, msg}'
+
+printf '{"id":1,"msg":"billing question"}\n' \
+  | ajq --backend mock -c '{id, route: sem_classify(.msg; "billing"; "bug"; "account")}'
+```
+
+Do not present `sem_extract` or `sem_redact` as general-purpose supported
+transforms. Their unbounded value-operator contexts remain limited and fail
+loudly outside documented gated/interleaved execution shapes.
+
+- [Filter JSON by meaning](https://ricardocabral.github.io/ajq/docs/how-to/filter-json-by-meaning/)
+- [Classify JSON and NDJSON streams](https://ricardocabral.github.io/ajq/docs/how-to/classify-json-streams/)
+- [Semantic functions reference](https://ricardocabral.github.io/ajq/docs/reference/semantic-functions/)
+- [Project status](https://ricardocabral.github.io/ajq/docs/explanation/project-status/)
+
+## Cache, privacy, and backend safety
+
+Successful semantic judgements are stored locally to reuse repeated work. Use
+`--no-cache` when private or one-off processing must bypass both persistent
+cache reads and writes; it is not a cost or call limit.
+
+```bash
+printf '[{"msg":"refund requested"}]' \
+  | ajq --backend mock --no-cache --stats \
+      '.[] | select(.msg =~ "refund request") | .msg'
+```
+
+Never put API keys in commands, logs, or checked-in files. Cloud credentials are
+read from environment variables. Pick a backend explicitly for real semantic
+work and retain a finite `--max-calls` guard. Pure jq operations need no backend.
+
+- [Manage the judgement cache](https://ricardocabral.github.io/ajq/docs/how-to/manage-the-cache/)
+- [Backends reference](https://ricardocabral.github.io/ajq/docs/reference/backends/)
+- [Configuration reference](https://ricardocabral.github.io/ajq/docs/reference/configuration/)
+- [Security policy](https://raw.githubusercontent.com/ricardocabral/ajq/main/SECURITY.md)
+
+## Public documentation index
+
+- [Documentation home](https://ricardocabral.github.io/ajq/docs/)
+- [How-to guides](https://ricardocabral.github.io/ajq/docs/how-to/)
+- [Reference](https://ricardocabral.github.io/ajq/docs/reference/)
+- [GitHub repository](https://github.com/ricardocabral/ajq)
+- [Releases](https://github.com/ricardocabral/ajq/releases)
