@@ -15,10 +15,10 @@ constructs. ajq adds only the `=~` and `!~` surface sugar before parsing.
 |---|---|---|---|---|
 | `sem_match` | `sem_match(value; "spec")` | predicate | boolean | Shipped |
 | `sem_classify` | `sem_classify(value; "a"; "b"; …)` | bounded value | one label from the given labels | Shipped |
-| `sem_extract` | `sem_extract(value; "what")` | unbounded value | string | Registered, but standalone three-phase execution currently reports unsupported |
+| `sem_extract` | `sem_extract(value; "what")` | unbounded value | string | Limited: supported only in gated/interleaved fallback contexts |
 | `sem_score` | `sem_score(value; "spec")` | unbounded value | number | Limited: supported in `sort_by(...)` three-phase placeholder mode and in gated/interleaved fallback contexts |
 | `sem_norm` | `sem_norm(value; "canonicalization spec")` | unbounded value | string | Limited: supported in `group_by(...)` three-phase placeholder mode and in gated/interleaved fallback contexts |
-| `sem_redact` | `sem_redact(value; "redaction spec")` | unbounded value | string | Registered, but standalone three-phase execution currently reports unsupported |
+| `sem_redact` | `sem_redact(value; "redaction spec")` | unbounded value | string | Limited: supported only in gated/interleaved fallback contexts |
 
 The **spec** is a literal string in the query. Stream **data** is structurally fenced by
 the selected backend's output constraints.
@@ -82,16 +82,17 @@ That expression returns one of `"billing"`, `"bug"`, or `"feature"`.
 | Semantic sort key | `sort_by(sem_score(.review; "positivity"))` | Limited, supported three-phase placeholder mode |
 | Semantic grouping key | `group_by(sem_norm(.company; "canonical name"))` | Limited, supported three-phase placeholder mode |
 | Gated semantic score | `select(sem_score(.review; "positivity") > 0.8)` | Limited, uses interleaved fallback |
-| Typed extraction | `sem_extract(.raw; "years")` | Registered but currently unsupported in standalone three-phase execution |
-| Semantic redaction | `.notes |= sem_redact(.; "PII")` | Registered but currently unsupported in standalone three-phase execution |
+| Gated typed extraction | `select(sem_extract(.raw; "years") != "")` | Limited, uses interleaved fallback |
+| Gated semantic redaction | `select(sem_redact(.notes; "PII") != .notes)` | Limited, uses interleaved fallback |
 
 `sem_score` and `sem_norm` are not general-purpose enrichment operators in 0.0.1. Use
 `sem_score` as a `sort_by(...)` key and `sem_norm` as a `group_by(...)` key when you want
-the three-phase executor. When an unbounded value result is used to prune control flow,
-such as a score comparison inside `select` or `if`, ajq may choose an interleaved fallback
-instead of the harvest/resolve/execute path. That fallback is bounded by the same backend,
-cache, and `--max-calls` controls, but its call count is not available as a three-phase
-harvest estimate.
+the three-phase executor. `sem_extract` and `sem_redact` have no supported three-phase
+context; use them only in a gated control-flow context. When an unbounded value result is
+used to prune control flow, such as a score comparison inside `select` or `if`, ajq may
+choose an interleaved fallback instead of the harvest/resolve/execute path. That fallback
+is bounded by the same backend, cache, and `--max-calls` controls, but its call count is
+not available as a three-phase harvest estimate.
 
 ## Current grammar scope
 
