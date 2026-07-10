@@ -115,11 +115,11 @@ type statusError struct {
 }
 
 func (e *statusError) Error() string {
-	body := strings.TrimSpace(e.Body)
-	if body == "" {
+	summary := promptkit.SanitizeProviderErrorBody(e.Body)
+	if summary == "" {
 		return fmt.Sprintf("provider returned status %d", e.Code)
 	}
-	return fmt.Sprintf("provider returned status %d: %s", e.Code, body)
+	return fmt.Sprintf("provider returned status %d (%s)", e.Code, summary)
 }
 
 // Warm is a no-op for remote OpenAI-compatible backends.
@@ -322,14 +322,14 @@ func (b *Backend) client() *http.Client {
 }
 
 func (b *Backend) authError(st *statusError) error {
-	body := strings.TrimSpace(st.Body)
-	if body != "" {
-		body = ": " + body
+	summary := promptkit.SanitizeProviderErrorBody(st.Body)
+	if summary != "" {
+		summary = " (" + summary + ")"
 	}
 	if strings.TrimSpace(b.APIKeyEnv) != "" {
-		return fmt.Errorf("provider authentication failed with status %d%s; check %s", st.Code, body, b.APIKeyEnv)
+		return fmt.Errorf("provider authentication failed with status %d%s; check %s", st.Code, summary, b.APIKeyEnv)
 	}
-	return fmt.Errorf("provider authentication failed with status %d%s; check API key", st.Code, body)
+	return fmt.Errorf("provider authentication failed with status %d%s; check API key", st.Code, summary)
 }
 
 func isRetryableStatus(code int) bool {
