@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -204,6 +205,12 @@ func TestCacheStatusJSONContract(t *testing.T) {
 	var unavailable map[string]any
 	if err := json.Unmarshal([]byte(stdout), &unavailable); err != nil || unavailable["error"] != "status_unavailable" {
 		t.Fatalf("decode unavailable cache JSON = (%v, %v)", unavailable, err)
+	}
+
+	stdout, stderr, err = executeCacheTest(t, nil, "", "cache", "status")
+	wantHuman := fmt.Sprintf("location: %s\nentries: 1\nbytes: 15\n", location)
+	if err != nil || stderr != "" || stdout != wantHuman {
+		t.Fatalf("human regular-file cache status = (%v, %q, %q), want %q", err, stdout, stderr, wantHuman)
 	}
 }
 

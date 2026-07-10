@@ -119,6 +119,25 @@ func TestModelsListJSONContract(t *testing.T) {
 	})
 }
 
+func TestModelsListJSONExactSingleCatalogRow(t *testing.T) {
+	cacheDir := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	t.Setenv("AJQ_CACHE_DIR", cacheDir)
+	t.Setenv("AJQ_CONFIG", configPath)
+	t.Setenv("AJQ_MODEL", "")
+	if err := os.WriteFile(configPath, []byte("# use local default\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pr := &provision.Provisioner{Catalog: provision.Catalog{Models: map[string]provision.Model{
+		"qwen2.5-1.5b": {Name: "qwen2.5-1.5b", Asset: provision.Asset{Kind: provision.KindModel, Name: "qwen2.5-1.5b", Version: "test", Filename: "tiny.gguf", Size: 10}, RAMNote: "tiny RAM"},
+	}}, Layout: provision.NewLayout(cacheDir)}
+	stdout, stderr, err := runCLIForModelsTest("", pr, "models", "list", "--json")
+	want := `{"schema_version":"1","active":{"state":"catalog","name":"qwen2.5-1.5b"},"models":[{"name":"qwen2.5-1.5b","active":true,"installed":false,"filename":"tiny.gguf","path":"` + filepath.Join(cacheDir, "models", "tiny.gguf") + `","size_bytes":10,"ram":"tiny RAM"}]}` + "\n"
+	if err != nil || stderr != "" || stdout != want {
+		t.Fatalf("exact models JSON = (%v, %q, %q), want %q", err, stdout, stderr, want)
+	}
+}
+
 func TestModelsPullDownloadsChecksumVerifiedModel(t *testing.T) {
 	body := []byte("tiny model")
 	var hits int

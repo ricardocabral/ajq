@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,10 @@ import (
 
 // fakeProvisioner is an injectable ProvisionController for CLI tests. It never
 // touches the filesystem, PATH, or network.
+type failingProvisionWriter struct{ err error }
+
+func (w failingProvisionWriter) Write([]byte) (int, error) { return 0, w.err }
+
 type fakeProvisioner struct {
 	plan          provision.Plan
 	planErr       error
@@ -132,8 +137,16 @@ func TestProvisionCheckJSONContract(t *testing.T) {
 	if err == nil || cli.ExitCode(err) != 1 || stderr != "" || selected.installCalled || selected.planModelName != "qwen3-4b" {
 		t.Fatalf("missing selected provision JSON = (%v, %q), installed=%t model=%q", err, stderr, selected.installCalled, selected.planModelName)
 	}
-	if !strings.Contains(stdout, `"ready":false`) || !strings.HasSuffix(stdout, `"actions":[{"id":"provision","command":"ajq provision"},{"id":"models_pull","command":"ajq models pull qwen3-4b"}]}`+"\n") {
-		t.Fatalf("missing selected provision JSON/order = %q", stdout)
+	wantMissingSelected := "{\"schema_version\":\"1\",\"platform\":{\"os\":\"darwin\",\"arch\":\"arm64\"},\"ready\":false,\"engine\":{\"kind\":\"engine\",\"name\":\"llama-server\",\"version\":\"\",\"filename\":\"\",\"present\":false,\"path\":\"/opt/homebrew/bin/llama-server\"},\"model\":{\"kind\":\"model\",\"name\":\"qwen3-4b\",\"version\":\"\",\"filename\":\"qwen3.gguf\",\"present\":false,\"path\":\"/cache/models/m.gguf\"},\"actions\":[{\"id\":\"provision\",\"command\":\"ajq provision\"},{\"id\":\"models_pull\",\"command\":\"ajq models pull qwen3-4b\"}]}\n"
+	if stdout != wantMissingSelected {
+		t.Fatalf("missing selected provision JSON/order = %q, want %q", stdout, wantMissingSelected)
+	}
+
+	missingDefault := &fakeProvisioner{plan: planMissingModel()}
+	stdout, stderr, err = runProvision(missingDefault, "provision", "--check", "--json")
+	wantMissingDefault := "{\"schema_version\":\"1\",\"platform\":{\"os\":\"darwin\",\"arch\":\"arm64\"},\"ready\":false,\"engine\":{\"kind\":\"engine\",\"name\":\"llama-server\",\"version\":\"\",\"filename\":\"\",\"present\":true,\"path\":\"/opt/homebrew/bin/llama-server\",\"source\":\"path\"},\"model\":{\"kind\":\"model\",\"name\":\"qwen2.5-1.5b\",\"version\":\"\",\"filename\":\"\",\"present\":false,\"path\":\"/cache/models/m.gguf\"},\"actions\":[{\"id\":\"provision\",\"command\":\"ajq provision\"}]}\n"
+	if err == nil || cli.ExitCode(err) != 1 || stderr != "" || stdout != wantMissingDefault || missingDefault.installCalled {
+		t.Fatalf("missing default provision JSON = (%v, %q, %q), want %q", err, stdout, stderr, wantMissingDefault)
 	}
 
 	legacy := planAllPresent()
@@ -163,6 +176,17 @@ func TestProvisionJSONRejectsInstallAndHidesSelectionFailure(t *testing.T) {
 	stdout, stderr, err = runProvision(&fakeProvisioner{plan: planAllPresent()}, "provision", "--check", "--json")
 	if err == nil || cli.ExitCode(err) != 1 || stdout != "" || strings.Contains(stderr, sentinel) || !strings.Contains(stderr, "provisioning check unavailable") {
 		t.Fatalf("selection failure leaked or changed = (%v, %q, %q)", err, stdout, stderr)
+	}
+}
+
+func TestProvisionJSONWriterFailure(t *testing.T) {
+	t.Setenv("AJQ_CONFIG", "")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	writeErr := errors.New("provision-json-writer-sentinel")
+	var stderr bytes.Buffer
+	err := cli.Execute(context.Background(), cli.Options{Stdin: strings.NewReader(""), Stdout: failingProvisionWriter{err: writeErr}, Stderr: &stderr, Provision: &fakeProvisioner{plan: planAllPresent()}}, []string{"provision", "--check", "--json"})
+	if err == nil || !errors.Is(err, writeErr) || !strings.Contains(stderr.String(), "write provisioning JSON status") {
+		t.Fatalf("provision JSON writer failure = (%v, %q)", err, stderr.String())
 	}
 }
 
