@@ -108,6 +108,74 @@ func TestPlanModelResolvesRequestedCatalogModel(t *testing.T) {
 	}
 }
 
+func TestPlanModelOnlyResolvesRequestedCatalogModel(t *testing.T) {
+	cacheDir := "/tmp/ajq-cache"
+	modelPath := filepath.Join(cacheDir, "models", "Qwen3-4B-Q4_K_M.gguf")
+	pr := macProvisioner(cacheDir)
+	pr.FileExists = fakeFS(modelPath)
+
+	plan, err := pr.PlanModelOnly("qwen3-4b")
+	if err != nil {
+		t.Fatalf("PlanModelOnly: %v", err)
+	}
+	if !plan.Model.Present || plan.Model.Asset.Name != "qwen3-4b" || plan.Model.Source != "cache" {
+		t.Fatalf("requested model should be a qwen3-4b cache hit: %+v", plan.Model)
+	}
+	if plan.Model.Path != modelPath {
+		t.Fatalf("requested model path = %q, want %q", plan.Model.Path, modelPath)
+	}
+	if plan.Engine != (AssetStatus{}) {
+		t.Fatalf("PlanModelOnly engine = %+v, want zero value", plan.Engine)
+	}
+}
+
+func TestPlanModelOnlyWorksWithoutSupportedEngine(t *testing.T) {
+	cacheDir := "/tmp/ajq-cache"
+	modelPath := filepath.Join(cacheDir, "models", "Qwen3-4B-Q4_K_M.gguf")
+	pr := &Provisioner{
+		Catalog:    DefaultCatalog(),
+		Layout:     NewLayout(cacheDir),
+		Platform:   Platform{OS: "plan9", Arch: "mips"},
+		FileExists: fakeFS(modelPath),
+	}
+
+	plan, err := pr.PlanModelOnly("qwen3-4b")
+	if err != nil {
+		t.Fatalf("PlanModelOnly on unsupported platform: %v", err)
+	}
+	if !plan.Model.Present || plan.Model.Asset.Name != "qwen3-4b" || plan.Model.Source != "cache" {
+		t.Fatalf("requested model should be a qwen3-4b cache hit: %+v", plan.Model)
+	}
+	if plan.Engine != (AssetStatus{}) {
+		t.Fatalf("PlanModelOnly engine = %+v, want zero value", plan.Engine)
+	}
+}
+
+func TestPlanModelOnlyUnknownNameErrors(t *testing.T) {
+	pr := macProvisioner("/tmp/ajq-cache")
+	pr.FileExists = fakeFS()
+	if _, err := pr.PlanModelOnly("bogus"); err == nil || !strings.Contains(err.Error(), "valid models") {
+		t.Fatalf("PlanModelOnly unknown error = %v, want valid-model list", err)
+	}
+}
+
+func TestPlanModelOnlyHonorsModelOverride(t *testing.T) {
+	cacheDir := "/tmp/ajq-cache"
+	modelOverride := "/custom/model.gguf"
+	cachedModel := filepath.Join(cacheDir, "models", DefaultModelFilename)
+	pr := macProvisioner(cacheDir)
+	pr.ModelOverride = modelOverride
+	pr.FileExists = fakeFS(modelOverride, cachedModel)
+
+	plan, err := pr.PlanModelOnly("")
+	if err != nil {
+		t.Fatalf("PlanModelOnly: %v", err)
+	}
+	if plan.Model.Path != modelOverride || plan.Model.Source != "override" {
+		t.Fatalf("model override should take precedence over cache: %+v", plan.Model)
+	}
+}
+
 func TestPlanModelUnknownNameErrors(t *testing.T) {
 	pr := macProvisioner("/tmp/ajq-cache")
 	pr.FileExists = fakeFS()
