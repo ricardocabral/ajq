@@ -77,11 +77,11 @@ type statusError struct {
 }
 
 func (e *statusError) Error() string {
-	body := strings.TrimSpace(e.Body)
-	if body == "" {
+	summary := promptkit.SanitizeProviderErrorBody(e.Body)
+	if summary == "" {
 		return fmt.Sprintf("ollama returned status %d", e.Code)
 	}
-	return fmt.Sprintf("ollama returned status %d: %s", e.Code, body)
+	return fmt.Sprintf("ollama returned status %d (%s)", e.Code, summary)
 }
 
 // ResolveBaseURL applies Ollama base URL precedence: explicit flag/config value
