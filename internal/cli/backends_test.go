@@ -210,6 +210,92 @@ func TestOpenAIBaseURLOverrideReachesClientAndModelIDUsesBackendPrefix(t *testin
 	}
 }
 
+func TestModelIdentityIncludesBaseURLForHTTPBackends(t *testing.T) {
+	tests := []struct {
+		backendName string
+		model       string
+		wantEmpty   string
+	}{
+		{backendName: "openai", model: "gpt-test", wantEmpty: "openai/gpt-test"},
+		{backendName: "ollama", model: "llama3.2", wantEmpty: "ollama/llama3.2"},
+		{backendName: "local", model: "qwen2.5-3b", wantEmpty: "local/qwen2.5-3b"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.backendName, func(t *testing.T) {
+			registration, ok := lookupBackend(tt.backendName)
+			if !ok {
+				t.Fatalf("%s backend not registered", tt.backendName)
+			}
+			first, err := registration.ModelIdentity(config.Settings{Model: tt.model, BaseURL: "http://endpoint-one.test/v1"})
+			if err != nil {
+				t.Fatalf("first ModelIdentity returned error: %v", err)
+			}
+			second, err := registration.ModelIdentity(config.Settings{Model: tt.model, BaseURL: "http://endpoint-two.test/v1"})
+			if err != nil {
+				t.Fatalf("second ModelIdentity returned error: %v", err)
+			}
+			if first == second {
+				t.Fatalf("ModelIdentity values must differ across base URLs: %q", first)
+			}
+			empty, err := registration.ModelIdentity(config.Settings{Model: tt.model})
+			if err != nil {
+				t.Fatalf("empty-base-url ModelIdentity returned error: %v", err)
+			}
+			if empty != tt.wantEmpty {
+				t.Fatalf("empty-base-url ModelIdentity = %q, want %q", empty, tt.wantEmpty)
+			}
+		})
+	}
+}
+
+func TestOpenAIBaseURLSeparatesPersistentSemanticCache(t *testing.T) {
+	isolateConfigEnv(t)
+	t.Setenv("AJQ_CACHE_DIR", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "test-key")
+
+	newServer := func(response string) (*httptest.Server, *int) {
+		calls := new(int)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			*calls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"` + response + `"}}]}`))
+		}))
+		return server, calls
+	}
+	firstServer, firstCalls := newServer("true")
+	defer firstServer.Close()
+	secondServer, secondCalls := newServer("false")
+	defer secondServer.Close()
+
+	run := func(baseURL string) (string, string, error) {
+		var out, errBuf bytes.Buffer
+		err := Execute(context.Background(), Options{
+			Stdin:  strings.NewReader(`{"msg":"keep"}`),
+			Stdout: &out,
+			Stderr: &errBuf,
+		}, []string{"--backend", "openai", "--model", "gpt-test", "--base-url", baseURL + "/v1", `.msg =~ "keep"`})
+		return out.String(), errBuf.String(), err
+	}
+
+	stdout, stderr, err := run(firstServer.URL)
+	if err != nil {
+		t.Fatalf("first semantic query returned error: %v; stderr=%q", err, stderr)
+	}
+	if stdout != "true\n" || stderr != "" {
+		t.Fatalf("first stdout=%q stderr=%q", stdout, stderr)
+	}
+	stdout, stderr, err = run(secondServer.URL)
+	if err != nil {
+		t.Fatalf("second semantic query returned error: %v; stderr=%q", err, stderr)
+	}
+	if stdout != "false\n" || stderr != "" {
+		t.Fatalf("second stdout=%q stderr=%q", stdout, stderr)
+	}
+	if *firstCalls != 1 || *secondCalls != 1 {
+		t.Fatalf("endpoint calls = (%d, %d), want (1, 1)", *firstCalls, *secondCalls)
+	}
+}
+
 func TestAnthropicRegistrationRequiresEnvKeyAndUsesResolvedModelID(t *testing.T) {
 	registration, ok := lookupBackend("anthropic")
 	if !ok {
