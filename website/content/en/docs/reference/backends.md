@@ -21,7 +21,11 @@ selected by flags, environment, or config.
 | `openrouter` | `--backend openrouter` | Required `--model` / config / env | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `100` |
 | `anthropic` | `--backend anthropic` or `--cloud` | `claude-haiku-4-5`; aliases `haiku`, `sonnet`, `opus` | provider default; no user base URL | `ANTHROPIC_API_KEY` | `100` |
 
-`max_calls` counts post-dedup backend judgements. `0` means unlimited.
+`max_calls` counts post-dedup backend judgements. `0` means unlimited. For a
+machine-readable static projection of these registered backends, use `ajq
+capabilities --json`; it does not resolve configured credentials or runtime
+asset state. In that projection Ollama has no `default_base_url`, because its
+runtime URL may come from `OLLAMA_HOST` before the documented loopback fallback.
 
 ## Mock
 

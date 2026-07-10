@@ -46,7 +46,19 @@ precedence.
 
 ## Help-first agent probe
 
-Start with `ajq --help`, then run `ajq examples` for categorized, copy-pasteable
+For machine consumers, begin with `ajq capabilities --json`, before examples
+or query execution. It is static introspection: it does not load config or
+credentials, construct a backend, start a daemon, inspect/provision assets, or
+contact the network. Its versioned `schema_version: "1"` document is the stable
+contract for input/output modes, semantic-function availability, backend
+defaults, cost/cache/provisioning notes, safety guarantees, and discovery
+commands. The plain `ajq capabilities` summary, `ajq_version`, and human
+backend descriptions are informational build text; all other documented v1
+fields and enum values are stable. Consumers must use `schema_version` as the
+contract discriminator and ignore unknown fields and future enum values for
+compatible v1 builds.
+
+After capabilities discovery, run `ajq examples` for categorized, copy-pasteable
 safe workflows. `ajq examples [topic]` can show one of `pure-jq`,
 `semantic-filter`, `explain`, `classification`, or `ndjson`; its semantic
 commands explicitly use `--backend mock` and therefore need no model, network,
@@ -84,6 +96,7 @@ model.
 |---|---|
 | `ajq cache status` | Print persistent judgement cache location, entry count, and bytes. |
 | `ajq cache clear` | Delete persistent judgement cache entries and report what was freed. |
+| `ajq capabilities [--json]` | Print informational static metadata, or the versioned machine-readable capability contract for agents. |
 | `ajq daemon status` | Print the warm local daemon status. |
 | `ajq examples [topic]` | Print categorized safe examples; semantic examples explicitly use `--backend mock`. |
 | `ajq daemon stop` | Stop the local daemon if running; idempotent. |

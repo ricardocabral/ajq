@@ -12,16 +12,23 @@ is explicit, cache-keyed by backend, model, spec, and canonical value, and
 bounded by user-visible cost controls.
 
 Shipped semantic surfaces are fuzzy matching (`=~`, `!~`, `sem_match`) and
-bounded `sem_classify`. `sem_score` and `sem_norm` are limited to documented
-contexts. Standalone `sem_extract` and `sem_redact` are registered but currently
-unsupported, so do not describe ajq as a general semantic extraction or redaction
-tool yet.
+bounded `sem_classify`. The unbounded value operators are limited: `sem_score`
+and `sem_norm` also support their documented three-phase contexts, while
+`sem_extract` and `sem_redact` support only gated/interleaved contexts. Other
+unbounded contexts fail loudly, so do not describe ajq as a general semantic
+extraction or redaction tool yet.
 
 ## Start here
 
-After `ajq --help`, run `ajq examples` for safe copy-paste commands. Semantic
-examples explicitly use `--backend mock`, so they require no API key, network,
-provisioning, or local model.
+For a machine consumer, first run `ajq capabilities --json`. It is static
+introspection, not backend selection or validation: it does not load config or
+credentials, construct a backend, start a daemon, provision assets, or contact
+the network. Use its versioned contract to learn available modes, operators,
+backends, and cost/safety limits. Then run `ajq examples` for safe copy-paste
+commands. Semantic examples explicitly use `--backend mock`, so they require
+no API key, network, provisioning, or local model. Before a real semantic run,
+select a backend explicitly, use `--explain`, and set an appropriate
+`--max-calls` cap.
 
 - [Website home](https://ricardocabral.github.io/ajq/): Product overview, split-execution summary, comparison, and performance notes.
 - [Documentation index](https://ricardocabral.github.io/ajq/docs/): Entry point for tutorials, how-to guides, reference pages, and design explanations.
