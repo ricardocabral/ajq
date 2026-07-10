@@ -24,6 +24,12 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   cached judgements from one compatible deployment being reused by another
   deployment serving a model with the same name.
 
+### Security
+
+- HTTP-status error messages from OpenAI-compatible, Ollama, and Anthropic
+  backends no longer include raw provider response bodies; they report only the
+  status code and, when available, structured error type or code fields.
+
 ## [0.0.3] - 2026-07-10
 
 ### Fixed
