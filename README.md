@@ -6,6 +6,10 @@ Use it when you need to classify JSON streams, find records by meaning instead o
 
 ## Usage
 
+Start with `ajq --help` to see the same safe probe workflow in the CLI. For
+coding agents, `--backend mock` is the deterministic, no-network, no-model path
+to exercise semantic query syntax before selecting a real backend.
+
 ```bash
 # Help and version
 ajq --help
@@ -15,7 +19,8 @@ ajq --version
 printf '{"users":[{"name":"Ada"}]}' | ajq -r '.users[].name'
 # Ada
 
-# Semantic grep for JSON with the deterministic mock backend (no model, network, or API key)
+# Semantic grep for JSON with the deterministic mock backend: safe agent probe
+# (no model, network, or API key)
 printf '[{"id":1,"msg":"please keep this"},{"id":2,"msg":"drop it"}]' \
   | ajq --backend mock -c '.[] | select(.msg =~ "keep") | .id'
 # 1
