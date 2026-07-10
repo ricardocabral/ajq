@@ -4,6 +4,32 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 
+usage() {
+  cat <<'EOF'
+Usage: scripts/release_smoke.sh
+
+Run the full release smoke suite. The suite uses a source-built CLI for
+hermetic discovery checks, then runs test, lint, packaging, installer, and
+website gates.
+
+Options:
+  -h, --help  Show this help and exit.
+EOF
+}
+
+case "${1:-}" in
+  "") ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    printf 'unknown option: %s\n\n' "$1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
 step() {
   printf '\n==> %s\n' "$1"
 }
@@ -62,6 +88,92 @@ run_local_provision_check() {
   fi
 }
 
+run_discovery_smoke() (
+  local audit_dir gocache gomodcache gopath provision_status
+  audit_dir=$(mktemp -d)
+  trap 'rm -rf "$audit_dir"' EXIT
+  gocache=$(go env GOCACHE)
+  gomodcache=$(go env GOMODCACHE)
+  gopath=$(go env GOPATH)
+
+  run_ajq() {
+    env -i \
+      PATH="$PATH" \
+      HOME="$audit_dir/home" \
+      XDG_CONFIG_HOME="$audit_dir/config" \
+      AJQ_CONFIG= \
+      AJQ_CACHE_DIR="$audit_dir/cache" \
+      "$audit_dir/ajq" "$@"
+  }
+
+  build_source_ajq() {
+    env -i \
+      PATH="$PATH" \
+      HOME="$audit_dir/home" \
+      XDG_CONFIG_HOME="$audit_dir/config" \
+      AJQ_CONFIG= \
+      AJQ_CACHE_DIR="$audit_dir/cache" \
+      GOCACHE="$gocache" \
+      GOMODCACHE="$gomodcache" \
+      GOPATH="$gopath" \
+      go build -o "$audit_dir/ajq" ./cmd/ajq
+  }
+
+  assert_no_stderr() {
+    if [ -s "$1" ]; then
+      printf 'unexpected stderr from discovery command:\n' >&2
+      cat "$1" >&2
+      return 1
+    fi
+  }
+
+  assert_json_v1() {
+    python3 - "$1" <<'PY'
+import json
+import pathlib
+import sys
+
+raw = pathlib.Path(sys.argv[1]).read_text()
+if not raw.endswith("\n"):
+    raise SystemExit("JSON probe did not end with a newline")
+value = json.loads(raw)
+if not isinstance(value, dict) or value.get("schema_version") != "1":
+    raise SystemExit("JSON probe did not return a v1 object")
+PY
+  }
+
+  mkdir -p "$audit_dir/home" "$audit_dir/config" "$audit_dir/cache"
+  step "hermetic discovery CLI smoke"
+  build_source_ajq
+
+  run_ajq examples >"$audit_dir/examples.out" 2>"$audit_dir/examples.err"
+  assert_no_stderr "$audit_dir/examples.err"
+  grep -Fq 'Semantic examples use --backend mock and require no model, network access, or API key.' "$audit_dir/examples.out"
+
+  run_ajq capabilities --json >"$audit_dir/capabilities.json" 2>"$audit_dir/capabilities.err"
+  assert_no_stderr "$audit_dir/capabilities.err"
+  assert_json_v1 "$audit_dir/capabilities.json"
+
+  run_ajq models list --json >"$audit_dir/models.json" 2>"$audit_dir/models.err"
+  assert_no_stderr "$audit_dir/models.err"
+  assert_json_v1 "$audit_dir/models.json"
+
+  run_ajq cache status --json >"$audit_dir/cache.json" 2>"$audit_dir/cache.err"
+  assert_no_stderr "$audit_dir/cache.err"
+  assert_json_v1 "$audit_dir/cache.json"
+
+  set +e
+  run_ajq provision --check --json >"$audit_dir/provision.json" 2>"$audit_dir/provision.err"
+  provision_status=$?
+  set -e
+  if [ "$provision_status" -ne 0 ] && [ "$provision_status" -ne 1 ]; then
+    printf 'ajq provision --check --json exited %d, want 0 or missing-assets status 1\n' "$provision_status" >&2
+    return 1
+  fi
+  assert_no_stderr "$audit_dir/provision.err"
+  assert_json_v1 "$audit_dir/provision.json"
+)
+
 run_openrouter_live_smoke() {
   local cache_dir out
   require_env OPENROUTER_API_KEY AJQ_OPENROUTER_MODEL
@@ -91,6 +203,7 @@ run_local_live_smoke() {
 run "standard tests" make test
 run "lint" make lint
 run "shell scripts lint" shellcheck scripts/install.sh scripts/install_test.sh scripts/release_smoke.sh
+run_discovery_smoke
 run_mock_smoke
 run_local_provision_check
 run "release snapshot" make release-snapshot
