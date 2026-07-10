@@ -3,6 +3,7 @@ package provision
 import (
 	"errors"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -59,6 +60,22 @@ func macProvisioner(cacheDir string) *Provisioner {
 		Layout:   NewLayout(cacheDir),
 		Platform: Platform{OS: "darwin", Arch: "arm64"},
 		LookPath: noLookPath,
+	}
+}
+
+func TestModelCatalogReturnsDefaultWhenUnset(t *testing.T) {
+	if got, want := (&Provisioner{}).ModelCatalog(), DefaultCatalog(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("ModelCatalog() = %+v, want default %+v", got, want)
+	}
+}
+
+func TestModelCatalogReturnsInjectedCatalog(t *testing.T) {
+	catalog := DefaultCatalog()
+	catalog.Model = Asset{Name: "injected"}
+	pr := &Provisioner{Catalog: catalog}
+
+	if got := pr.ModelCatalog(); !reflect.DeepEqual(got, catalog) {
+		t.Fatalf("ModelCatalog() = %+v, want injected catalog %+v", got, catalog)
 	}
 }
 
