@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	semanticcache "github.com/ricardocabral/ajq/internal/cache"
 	"github.com/spf13/cobra"
@@ -30,6 +31,11 @@ func newCacheStatusCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			stats, statusErr := semanticcache.Status("")
+			if statusErr == nil {
+				if info, err := os.Stat(stats.Location); err == nil && !info.IsDir() {
+					statusErr = fmt.Errorf("judgement cache location is not a directory")
+				}
+			}
 			if statusErr != nil && !jsonOutput {
 				return statusErr
 			}

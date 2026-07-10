@@ -20,6 +20,7 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added versioned JSON state probes for `ajq models list`, `ajq cache status`, and `ajq provision --check`, so agents can inspect local model, cache, and provisioning readiness without parsing human output.
 - Added `ajq capabilities --json`, a static versioned machine-readable contract for agents to discover modes, semantic availability, backend defaults, cost/cache/safety limits, and safe examples without loading configuration or initializing a backend.
 - Added `ajq examples [topic]` for categorized, copy-pasteable safe CLI workflows; semantic snippets explicitly use the deterministic `--backend mock`.
 - Added copy-pasteable root and discovery-command help examples, including the

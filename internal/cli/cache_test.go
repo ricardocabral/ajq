@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,6 +166,44 @@ func TestCacheStatusAndClearCommands(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "entries: 0\n") || !strings.Contains(stdout, "bytes: 0\n") {
 		t.Fatalf("status after clear = %q, want zero", stdout)
+	}
+}
+
+func TestCacheStatusJSONContract(t *testing.T) {
+	cacheDir := isolateCacheCLIEnv(t)
+	stdout, stderr, err := executeCacheTest(t, nil, "", "cache", "status", "--json")
+	if err != nil || stderr != "" {
+		t.Fatalf("empty cache status JSON = (%v, %q)", err, stderr)
+	}
+	want := `{"schema_version":"1","availability":"available","path":"` + semanticcache.JudgementsDir(cacheDir) + `","entries":0,"bytes":0}` + "\n"
+	if stdout != want {
+		t.Fatalf("empty cache status JSON = %q, want %q", stdout, want)
+	}
+	var available struct {
+		Availability string `json:"availability"`
+		Path         string `json:"path"`
+		Entries      int    `json:"entries"`
+		Bytes        int64  `json:"bytes"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &available); err != nil || available.Availability != "available" || available.Entries != 0 || available.Bytes != 0 {
+		t.Fatalf("decode available cache JSON = (%+v, %v)", available, err)
+	}
+
+	location := semanticcache.JudgementsDir(cacheDir)
+	if err := os.WriteFile(location, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, err = executeCacheTest(t, nil, "", "cache", "status", "--json")
+	if err == nil || ExitCode(err) != 1 || stderr != "" {
+		t.Fatalf("unavailable cache status JSON = (%v, %q)", err, stderr)
+	}
+	want = `{"schema_version":"1","availability":"unavailable","path":"` + location + `","entries":0,"bytes":0,"error":"status_unavailable"}` + "\n"
+	if stdout != want {
+		t.Fatalf("unavailable cache JSON = %q, want %q", stdout, want)
+	}
+	var unavailable map[string]any
+	if err := json.Unmarshal([]byte(stdout), &unavailable); err != nil || unavailable["error"] != "status_unavailable" {
+		t.Fatalf("decode unavailable cache JSON = (%v, %v)", unavailable, err)
 	}
 }
 

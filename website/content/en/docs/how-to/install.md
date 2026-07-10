@@ -101,6 +101,27 @@ ajq provision --check
 default model. It also reuses assets you already have, including explicit overrides,
 cache entries, a legacy `<cache>/bin/llama-server`, or a `llama-server` on `PATH`.
 
+### Agent readiness probe
+
+Use the status-only JSON probe when an agent needs to decide whether it can use
+the managed local backend. A missing asset deliberately exits 1 **after** writing
+its complete JSON result, so retain stdout instead of using a shell pipeline that
+discards it:
+
+```bash
+set +e
+ajq provision --check --json > ajq-readiness.json
+status=$?
+set -e
+cat ajq-readiness.json
+# status=0 means ready; status=1 means inspect .actions and provision explicitly.
+```
+
+The document includes `ready`, engine/model presence and local paths, and ordered
+`actions`. It only inspects configuration, filesystem, and PATH state: it does
+not download assets, start a daemon, or contact a backend. `--json` is valid only
+with `--check`; use `ajq provision` separately to install the requested assets.
+
 ## Homebrew status
 
 The release pipeline publishes a Homebrew cask to the public

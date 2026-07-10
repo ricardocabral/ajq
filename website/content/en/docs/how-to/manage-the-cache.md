@@ -31,6 +31,21 @@ Set `AJQ_CACHE_DIR` when you want an isolated cache for a project or test:
 AJQ_CACHE_DIR="$PWD/.ajq-cache" ajq cache status
 ```
 
+### Inspect cache state from an agent
+
+Use the versioned JSON probe instead of parsing the human table-like output:
+
+```bash
+ajq cache status --json
+# {"schema_version":"1","availability":"available","path":".../judgements","entries":0,"bytes":0}
+```
+
+`availability: "available"` includes a missing cache directory (zero entries).
+If ajq cannot inspect the configured location, it writes a complete document with
+`availability: "unavailable"`, zero counts, and `error: "status_unavailable"`,
+then exits non-zero. Paths are intentional local-state output; the document does
+not include cache values, prompts, credentials, or raw filesystem errors.
+
 ## Re-run a semantic query for free
 
 Run a semantic query once with stats:

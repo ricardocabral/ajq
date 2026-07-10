@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -41,6 +42,81 @@ func TestModelsListShowsInstalledAndActive(t *testing.T) {
 	if !strings.Contains(stdout, "qwen2.5-3b") || !strings.Contains(stdout, "*       yes") {
 		t.Fatalf("list should mark qwen2.5-3b active and installed: %q", stdout)
 	}
+}
+
+func TestModelsListJSONContract(t *testing.T) {
+	cacheDir := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	t.Setenv("AJQ_CACHE_DIR", cacheDir)
+	t.Setenv("AJQ_CONFIG", configPath)
+	t.Setenv("AJQ_MODEL", "")
+	if err := os.WriteFile(configPath, []byte("model = \"qwen2.5-3b\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	layout := provision.NewLayout(cacheDir)
+	if err := os.MkdirAll(layout.ModelsDir(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.ModelPath("qwen2.5-3b-instruct-q4_k_m.gguf"), []byte("installed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runCLIForModelsTest("", nil, "models", "list", "--json")
+	if err != nil || stderr != "" {
+		t.Fatalf("models list --json = (%v, %q)", err, stderr)
+	}
+	if !strings.HasSuffix(stdout, "\n") || !strings.HasPrefix(stdout, `{"schema_version":"1","active":{"state":"catalog","name":"qwen2.5-3b"},"models":[`) {
+		t.Fatalf("models JSON wire prefix/order = %q", stdout)
+	}
+	var document struct {
+		SchemaVersion string `json:"schema_version"`
+		Active        struct {
+			State string `json:"state"`
+			Name  string `json:"name"`
+		} `json:"active"`
+		Models []struct {
+			Name      string `json:"name"`
+			Active    bool   `json:"active"`
+			Installed bool   `json:"installed"`
+			Filename  string `json:"filename"`
+			Path      string `json:"path"`
+			SizeBytes int64  `json:"size_bytes"`
+			RAM       string `json:"ram"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &document); err != nil {
+		t.Fatalf("models JSON invalid: %v", err)
+	}
+	if document.SchemaVersion != "1" || document.Active.State != "catalog" || document.Active.Name != "qwen2.5-3b" || len(document.Models) < 2 {
+		t.Fatalf("models document = %+v", document)
+	}
+	for i, model := range document.Models {
+		if i > 0 && document.Models[i-1].Name > model.Name {
+			t.Fatalf("models not ordered: %#v", document.Models)
+		}
+		if model.Name == "qwen2.5-3b" && (!model.Active || !model.Installed || model.Filename == "" || model.Path == "" || model.SizeBytes <= 0 || model.RAM == "") {
+			t.Fatalf("active model row = %#v", model)
+		}
+	}
+
+	t.Run("path-like active", func(t *testing.T) {
+		t.Setenv("AJQ_MODEL", filepath.Join(t.TempDir(), "selected.gguf"))
+		stdout, stderr, err := runCLIForModelsTest("", nil, "models", "list", "--json")
+		if err != nil || stderr != "" || !strings.Contains(stdout, `"active":{"state":"path_like","path":`) || strings.Contains(stdout, `"active":true`) {
+			t.Fatalf("path-like models JSON = (%v, %q, %q)", err, stdout, stderr)
+		}
+	})
+	t.Run("unknown active hides config error", func(t *testing.T) {
+		const sentinel = "models-json-secret-sentinel"
+		t.Setenv("AJQ_CONFIG", filepath.Join(t.TempDir(), "bad.toml"))
+		if err := os.WriteFile(os.Getenv("AJQ_CONFIG"), []byte("api_key = \""+sentinel+"\"\nmodel = ["), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		stdout, stderr, err := runCLIForModelsTest("", nil, "models", "list", "--json")
+		if err != nil || stderr != "" || !strings.Contains(stdout, `"active":{"state":"unknown"}`) || strings.Contains(stdout, sentinel) {
+			t.Fatalf("unknown models JSON leaked or failed = (%v, %q, %q)", err, stdout, stderr)
+		}
+	})
 }
 
 func TestModelsPullDownloadsChecksumVerifiedModel(t *testing.T) {
