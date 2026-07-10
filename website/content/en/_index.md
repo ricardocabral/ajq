@@ -1,9 +1,8 @@
 ---
-title: ajq — semantic jq for messy JSON streams
+title: ajq — semantic jq for JSON streams
 description: >
-  ajq is a Go CLI for semantic jq: fuzzy JSON filtering, semantic grep for
-  JSON/NDJSON, and bounded classification while pure jq execution stays
-  deterministic.
+  Semantic jq for messy JSON/NDJSON: filter by meaning, classify streams, and
+  keep pure jq deterministic with explicit model calls.
 ---
 
 {{< blocks/cover title="ajq" image_anchor="top" height="full" color="dark" >}}

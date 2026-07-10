@@ -2,7 +2,7 @@
 # Built and deployed by GitHub Actions to GitHub Pages.
 
 baseURL = "https://ricardocabral.github.io/ajq/"
-title = "ajq"
+title = "ajq — semantic jq"
 
 # Language
 locale = "en-us"
@@ -68,7 +68,7 @@ disableKinds = ["taxonomy", "term"]
   github_subdir = "website"
 
   # Tagline shown in the browser tab suffix / SEO.
-  description = "Semantic jq for messy JSON streams. ajq adds fuzzy JSON filtering, semantic grep for JSON/NDJSON, and bounded classification while pure jq stays deterministic."
+  description = "Semantic jq for messy JSON/NDJSON: filter by meaning, classify streams, and keep pure jq deterministic with explicit model calls."
 
   offlineSearch = true
   offlineSearchSummaryLength = 200
@@ -120,5 +120,5 @@ disableKinds = ["taxonomy", "term"]
     label = "English"
     weight = 1
     [languages.en.params]
-      title = "ajq"
-      description = "Semantic jq for messy JSON streams. ajq adds fuzzy JSON filtering, semantic grep for JSON/NDJSON, and bounded classification while pure jq stays deterministic."
+      title = "ajq — semantic jq"
+      description = "Semantic jq for messy JSON/NDJSON: filter by meaning, classify streams, and keep pure jq deterministic with explicit model calls."
