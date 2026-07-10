@@ -30,7 +30,9 @@ type AvailabilityStatus string
 
 // AvailabilityStatus values are the closed v1 availability vocabulary.
 const (
+	// AvailabilityShipped means an operator is supported in every execution context.
 	AvailabilityShipped AvailabilityStatus = "shipped"
+	// AvailabilityLimited means an operator is supported only in listed contexts.
 	AvailabilityLimited AvailabilityStatus = "limited"
 )
 
@@ -39,9 +41,13 @@ type ExecutionContext string
 
 // ExecutionContext values are the closed v1 execution-context vocabulary.
 const (
-	ContextAll               ExecutionContext = "all"
-	ContextInterleavedGated  ExecutionContext = "interleaved_gated"
-	ContextThreePhaseSortBy  ExecutionContext = "three_phase_sort_by"
+	// ContextAll means the operator is supported in all semantic execution contexts.
+	ContextAll ExecutionContext = "all"
+	// ContextInterleavedGated means the operator is supported in gated interleaved execution.
+	ContextInterleavedGated ExecutionContext = "interleaved_gated"
+	// ContextThreePhaseSortBy means the operator is supported as a three-phase sort key.
+	ContextThreePhaseSortBy ExecutionContext = "three_phase_sort_by"
+	// ContextThreePhaseGroupBy means the operator is supported as a three-phase grouping key.
 	ContextThreePhaseGroupBy ExecutionContext = "three_phase_group_by"
 )
 
@@ -50,6 +56,7 @@ type Limitation string
 
 // Limitation values are the closed v1 limitation vocabulary.
 const (
+	// LimitationNonGatedUnboundedFailsLoudly describes unsupported unbounded contexts.
 	LimitationNonGatedUnboundedFailsLoudly Limitation = "non_gated_unbounded_fails_loudly"
 )
 
