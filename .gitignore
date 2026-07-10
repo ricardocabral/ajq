@@ -10,6 +10,7 @@ coverage.out
 *.prof
 prototype/
 /docs
+/ajq
 
 # Local configuration and secrets
 .env
@@ -21,13 +22,10 @@ prototype/
 .vscode/
 
 # Local assistant/tool state
+.agents/
 .claude/
 .pi/
 AGENTS.md
 agents.md
 CLAUDE.md
 claude.md
-
-# Pi project-local packages (if using pi install -l)
-.pi/npm/
-/ajq
