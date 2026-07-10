@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ricardocabral/ajq/internal/backend"
+	"github.com/ricardocabral/ajq/internal/backend/promptkit"
 	"github.com/ricardocabral/ajq/internal/schema"
 	"github.com/ricardocabral/ajq/internal/semantics"
 )
@@ -186,7 +187,7 @@ func (b *Backend) judgeOne(ctx context.Context, j backend.Judgement) (backend.Re
 	if err != nil {
 		return backend.Result{}, err
 	}
-	value, verr := coerceResult(constraint, content)
+	value, verr := promptkit.CoerceResult(constraint, content)
 	if verr != nil {
 		return backend.Result{Error: verr.Error()}, nil
 	}
@@ -233,7 +234,7 @@ func (b *Backend) chat(ctx context.Context, j backend.Judgement, constraint sche
 func (b *Backend) buildRequest(j backend.Judgement, constraint schema.Constraint) chatRequest {
 	return chatRequest{
 		Model:    b.Model,
-		Messages: []chatMessage{{Role: "user", Content: buildPrompt(j, constraint)}},
+		Messages: []chatMessage{{Role: "user", Content: promptkit.BuildPrompt(j, constraint)}},
 		Stream:   false,
 		Options:  chatOptions{Temperature: 0},
 		Format:   constraint.JSONSchema(),
@@ -289,90 +290,4 @@ func actionableStatusError(st *statusError, model string) error {
 func mentionsModelNotFound(body string) bool {
 	lower := strings.ToLower(body)
 	return strings.Contains(lower, "model") && strings.Contains(lower, "not found")
-}
-
-func buildPrompt(j backend.Judgement, constraint schema.Constraint) string {
-	var sb strings.Builder
-	sb.WriteString("You are a deterministic semantic judgement engine for the ajq query tool.\n")
-	sb.WriteString("Operation: ")
-	sb.WriteString(j.Op)
-	sb.WriteString("\n")
-	sb.WriteString("Return type: ")
-	sb.WriteString(string(constraint.Type))
-	sb.WriteString("\n")
-	if len(j.Specs) > 0 {
-		sb.WriteString("Specs: ")
-		sb.WriteString(strings.Join(j.Specs, " | "))
-		sb.WriteString("\n")
-	}
-	if len(constraint.Enum) > 0 {
-		sb.WriteString("Allowed labels: ")
-		sb.WriteString(strings.Join(constraint.Enum, ", "))
-		sb.WriteString("\n")
-	}
-	sb.WriteString("Value: ")
-	sb.WriteString(canonicalValueString(j.Value))
-	sb.WriteString("\n")
-	sb.WriteString(opInstruction(j.Op, constraint.Type))
-	sb.WriteString("\nRespond with only the JSON result and nothing else.")
-	return sb.String()
-}
-
-func opInstruction(op string, rt semantics.ReturnType) string {
-	switch op {
-	case "sem_match":
-		return "Decide whether the value satisfies the spec. Answer true or false."
-	case "sem_classify":
-		return "Choose exactly one allowed label that best fits the value."
-	case "sem_score":
-		return "Rate how strongly the value matches the spec as a number between 0 and 1."
-	case "sem_norm":
-		return "Return a normalized string form of the value."
-	case "sem_extract":
-		return "Extract the requested information from the value as a string."
-	case "sem_redact":
-		return "Return the value with the requested information redacted as a string."
-	default:
-		switch rt {
-		case semantics.ReturnBool:
-			return "Answer true or false."
-		case semantics.ReturnNumber:
-			return "Answer with a number."
-		default:
-			return "Answer with a string."
-		}
-	}
-}
-
-func coerceResult(constraint schema.Constraint, content string) (any, error) {
-	trimmed := strings.TrimSpace(content)
-	if trimmed == "" {
-		return nil, fmt.Errorf("%s: empty completion content", constraint.Op)
-	}
-	var decoded any
-	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
-		if constraint.Type == semantics.ReturnString {
-			decoded = trimmed
-		} else {
-			return nil, fmt.Errorf("%s: invalid JSON result %q: %w", constraint.Op, trimmed, err)
-		}
-	}
-	if err := constraint.Validate(decoded); err != nil {
-		return nil, err
-	}
-	return decoded, nil
-}
-
-func canonicalValueString(value any) string {
-	if value == nil {
-		return "null"
-	}
-	if s, ok := value.(string); ok {
-		return s
-	}
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Sprint(value)
-	}
-	return string(encoded)
 }
