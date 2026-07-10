@@ -91,8 +91,19 @@ func NewRootCommand(opts Options) *cobra.Command {
 	var noCache bool
 
 	cmd := &cobra.Command{
-		Use:           "ajq [query]",
-		Short:         "jq-like stream processor for adaptive structured data queries",
+		Use:   "ajq [query]",
+		Short: "jq-like stream processor for adaptive structured data queries",
+		Long: `ajq runs ordinary jq queries deterministically and uses a semantic backend
+only for explicit semantic operators. Start with --backend mock to safely
+exercise semantic query syntax without a model, network access, or API key.`,
+		Example: `  # Pure jq: deterministic and no backend required.
+  printf '{"users":[{"name":"Ada"}]}' | ajq -r '.users[].name'
+
+  # Safe semantic probe: mock is deterministic and needs no model or network.
+  printf '[{"id":1,"msg":"please keep this"}]' | ajq --backend mock -c '.[] | select(.msg =~ "keep") | .id'
+
+  # Inspect the semantic plan and estimated calls before running a query.
+  printf '[{"msg":"refund demanded"}]' | ajq --backend mock --explain '.[] | select(.msg =~ "angry/frustrated") | .msg'`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, args []string) error {

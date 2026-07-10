@@ -18,8 +18,11 @@ type modelCatalogProvider interface {
 // newModelsCommand builds `ajq models`, the local GGUF model management group.
 func newModelsCommand(opts Options) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "models",
-		Short:         "list, pull, and select local GGUF models",
+		Use:   "models",
+		Short: "list, pull, and select local GGUF models",
+		Long:  "Inspect and manage the catalog of local GGUF models used by --backend local.",
+		Example: `  # List local model choices and whether they are installed.
+  ajq models list`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

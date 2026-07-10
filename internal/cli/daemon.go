@@ -50,8 +50,11 @@ func resolveDaemonController(opts Options) DaemonController {
 // newDaemonCommand builds the `ajq daemon` command tree.
 func newDaemonCommand(opts Options) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "daemon",
-		Short:         "manage the local llama-server daemon",
+		Use:   "daemon",
+		Short: "manage the local llama-server daemon",
+		Long:  "Inspect or stop the local llama-server daemon used by --backend local.",
+		Example: `  # Inspect the local daemon without starting a model.
+  ajq daemon status`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,

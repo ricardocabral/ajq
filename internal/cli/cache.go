@@ -11,6 +11,9 @@ func newCacheCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cache",
 		Short: "Manage the persistent judgement cache",
+		Long:  "Inspect or clear cached semantic judgements stored on this machine.",
+		Example: `  # Inspect the local semantic judgement cache.
+  ajq cache status`,
 	}
 	cmd.AddCommand(newCacheStatusCommand())
 	cmd.AddCommand(newCacheClearCommand())
