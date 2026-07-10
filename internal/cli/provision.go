@@ -202,8 +202,14 @@ func provisionAssetStatusFor(status provision.AssetStatus) provisionAssetStatus 
 	}
 	if status.Present {
 		switch strings.ToLower(status.Source) {
-		case "override", "bundle", "cache":
+		case "override", "bundle":
 			asset.Source = strings.ToLower(status.Source)
+		case "cache":
+			if status.Asset.Kind == provision.KindEngine {
+				asset.Source = "legacy_cache"
+			} else {
+				asset.Source = "cache"
+			}
 		case "path":
 			asset.Source = "path"
 		default:
