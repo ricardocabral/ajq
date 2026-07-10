@@ -271,6 +271,13 @@ func TestAnthropicBackendStatusErrors(t *testing.T) {
 	}
 }
 
+func TestMapSDKErrorLeavesNonAPIErrorsUntouched(t *testing.T) {
+	err := context.Canceled
+	if got := mapSDKError(err); got != err {
+		t.Fatalf("mapSDKError() = %v, want original error %v", got, err)
+	}
+}
+
 func TestAnthropicBackendResponseEdgeCasesArePerItemErrors(t *testing.T) {
 	tests := []struct {
 		name       string

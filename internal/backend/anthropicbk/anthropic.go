@@ -146,15 +146,33 @@ func (b *Backend) judgeOne(ctx context.Context, j backend.Judgement) (backend.Re
 
 func mapSDKError(err error) error {
 	var apiErr *anthropic.Error
-	if errors.As(err, &apiErr) {
-		switch {
-		case apiErr.StatusCode == http.StatusUnauthorized:
-			return fmt.Errorf("anthropic authentication failed with status %d; check %s (create a key at https://console.anthropic.com/settings/keys): %w", apiErr.StatusCode, APIKeyEnv, err)
-		case apiErr.StatusCode == http.StatusTooManyRequests || apiErr.StatusCode >= 500:
-			return fmt.Errorf("anthropic provider returned status %d after SDK retries; judgements are cached so the run can be resumed cheaply: %w", apiErr.StatusCode, err)
-		}
+	if !errors.As(err, &apiErr) {
+		return err
 	}
-	return err
+
+	summary := anthropicAPIErrorSummary(apiErr)
+	switch {
+	case apiErr.StatusCode == http.StatusUnauthorized:
+		return fmt.Errorf("anthropic authentication failed with status %d%s; check %s (create a key at https://console.anthropic.com/settings/keys)", apiErr.StatusCode, summary, APIKeyEnv)
+	case apiErr.StatusCode == http.StatusTooManyRequests || apiErr.StatusCode >= 500:
+		return fmt.Errorf("anthropic provider returned status %d%s after SDK retries; judgements are cached so the run can be resumed cheaply", apiErr.StatusCode, summary)
+	default:
+		return fmt.Errorf("anthropic provider returned status %d%s", apiErr.StatusCode, summary)
+	}
+}
+
+func anthropicAPIErrorSummary(apiErr *anthropic.Error) string {
+	parts := make([]string, 0, 2)
+	if errorType := string(apiErr.Type()); errorType != "" {
+		parts = append(parts, "error_type="+errorType)
+	}
+	if apiErr.RequestID != "" {
+		parts = append(parts, "request_id="+apiErr.RequestID)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(parts, " ") + ")"
 }
 
 func (b *Backend) buildRequest(j backend.Judgement, constraint schema.Constraint) anthropic.MessageNewParams {
