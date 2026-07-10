@@ -1,13 +1,21 @@
 # ajq
 
-> ajq is a Go CLI for JSON pipelines: it preserves deterministic jq execution
-> and adds explicit, schema-constrained semantic operations for matching,
-> classification, scoring, and extraction.
+> ajq is a Go CLI for semantic jq workflows: fuzzy JSON filters, semantic grep
+> for JSON/NDJSON streams, and bounded classification while ordinary jq stays
+> deterministic.
 
 Use ajq when ordinary jq filters are too literal for messy text, but you still
-need predictable JSON processing. Pure jq paths stay byte-reproducible and do
-not call AI backends. Semantic work is explicit, cache-keyed by backend, model,
-spec, and canonical value, and bounded by user-visible cost controls.
+need predictable JSON processing: classify JSON streams, find records by meaning,
+or add LLM-enhanced jq predicates without prompting over the whole document.
+Pure jq paths stay byte-reproducible and do not call AI backends. Semantic work
+is explicit, cache-keyed by backend, model, spec, and canonical value, and
+bounded by user-visible cost controls.
+
+Shipped semantic surfaces are fuzzy matching (`=~`, `!~`, `sem_match`) and
+bounded `sem_classify`. `sem_score` and `sem_norm` are limited to documented
+contexts. Standalone `sem_extract` and `sem_redact` are registered but currently
+unsupported, so do not describe ajq as a general semantic extraction or redaction
+tool yet.
 
 ## Start here
 
@@ -28,7 +36,7 @@ spec, and canonical value, and bounded by user-visible cost controls.
 ## Task guides
 
 - [Process NDJSON](https://ricardocabral.github.io/ajq/docs/how-to/process-ndjson/): Input framing for JSON, NDJSON, raw lines, and null input.
-- [Write a semantic filter](https://ricardocabral.github.io/ajq/docs/how-to/semantic-filter/): Fuzzy `=~` predicates and bounded semantic functions.
+- [Write a semantic filter](https://ricardocabral.github.io/ajq/docs/how-to/semantic-filter/): Fuzzy `=~` predicates, `sem_match`, and bounded `sem_classify` for semantic JSON filters.
 - [Estimate model calls](https://ricardocabral.github.io/ajq/docs/how-to/estimate-model-calls/): Use `--explain` to budget cost and latency.
 - [Use cloud backends](https://ricardocabral.github.io/ajq/docs/how-to/use-cloud-backends/): Anthropic, OpenAI, and OpenRouter backend setup.
 - [Control semantic costs](https://ricardocabral.github.io/ajq/docs/how-to/control-costs/): Max-call caps, cache-aware planning, and run statistics.

@@ -1,6 +1,8 @@
 # ajq
 
-`ajq` is `jq` for the AI era: a stream processor that keeps ordinary jq byte-deterministic and calls a language model only for explicit semantic operations such as fuzzy matching, classification, scoring, and normalization.
+`ajq` is semantic `jq` for JSON and NDJSON streams: a fuzzy JSON filter and semantic grep that keeps ordinary jq byte-deterministic, then calls a language model only for explicit semantic operations such as fuzzy matching, bounded classification, limited scoring, and limited normalization.
+
+Use it when you need to classify JSON streams, find records by meaning instead of exact text, or add LLM-enhanced jq predicates without turning the whole pipeline into a prompt.
 
 ## Usage
 
@@ -13,12 +15,12 @@ ajq --version
 printf '{"users":[{"name":"Ada"}]}' | ajq -r '.users[].name'
 # Ada
 
-# Semantic filter with the deterministic mock backend (no model, network, or API key)
+# Semantic grep for JSON with the deterministic mock backend (no model, network, or API key)
 printf '[{"id":1,"msg":"please keep this"},{"id":2,"msg":"drop it"}]' \
   | ajq --backend mock -c '.[] | select(.msg =~ "keep") | .id'
 # 1
 
-# Inspect semantic plan and estimated backend calls before running
+# Inspect semantic plan and estimated backend calls before running an LLM-enhanced jq query
 printf '[{"msg":"refund demanded"}]' \
   | ajq --backend mock --explain '.[] | select(.msg =~ "angry/frustrated") | .msg'
 ```
@@ -48,7 +50,8 @@ release workflow.
 | Persistent cache | Semantic judgements are stored on disk under the ajq cache directory; `--no-cache` disables reads/writes for sensitive runs. |
 | Local provisioning | `ajq provision` downloads or locates the llama.cpp engine and default GGUF model for `--backend local` on supported platforms. |
 | Model management | `ajq models list`, `ajq models pull`, and `ajq models use` manage checksum-pinned local GGUF catalog models. |
-| Determinism contract | Pure jq paths stay byte-reproducible; semantic results are schema-constrained and cache-keyed by backend/model/spec/value. |
+| Semantic operators | Fuzzy matching (`=~` / `sem_match`) and bounded `sem_classify` ship for filters and labels; `sem_score` and `sem_norm` are limited to supported contexts. Standalone `sem_extract` and `sem_redact` are registered but currently unsupported. |
+| Determinism contract | Pure jq paths stay byte-reproducible and never contact AI backends; only explicit semantic operators make schema-constrained, cache-keyed model calls by backend/model/spec/value. |
 
 ## Docs
 

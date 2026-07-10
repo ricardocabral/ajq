@@ -68,7 +68,7 @@ disableKinds = ["taxonomy", "term"]
   github_subdir = "website"
 
   # Tagline shown in the browser tab suffix / SEO.
-  description = "jq for the AI era. ajq pulls clean, structured data out of messy streams with semantic matching, classification, and extraction."
+  description = "Semantic jq for messy JSON streams. ajq adds fuzzy JSON filtering, semantic grep for JSON/NDJSON, and bounded classification while pure jq stays deterministic."
 
   offlineSearch = true
   offlineSearchSummaryLength = 200
@@ -121,4 +121,4 @@ disableKinds = ["taxonomy", "term"]
     weight = 1
     [languages.en.params]
       title = "ajq"
-      description = "jq for the AI era. ajq pulls clean, structured data out of messy streams with semantic matching, classification, and extraction."
+      description = "Semantic jq for messy JSON streams. ajq adds fuzzy JSON filtering, semantic grep for JSON/NDJSON, and bounded classification while pure jq stays deterministic."
