@@ -1,18 +1,17 @@
 ---
-title: ajq
+title: ajq — semantic jq for JSON streams
 description: >
-  ajq is a Go CLI that keeps ordinary jq deterministic while adding explicit,
-  schema-constrained semantic matching, classification, scoring, and extraction
-  for messy JSON streams.
+  Semantic jq for messy JSON/NDJSON: filter by meaning, classify streams, and
+  keep pure jq deterministic with explicit model calls.
 ---
 
 {{< blocks/cover title="ajq" image_anchor="top" height="full" color="dark" >}}
 <div class="mx-auto">
-  <p class="cover-tagline h3 mt-2 mb-3">grep for meaning.</p>
-  <p class="lead">Clean, structured data out of messy streams.<br>It's <code>jq</code> for the AI era.</p>
+  <p class="cover-tagline h3 mt-2 mb-3">semantic grep for JSON.</p>
+  <p class="lead">Filter and classify messy JSON/NDJSON by meaning.<br>It's LLM-enhanced <code>jq</code> with a deterministic core.</p>
 
   <div class="cover-code">
-<span class="tok-comment"># keep the deterministic parts of jq, add fuzzy operators</span><br>
+<span class="tok-comment"># fuzzy JSON filter: keep jq deterministic, make only the predicate semantic</span><br>
 cat tickets.json | ajq --backend local <span class="tok-op">'</span>.[] | select(.msg <span class="tok-sem">=~</span> <span class="tok-op">"angry/frustrated"</span>) | .id<span class="tok-op">'</span>
   </div>
 
@@ -36,10 +35,10 @@ go install github.com/ricardocabral/ajq/cmd/ajq@latest
 {{< /blocks/cover >}}
 
 {{% blocks/lead color="primary" %}}
-**ajq** brings semantic matching, classification, and extraction to JSON streams, using
+**ajq** brings semantic matching and bounded classification to JSON streams, using
 the jq language you already know. It runs the ordinary parts of your query through a real
-jq engine and only calls a language model for the fuzzy bits, one small field value at a
-time.
+jq engine and only calls a language model for explicit fuzzy operators, one small field
+value at a time.
 
 So most of your pipeline stays byte-for-byte reproducible, and what you pay tracks how
 many fuzzy decisions you actually make, not how big your input is.
@@ -48,14 +47,15 @@ many fuzzy decisions you actually make, not how big your input is.
 {{% blocks/section color="white" type="row" %}}
 {{% blocks/feature icon="fa-bolt" title="Deterministic core" %}}
 Real `jq` semantics, powered by [`gojq`](https://github.com/itchyny/gojq). Most of every
-pipeline is byte-reproducible: the same input gives you the same bytes on every run. Only
-the fuzzy operators ever reach for a model.
+pipeline is byte-reproducible: the same input gives you the same bytes on every run. Pure
+jq paths never contact AI backends; only explicit semantic operators reach for a model.
 {{% /blocks/feature %}}
 
 {{% blocks/feature icon="fa-wand-magic-sparkles" title="Semantic operators" %}}
-`select(.x =~ "spec")`, `sem_classify`, `sem_extract`, `sem_score` and friends are just jq
-functions. There's no new grammar to learn, so fuzzy predicates compose with `select`,
-`sort_by`, `group_by`, object construction, and updates like anything else.
+`select(.x =~ "spec")` and `sem_classify` are jq-shaped operators for fuzzy filters and
+labels. `sem_score` and `sem_norm` are available only in supported contexts, while
+standalone `sem_extract` and `sem_redact` are registered but unsupported. There is no new
+grammar to learn, so semantic predicates compose with ordinary jq pipelines.
 {{% /blocks/feature %}}
 
 {{% blocks/feature icon="fa-microchip" title="Local-first and cheap" %}}
@@ -73,7 +73,7 @@ replay repeated decisions without another model call.
 
 </div>
 
-A real `ajq` query is mostly plain `jq`. Only the *fuzzy* operator needs a model:
+A real `ajq` query is mostly plain `jq`. Only the explicit *fuzzy* operator needs a model:
 
 ```text
 cat data.json | ajq --backend local '.users[] | select(.feedback =~ "angry/frustrated") | .id'
@@ -171,8 +171,8 @@ field value at a time, the context stays tiny and a 1.5B model is plenty. There'
 Here's the gap ajq fills. `grep`, `awk`, and `jq` are deterministic but literal. `llm-jq`
 uses an LLM to write a jq program from your prompt, then runs that program over the data.
 A hand-rolled LLM script can be fuzzy, but it pays per row, drifts over time, and leaves
-you to plumb the JSON yourself. ajq keeps jq's ergonomics and adds only the fuzzy
-operators, deduplicated and cached.
+you to plumb the JSON yourself. ajq keeps jq's ergonomics and adds explicit fuzzy JSON
+filters and classification, deduplicated and cached.
 {{% /blocks/section %}}
 
 {{% blocks/section color="light" %}}

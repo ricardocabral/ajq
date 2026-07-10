@@ -75,7 +75,7 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     skip_upload: '{{ if index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
     homepage: https://github.com/ricardocabral/ajq
-    description: jq-like stream processor for semantic matching and classification
+    description: semantic jq for fuzzy JSON filtering and bounded classification
     url:
       verified: github.com/ricardocabral/ajq
     hooks:

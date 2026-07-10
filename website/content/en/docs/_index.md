@@ -3,8 +3,9 @@ title: Documentation
 linkTitle: Docs
 weight: 20
 description: >
-  Tutorials, how-to guides, reference material, and design notes for using ajq's
-  deterministic jq core and explicit semantic operators.
+  Tutorials, how-to guides, reference material, and design notes for semantic jq:
+  fuzzy JSON filters, bounded classification, deterministic jq execution, and
+  explicit model-backed operators.
 menu:
   main:
     weight: 20
@@ -29,15 +30,15 @@ remains a roadmap item. For the full picture, see
 
 ### 🎓 [Tutorials](tutorials/)
 
-Run your first ajq pipeline and inspect a semantic plan.
+Run your first ajq pipeline and inspect how semantic JSON filters are planned.
 
 </div>
 <div class="col-md-6 mb-4">
 
 ### 🛠️ [How-to guides](how-to/)
 
-Install ajq, process streams, write semantic filters, use cloud or local models, control
-costs, manage the cache, and configure defaults.
+Install ajq, process JSON/NDJSON streams, write fuzzy filters, classify records, use
+cloud or local models, control costs, manage the cache, and configure defaults.
 
 </div>
 <div class="col-md-6 mb-4">

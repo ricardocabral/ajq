@@ -24,6 +24,10 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   ecosystem adapters such as `jc`, `yq`/`xq`, and `fq`.
 - Added canonical and structured website metadata, explicit robots/sitemap
   discovery, and a curated `/llms.txt` index for machine-facing documentation.
+- Refined README, website home, release metadata, and `/llms.txt` positioning so
+  ajq is described as semantic jq for fuzzy JSON filtering, semantic grep for
+  JSON/NDJSON, and bounded classification without over-claiming unsupported
+  extraction or redaction operators.
 
 ## [0.0.1] - 2026-07-09
 
