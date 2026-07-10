@@ -14,6 +14,8 @@ Use these when you know the task. New to ajq? Start with
 - **[Install ajq](install/)** — get ajq onto your machine and provision local assets.
 - **[Process an NDJSON stream](process-ndjson/)** — handle newline-delimited JSON and raw
   log lines.
+- **[Use ajq with other data formats](use-other-data-formats/)** — pipe JSON from
+  complementary jq ecosystem adapters into ajq.
 - **[Write a semantic filter](semantic-filter/)** — use fuzzy `=~` predicates and bounded
   semantic functions.
 - **[Estimate model calls before running](estimate-model-calls/)** — use `--explain` to

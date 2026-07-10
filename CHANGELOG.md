@@ -18,6 +18,11 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+### Added
+
+- Added a how-to guide for using ajq with JSON produced by complementary jq
+  ecosystem adapters such as `jc`, `yq`/`xq`, and `fq`.
+
 ## [0.0.1] - 2026-07-09
 
 ### Added
