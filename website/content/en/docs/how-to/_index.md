@@ -14,6 +14,12 @@ Use these when you know the task. New to ajq? Start with
 - **[Install ajq](install/)** — get ajq onto your machine and provision local assets.
 - **[Process an NDJSON stream](process-ndjson/)** — handle newline-delimited JSON and raw
   log lines.
+- **[Filter JSON by meaning](filter-json-by-meaning/)** — find records by topic or intent
+  with explicit semantic predicates.
+- **[Classify JSON and NDJSON streams](classify-json-streams/)** — route records into a
+  fixed set of semantic labels.
+- **[Use ajq safely from coding agents](agent-safe-semantic-workflow/)** — start with mock
+  and `--explain`, then cap and observe real model calls.
 - **[Use ajq with other data formats](use-other-data-formats/)** — pipe JSON from
   complementary jq ecosystem adapters into ajq.
 - **[Write a semantic filter](semantic-filter/)** — use fuzzy `=~` predicates and bounded

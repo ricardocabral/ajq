@@ -59,6 +59,8 @@ Everything beyond the quick start lives on the website:
 
 - [Install details](https://ricardocabral.github.io/ajq/docs/how-to/install/)
 - [First pipeline tutorial](https://ricardocabral.github.io/ajq/docs/tutorials/first-pipeline/)
+- [Filter JSON by meaning](https://ricardocabral.github.io/ajq/docs/how-to/filter-json-by-meaning/)
+- [Classify JSON and NDJSON streams](https://ricardocabral.github.io/ajq/docs/how-to/classify-json-streams/)
 - [Semantic functions reference](https://ricardocabral.github.io/ajq/docs/reference/semantic-functions/)
 - [CLI reference](https://ricardocabral.github.io/ajq/docs/reference/cli/)
 - [Split execution](https://ricardocabral.github.io/ajq/docs/explanation/split-execution/) and [determinism](https://ricardocabral.github.io/ajq/docs/explanation/determinism/)

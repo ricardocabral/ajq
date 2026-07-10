@@ -20,6 +20,8 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added problem-first how-to guides for filtering JSON by meaning, classifying
+  JSON/NDJSON streams, and using ajq safely from coding agents.
 - Added a how-to guide for using ajq with JSON produced by complementary jq
   ecosystem adapters such as `jc`, `yq`/`xq`, and `fq`.
 - Added canonical and structured website metadata, explicit robots/sitemap
