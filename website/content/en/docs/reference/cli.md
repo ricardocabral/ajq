@@ -90,21 +90,51 @@ list` shows local model availability, `ajq cache status` inspects the local
 judgement cache, and `ajq daemon status` checks daemon state without starting a
 model.
 
+## JSON state probes
+
+Coding agents can request versioned local-state documents with command-local
+`--json` flags. Every document has `schema_version: "1"`, is one JSON document
+on stdout, and has a trailing newline. Consumers should use the schema version,
+ignore unknown future fields/enums, and keep stdout even when a readiness check
+has a non-zero exit status.
+
+- `ajq models list --json` returns `active` and ordered `models`. `active.state`
+  is `catalog`, `path_like`, or `unknown`; `name` occurs only for `catalog` and
+  `path` only for `path_like`. Each catalog row contains `name`, `active`,
+  `installed`, `filename`, `path`, `size_bytes`, and `ram`.
+- `ajq cache status --json` returns `availability` (`available` or
+  `unavailable`), `path`, `entries`, and `bytes`. An unavailable local cache
+  also has `error: "status_unavailable"` and exits non-zero; it never exposes a
+  raw filesystem error.
+- `ajq provision --check --json` returns `platform`, `ready`, `engine`,
+  `model`, and ordered `actions`. Assets contain identity, `present`, `path`,
+  and `source` when present; sources include `override`, `bundle`,
+  `legacy_cache`, `path`, `cache`, and `unknown`. Missing readiness produces a
+  complete document then exits 1. Actions are engine-first: `provision` runs
+  `ajq provision`, and a selected non-default model can add `models_pull` with
+  `ajq models pull <name>`. `--json` requires `--check`; `ajq provision --json`
+  is rejected and never starts provisioning.
+
+These probes only read local configuration, filesystem, and PATH state. They do
+not construct a backend, contact a provider, download assets, or start a daemon.
+They intentionally omit credentials, prompts, provider responses, catalog URLs,
+and checksums.
+
 ## Subcommands
 
 | Command | Description |
 |---|---|
-| `ajq cache status` | Print persistent judgement cache location, entry count, and bytes. |
+| `ajq cache status [--json]` | Print persistent judgement cache status, or its versioned machine-readable probe. |
 | `ajq cache clear` | Delete persistent judgement cache entries and report what was freed. |
 | `ajq capabilities [--json]` | Print informational static metadata, or the versioned machine-readable capability contract for agents. |
 | `ajq daemon status` | Print the warm local daemon status. |
 | `ajq examples [topic]` | Print categorized safe examples; semantic examples explicitly use `--backend mock`. |
 | `ajq daemon stop` | Stop the local daemon if running; idempotent. |
-| `ajq models list` | Print the pinned local model catalog with active/installed markers, sizes, and RAM notes. |
+| `ajq models list [--json]` | Print the pinned local model catalog, or its versioned machine-readable probe. |
 | `ajq models pull <name>` | Download a checksum-pinned catalog model into the ajq cache. |
 | `ajq models use <name>` | Persist `model = "<name>"` to config after verifying the model is installed. |
 | `ajq provision` | Download or locate the local `llama-server` engine and default GGUF model. |
-| `ajq provision --check` | Report provisioning status and exit non-zero if assets are missing, without downloading. |
+| `ajq provision --check [--json]` | Report provisioning status (or its versioned JSON) and exit non-zero if assets are missing, without downloading. |
 
 The root help also includes Cobra's generated `completion` and `help` commands.
 

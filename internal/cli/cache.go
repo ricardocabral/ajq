@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 
 	semanticcache "github.com/ricardocabral/ajq/internal/cache"
 	"github.com/spf13/cobra"
@@ -21,14 +24,32 @@ func newCacheCommand() *cobra.Command {
 }
 
 func newCacheStatusCommand() *cobra.Command {
-	return &cobra.Command{
+	var jsonOutput bool
+	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show persistent judgement cache status",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			stats, err := semanticcache.Status("")
-			if err != nil {
-				return err
+			stats, statusErr := semanticcache.Status("")
+			if statusErr != nil && !jsonOutput {
+				return statusErr
+			}
+			if jsonOutput {
+				if statusErr == nil {
+					if info, err := os.Stat(stats.Location); err == nil && !info.IsDir() {
+						statusErr = fmt.Errorf("judgement cache location is not a directory")
+					}
+				}
+				if stats.Location == "" {
+					stats.Location = semanticcache.JudgementsDir("")
+				}
+				if err := writeCacheStatusJSON(cmd.OutOrStdout(), stats, statusErr == nil); err != nil {
+					return &ExitError{Code: 1, Err: fmt.Errorf("write cache status: %w", err)}
+				}
+				if statusErr != nil {
+					return &ExitError{Code: 1, Silent: true}
+				}
+				return nil
 			}
 			if err := writeCacheStats(cmd, stats, false); err != nil {
 				return fmt.Errorf("write cache status: %w", err)
@@ -36,6 +57,8 @@ func newCacheStatusCommand() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "print the versioned machine-readable cache status")
+	return cmd
 }
 
 func newCacheClearCommand() *cobra.Command {
@@ -54,6 +77,33 @@ func newCacheClearCommand() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// cacheStatusDocument is the deterministic v1 wire contract for `ajq cache status --json`.
+type cacheStatusDocument struct {
+	SchemaVersion string `json:"schema_version"`
+	Availability  string `json:"availability"`
+	Path          string `json:"path"`
+	Entries       int    `json:"entries"`
+	Bytes         int64  `json:"bytes"`
+	Error         string `json:"error,omitempty"`
+}
+
+func writeCacheStatusJSON(w io.Writer, stats semanticcache.Stats, available bool) error {
+	document := cacheStatusDocument{
+		SchemaVersion: "1",
+		Availability:  "available",
+		Path:          stats.Location,
+		Entries:       stats.Entries,
+		Bytes:         stats.Bytes,
+	}
+	if !available {
+		document.Availability = "unavailable"
+		document.Entries = 0
+		document.Bytes = 0
+		document.Error = "status_unavailable"
+	}
+	return json.NewEncoder(w).Encode(document)
 }
 
 func writeCacheStats(cmd *cobra.Command, stats semanticcache.Stats, cleared bool) error {

@@ -30,6 +30,11 @@ no API key, network, provisioning, or local model. Before a real semantic run,
 select a backend explicitly, use `--explain`, and set an appropriate
 `--max-calls` cap.
 
+For machine-readable local readiness, use `ajq models list --json`, `ajq cache
+status --json`, and `ajq provision --check --json`. These versioned local-state
+probes do not create a backend or download assets; the provisioning probe writes
+JSON before its expected exit 1 when assets are missing.
+
 - [Website home](https://ricardocabral.github.io/ajq/): Product overview, split-execution summary, comparison, and performance notes.
 - [Documentation index](https://ricardocabral.github.io/ajq/docs/): Entry point for tutorials, how-to guides, reference pages, and design explanations.
 - [Install ajq](https://ricardocabral.github.io/ajq/docs/how-to/install/): Release install script, Go install fallback, and local backend provisioning.

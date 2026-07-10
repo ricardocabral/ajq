@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -33,7 +35,8 @@ func newModelsCommand(opts Options) *cobra.Command {
 }
 
 func newModelsListCommand(opts Options) *cobra.Command {
-	return &cobra.Command{
+	var jsonOutput bool
+	cmd := &cobra.Command{
 		Use:           "list",
 		Short:         "list available local models",
 		SilenceUsage:  true,
@@ -41,13 +44,21 @@ func newModelsListCommand(opts Options) *cobra.Command {
 		Args:          cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			controller := resolveProvisionController(opts)
-			active, activeNote := activeCatalogModel(cmd)
-			if err := writeModelsList(cmd.OutOrStdout(), controller, active, activeNote); err != nil {
+			var err error
+			if jsonOutput {
+				err = writeModelsListJSON(cmd.OutOrStdout(), controller, activeCatalogModelJSON(cmd))
+			} else {
+				active, activeNote := activeCatalogModel(cmd)
+				err = writeModelsList(cmd.OutOrStdout(), controller, active, activeNote)
+			}
+			if err != nil {
 				return &ExitError{Code: 1, Err: fmt.Errorf("write models list: %w", err)}
 			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "print the versioned machine-readable model status")
+	return cmd
 }
 
 func newModelsPullCommand(opts Options) *cobra.Command {
@@ -117,7 +128,7 @@ func newModelsUseCommand(opts Options) *cobra.Command {
 	}
 }
 
-func writeModelsList(w interface{ Write([]byte) (int, error) }, controller ProvisionController, active, activeNote string) error {
+func writeModelsList(w io.Writer, controller ProvisionController, active, activeNote string) error {
 	catalog := catalogForController(controller)
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	if _, err := fmt.Fprintln(tw, "NAME\tACTIVE\tINSTALLED\tSIZE\tRAM"); err != nil {
@@ -143,6 +154,83 @@ func writeModelsList(w interface{ Write([]byte) (int, error) }, controller Provi
 		}
 	}
 	return tw.Flush()
+}
+
+// modelsListDocument is the deterministic v1 wire contract for `ajq models list --json`.
+type modelsListDocument struct {
+	SchemaVersion string           `json:"schema_version"`
+	Active        modelActiveState `json:"active"`
+	Models        []modelListEntry `json:"models"`
+}
+
+type modelActiveState struct {
+	State string `json:"state"`
+	Name  string `json:"name,omitempty"`
+	Path  string `json:"path,omitempty"`
+}
+
+type modelListEntry struct {
+	Name      string `json:"name"`
+	Active    bool   `json:"active"`
+	Installed bool   `json:"installed"`
+	Filename  string `json:"filename"`
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"size_bytes"`
+	RAM       string `json:"ram"`
+}
+
+func writeModelsListJSON(w io.Writer, controller ProvisionController, active modelActiveState) error {
+	catalog := catalogForController(controller)
+	document := modelsListDocument{SchemaVersion: "1", Active: active, Models: make([]modelListEntry, 0, len(catalog.Models))}
+	for _, model := range catalog.ModelsList() {
+		plan, err := controller.PlanModelOnly(model.Name)
+		entry := modelListEntry{
+			Name:      model.Name,
+			Active:    active.State == "catalog" && active.Name == model.Name,
+			Installed: err == nil && plan.Model.Present,
+			Filename:  model.Asset.Filename,
+			Path:      plan.Model.Path,
+			SizeBytes: model.Asset.Size,
+			RAM:       model.RAMNote,
+		}
+		if err != nil {
+			entry.Path = provision.NewLayout("").ModelPath(model.Asset.Filename)
+		}
+		document.Models = append(document.Models, entry)
+	}
+	if active.State == "catalog" {
+		found := false
+		for _, model := range document.Models {
+			if model.Active {
+				found = true
+				break
+			}
+		}
+		if !found {
+			document.Active = modelActiveState{State: "unknown"}
+		}
+	}
+	return json.NewEncoder(w).Encode(document)
+}
+
+func activeCatalogModelJSON(cmd *cobra.Command) modelActiveState {
+	fileValues, err := config.LoadWithOptions(config.LoadOptions{Stderr: io.Discard})
+	if err != nil {
+		return modelActiveState{State: "unknown"}
+	}
+	envValues, err := config.Env(os.Getenv)
+	if err != nil {
+		return modelActiveState{State: "unknown"}
+	}
+	settings := config.Resolve(config.Values{}, envValues, fileValues, backendRegistryDefaultValues("local"))
+	resolved, err := resolveLocalModelRequest(settings.Model)
+	if err != nil {
+		return modelActiveState{State: "unknown"}
+	}
+	if resolved.PathLike {
+		return modelActiveState{State: "path_like", Path: resolved.Path}
+	}
+	return modelActiveState{State: "catalog", Name: resolved.Name}
 }
 
 func catalogForController(controller ProvisionController) provision.Catalog {
