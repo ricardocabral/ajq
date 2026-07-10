@@ -18,6 +18,12 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+### Fixed
+
+- Semantic cache entries now distinguish `--base-url` endpoints, preventing
+  cached judgements from one compatible deployment being reused by another
+  deployment serving a model with the same name.
+
 ## [0.0.3] - 2026-07-10
 
 ### Fixed
