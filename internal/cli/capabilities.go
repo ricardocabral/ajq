@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/ricardocabral/ajq/internal/semantics"
 	"github.com/ricardocabral/ajq/internal/version"
+	"github.com/spf13/cobra"
 )
 
 // capabilitiesDocument is the deterministic v1 capabilities wire contract.
@@ -109,6 +112,38 @@ type capabilityMockBackendSafe struct {
 
 type capabilityDiscovery struct {
 	ExamplesCommand string `json:"examples_command"`
+}
+
+func newCapabilitiesCommand() *cobra.Command {
+	var jsonOutput bool
+	cmd := &cobra.Command{
+		Use:           "capabilities",
+		Short:         "print ajq capability metadata",
+		Long:          "Print static ajq capability metadata. The human summary is informational; use --json for the versioned machine-readable contract.",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			var err error
+			if jsonOutput {
+				err = json.NewEncoder(cmd.OutOrStdout()).Encode(newCapabilitiesDocument())
+			} else {
+				err = writeCapabilitiesSummary(cmd)
+			}
+			if err != nil {
+				return &ExitError{Code: 1, Err: fmt.Errorf("write capabilities: %w", err)}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "print the versioned machine-readable capabilities contract")
+	return cmd
+}
+
+func writeCapabilitiesSummary(cmd *cobra.Command) error {
+	document := newCapabilitiesDocument()
+	_, err := fmt.Fprintf(cmd.OutOrStdout(), "ajq capabilities (informational; use --json for the stable v%s contract)\nsemantic functions: %d\nbackends: %d\nexamples: %s\n", document.SchemaVersion, len(document.SemanticFunctions), len(document.Backends), document.Discovery.ExamplesCommand)
+	return err
 }
 
 func newCapabilitiesDocument() capabilitiesDocument {
