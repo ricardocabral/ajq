@@ -644,8 +644,8 @@ func TestFlagEnvConfigPrecedenceEndToEnd(t *testing.T) {
 		t.Fatalf("stdout=%q stderr=%q", stdout, stderr)
 	}
 	calls, modelIDs := be.snapshot()
-	if calls != 1 || len(modelIDs) == 0 || modelIDs[0] != "local/qwen2.5-3b" {
-		t.Fatalf("calls=%d modelIDs=%v, want local/qwen2.5-3b", calls, modelIDs)
+	if calls != 1 || len(modelIDs) == 0 || modelIDs[0] != "local/qwen2.5-3b@http://env" {
+		t.Fatalf("calls=%d modelIDs=%v, want local/qwen2.5-3b@http://env", calls, modelIDs)
 	}
 }
 
@@ -693,8 +693,8 @@ func TestLocalBackendDefaultModelUsesCatalogIdentityThroughCLI(t *testing.T) {
 		t.Fatalf("semantic query returned error: %v; stderr=%q", err, stderr)
 	}
 	calls, modelIDs := be.snapshot()
-	if calls != 1 || len(modelIDs) == 0 || modelIDs[0] != "local/qwen2.5-1.5b" {
-		t.Fatalf("calls=%d modelIDs=%v, want local/qwen2.5-1.5b", calls, modelIDs)
+	if calls != 1 || len(modelIDs) == 0 || modelIDs[0] != "local/qwen2.5-1.5b@http://127.0.0.1:8081" {
+		t.Fatalf("calls=%d modelIDs=%v, want local/qwen2.5-1.5b@http://127.0.0.1:8081", calls, modelIDs)
 	}
 }
 

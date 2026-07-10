@@ -80,7 +80,7 @@ var backendRegistry = []backendRegistration{
 			if err != nil {
 				return "", err
 			}
-			return resolved.ModelID, nil
+			return modelIdentityWithBaseURL(resolved.ModelID, settings.BaseURL), nil
 		},
 		Construct: func(opts Options, settings config.Settings) (backend.Backend, *semanticcache.Store, error) {
 			if opts.LocalBackend != nil {
@@ -99,7 +99,7 @@ var backendRegistry = []backendRegistration{
 		NeedsModel:     true,
 		NeedsBaseURL:   true,
 		ModelIdentity: func(settings config.Settings) (string, error) {
-			return "ollama/" + strings.TrimSpace(settings.Model), nil
+			return modelIdentityWithBaseURL("ollama/"+strings.TrimSpace(settings.Model), settings.BaseURL), nil
 		},
 		Construct: func(_ Options, settings config.Settings) (backend.Backend, *semanticcache.Store, error) {
 			be, err := newOllamaBackend(settings)
@@ -144,7 +144,7 @@ func openAICompatibleRegistration(name, defaultBaseURL, apiKeyEnv string) backen
 		DefaultMaxCalls:        100,
 		DefaultMaxOutputTokens: oai.DefaultMaxTokens,
 		ModelIdentity: func(settings config.Settings) (string, error) {
-			return name + "/" + strings.TrimSpace(settings.Model), nil
+			return modelIdentityWithBaseURL(name+"/"+strings.TrimSpace(settings.Model), settings.BaseURL), nil
 		},
 		Construct: func(_ Options, settings config.Settings) (backend.Backend, *semanticcache.Store, error) {
 			be, err := newOpenAICompatibleBackend(name, defaultBaseURL, apiKeyEnv, settings)
@@ -154,6 +154,14 @@ func openAICompatibleRegistration(name, defaultBaseURL, apiKeyEnv string) backen
 			return be, semanticcache.NewStore(), nil
 		},
 	}
+}
+
+func modelIdentityWithBaseURL(modelID, baseURL string) string {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		return modelID
+	}
+	return modelID + "@" + baseURL
 }
 
 func semanticStoreForSettings(settings config.Settings) *semanticcache.Store {
