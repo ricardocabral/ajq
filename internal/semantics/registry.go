@@ -25,6 +25,66 @@ const (
 	ReturnNumber ReturnType = "number"
 )
 
+// AvailabilityStatus describes an operator's supported execution surface.
+type AvailabilityStatus string
+
+// AvailabilityStatus values are the closed v1 availability vocabulary.
+const (
+	AvailabilityShipped AvailabilityStatus = "shipped"
+	AvailabilityLimited AvailabilityStatus = "limited"
+)
+
+// ExecutionContext identifies a supported semantic execution context.
+type ExecutionContext string
+
+// ExecutionContext values are the closed v1 execution-context vocabulary.
+const (
+	ContextAll               ExecutionContext = "all"
+	ContextInterleavedGated  ExecutionContext = "interleaved_gated"
+	ContextThreePhaseSortBy  ExecutionContext = "three_phase_sort_by"
+	ContextThreePhaseGroupBy ExecutionContext = "three_phase_group_by"
+)
+
+// Limitation identifies a known, intentional availability restriction.
+type Limitation string
+
+// Limitation values are the closed v1 limitation vocabulary.
+const (
+	LimitationNonGatedUnboundedFailsLoudly Limitation = "non_gated_unbounded_fails_loudly"
+)
+
+// Availability is canonical, static metadata about an operator's execution
+// support. It is deliberately separate from planner arity details so callers
+// can safely expose it without constructing a backend or inspecting config.
+// Its fixed storage keeps OpSpec comparable for planner callers.
+type Availability struct {
+	Status          AvailabilityStatus
+	contexts        [3]ExecutionContext
+	contextCount    int
+	limitations     [1]Limitation
+	limitationCount int
+}
+
+func availability(status AvailabilityStatus, contexts []ExecutionContext, limitations []Limitation) Availability {
+	var value Availability
+	value.Status = status
+	value.contextCount = copy(value.contexts[:], contexts)
+	value.limitationCount = copy(value.limitations[:], limitations)
+	return value
+}
+
+// SupportedContexts returns the operator's supported execution contexts in
+// deterministic declaration order.
+func (a Availability) SupportedContexts() []ExecutionContext {
+	return append([]ExecutionContext(nil), a.contexts[:a.contextCount]...)
+}
+
+// Limitations returns the operator's known limitations in deterministic
+// declaration order.
+func (a Availability) Limitations() []Limitation {
+	return append([]Limitation(nil), a.limitations[:a.limitationCount]...)
+}
+
 // OpSpec describes one v1 semantic operator's stable planner contract.
 type OpSpec struct {
 	Name                    string
@@ -39,6 +99,7 @@ type OpSpec struct {
 	ExplicitMinSpecs        int
 	ExplicitMaxSpecs        int
 	PreferImplicitAllString bool
+	Availability            Availability
 }
 
 func semMatchSpec() OpSpec {
@@ -46,6 +107,7 @@ func semMatchSpec() OpSpec {
 		Name: "sem_match", Kind: KindPredicate, Return: ReturnBool,
 		ImplicitMinArity: 1, ImplicitMaxArity: 1, ExplicitMinArity: 2, ExplicitMaxArity: 2,
 		ImplicitMinSpecs: 1, ImplicitMaxSpecs: 1, ExplicitMinSpecs: 1, ExplicitMaxSpecs: 1,
+		Availability: availability(AvailabilityShipped, []ExecutionContext{ContextAll}, nil),
 	}
 }
 
@@ -55,6 +117,7 @@ func semClassifySpec() OpSpec {
 		ImplicitMinArity: 2, ImplicitMaxArity: MaxJQFunctionArity, ExplicitMinArity: 3, ExplicitMaxArity: MaxJQFunctionArity,
 		ImplicitMinSpecs: 2, ImplicitMaxSpecs: MaxJQFunctionArity, ExplicitMinSpecs: 2, ExplicitMaxSpecs: MaxJQFunctionArity - 1,
 		PreferImplicitAllString: true,
+		Availability:            availability(AvailabilityShipped, []ExecutionContext{ContextAll}, nil),
 	}
 }
 
@@ -63,6 +126,7 @@ func semExtractSpec() OpSpec {
 		Name: "sem_extract", Kind: KindValue, Return: ReturnString,
 		ImplicitMinArity: 1, ImplicitMaxArity: 1, ExplicitMinArity: 2, ExplicitMaxArity: 2,
 		ImplicitMinSpecs: 1, ImplicitMaxSpecs: 1, ExplicitMinSpecs: 1, ExplicitMaxSpecs: 1,
+		Availability: availability(AvailabilityLimited, []ExecutionContext{ContextInterleavedGated}, []Limitation{LimitationNonGatedUnboundedFailsLoudly}),
 	}
 }
 
@@ -71,6 +135,7 @@ func semScoreSpec() OpSpec {
 		Name: "sem_score", Kind: KindValue, Return: ReturnNumber,
 		ImplicitMinArity: 1, ImplicitMaxArity: 1, ExplicitMinArity: 2, ExplicitMaxArity: 2,
 		ImplicitMinSpecs: 1, ImplicitMaxSpecs: 1, ExplicitMinSpecs: 1, ExplicitMaxSpecs: 1,
+		Availability: availability(AvailabilityLimited, []ExecutionContext{ContextInterleavedGated, ContextThreePhaseSortBy}, []Limitation{LimitationNonGatedUnboundedFailsLoudly}),
 	}
 }
 
@@ -79,6 +144,7 @@ func semNormSpec() OpSpec {
 		Name: "sem_norm", Kind: KindValue, Return: ReturnString,
 		ImplicitMinArity: 1, ImplicitMaxArity: 1, ExplicitMinArity: 2, ExplicitMaxArity: 2,
 		ImplicitMinSpecs: 1, ImplicitMaxSpecs: 1, ExplicitMinSpecs: 1, ExplicitMaxSpecs: 1,
+		Availability: availability(AvailabilityLimited, []ExecutionContext{ContextInterleavedGated, ContextThreePhaseGroupBy}, []Limitation{LimitationNonGatedUnboundedFailsLoudly}),
 	}
 }
 
@@ -87,6 +153,7 @@ func semRedactSpec() OpSpec {
 		Name: "sem_redact", Kind: KindValue, Return: ReturnString,
 		ImplicitMinArity: 1, ImplicitMaxArity: 1, ExplicitMinArity: 2, ExplicitMaxArity: 2,
 		ImplicitMinSpecs: 1, ImplicitMaxSpecs: 1, ExplicitMinSpecs: 1, ExplicitMaxSpecs: 1,
+		Availability: availability(AvailabilityLimited, []ExecutionContext{ContextInterleavedGated}, []Limitation{LimitationNonGatedUnboundedFailsLoudly}),
 	}
 }
 

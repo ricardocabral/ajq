@@ -46,6 +46,14 @@ precedence.
 
 ## Help-first agent probe
 
+For machine consumers, begin with `ajq capabilities --json`. Its versioned
+`schema_version: "1"` document is the stable contract for input/output modes,
+semantic-function availability, backend defaults, cost/cache/provisioning
+notes, safety guarantees, and discovery commands. `ajq_version` and human
+backend descriptions are informational build text; all other documented v1
+fields and enum values are stable. Consumers must ignore unknown fields and
+future enum values for compatible v1 builds.
+
 Start with `ajq --help`, then run `ajq examples` for categorized, copy-pasteable
 safe workflows. `ajq examples [topic]` can show one of `pure-jq`,
 `semantic-filter`, `explain`, `classification`, or `ndjson`; its semantic
