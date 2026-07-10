@@ -143,6 +143,26 @@ func TestOllamaBackendModelMissing404ErrorText(t *testing.T) {
 	}
 }
 
+func TestOllamaBackendStatusErrorDoesNotExposeResponseBody(t *testing.T) {
+	const marker = "echoed-value-marker-xyz"
+	srv, _ := newFakeOllama(t, func(idx int, w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(w, `{"error":{"type":"server_error","message":"`+marker+`"}}`)
+	})
+	be := baseBackend(srv)
+	_, err := be.Judge(context.Background(), []backend.Judgement{{Op: "sem_match", Return: semantics.ReturnBool, Specs: []string{"x"}, Value: "x"}})
+	if err == nil {
+		t.Fatal("Judge returned nil error, want status error")
+	}
+	if strings.Contains(err.Error(), marker) {
+		t.Fatalf("error exposed response body marker: %v", err)
+	}
+	if !strings.Contains(err.Error(), "error_type=server_error") {
+		t.Fatalf("error = %v, want structured error type", err)
+	}
+}
+
 func TestResolveBaseURLPrecedenceAndForms(t *testing.T) {
 	t.Setenv("OLLAMA_HOST", "127.0.0.1:15555")
 	got, err := ResolveBaseURL("http://flag-host:16666/")

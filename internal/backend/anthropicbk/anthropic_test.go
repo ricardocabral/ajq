@@ -271,6 +271,26 @@ func TestAnthropicBackendStatusErrors(t *testing.T) {
 	}
 }
 
+func TestAnthropicBackendStatusErrorDoesNotExposeResponseBody(t *testing.T) {
+	const marker = "echoed-value-marker-xyz"
+	srv, _ := newFakeAnthropic(t, func(idx int, w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"type":"error","error":{"type":"invalid_request_error","message":"`+marker+`"}}`)
+	})
+	be := baseBackend(t, srv)
+	_, err := be.Judge(context.Background(), []backend.Judgement{{Op: "sem_match", Return: semantics.ReturnBool, Schema: backend.ResultSchema{Type: semantics.ReturnBool}, Specs: []string{"x"}, Value: "x"}})
+	if err == nil {
+		t.Fatal("Judge returned nil error, want status error")
+	}
+	if strings.Contains(err.Error(), marker) {
+		t.Fatalf("error exposed response body marker: %v", err)
+	}
+	if !strings.Contains(err.Error(), "error_type=invalid_request_error") {
+		t.Fatalf("error = %v, want structured error type", err)
+	}
+}
+
 func TestMapSDKErrorLeavesNonAPIErrorsUntouched(t *testing.T) {
 	err := context.Canceled
 	if got := mapSDKError(err); got != err {
