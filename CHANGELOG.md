@@ -20,11 +20,14 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
-- Added versioned JSON state probes for `ajq models list`, `ajq cache status`, and `ajq provision --check`, so agents can inspect local model, cache, and provisioning readiness without parsing human output.
-- Added `ajq capabilities --json`, a static versioned machine-readable contract for agents to discover modes, semantic availability, backend defaults, cost/cache/safety limits, and safe examples without loading configuration or initializing a backend.
-- Added `ajq examples [topic]` for categorized, copy-pasteable safe CLI workflows; semantic snippets explicitly use the deterministic `--backend mock`.
-- Added copy-pasteable root and discovery-command help examples, including the
-  deterministic `--backend mock` agent probe and `--explain` plan workflow.
+- Added an agent-discovery CLI surface: `ajq examples [topic]` provides
+  categorized copy-pasteable safe workflows; `ajq capabilities --json` is a
+  static versioned contract that does not load configuration or initialize a
+  backend; and `ajq models list --json`, `ajq cache status --json`, and
+  check-only `ajq provision --check --json` provide versioned local-state
+  probes without parsing human output. Missing provisioning readiness still
+  emits its document and exits 1. Root and discovery-command help include the
+  deterministic `--backend mock` probe and `--explain` plan workflow.
 - Added problem-first how-to guides for filtering JSON by meaning, classifying
   JSON/NDJSON streams, and using ajq safely from coding agents.
 - Added a how-to guide for using ajq with JSON produced by complementary jq
