@@ -1,5 +1,7 @@
 # ajq
 
+![ajq — grep for meaning](website/static/images/brand/ajq-readme-banner.png)
+
 `ajq` is semantic `jq` for JSON and NDJSON streams: a fuzzy JSON filter and semantic grep that keeps ordinary jq byte-deterministic, then calls a language model only for explicit semantic operations such as fuzzy matching, bounded classification, limited scoring, and limited normalization.
 
 Use it when you need to classify JSON streams, find records by meaning instead of exact text, or add LLM-enhanced jq predicates without turning the whole pipeline into a prompt.
