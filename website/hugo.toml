@@ -11,6 +11,7 @@ defaultContentLanguage = "en"
 defaultContentLanguageInSubdir = false
 enableRobotsTXT = true
 enableGitInfo = true
+disableKinds = ["taxonomy", "term"]
 
 # Docsy needs raw HTML in Markdown for its shortcodes.
 [markup]
@@ -20,11 +21,6 @@ enableGitInfo = true
     style = "tango"
     lineNos = false
     noClasses = false
-
-# Comment out to disable taxonomies; Docsy uses tags/categories on blog.
-[taxonomies]
-  tag = "tags"
-  category = "categories"
 
 # Image processing defaults (Docsy cover/section images).
 [imaging]

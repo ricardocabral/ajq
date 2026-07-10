@@ -3,6 +3,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap">
 
+{{- $siteURL := .Site.BaseURL -}}
+{{- $description := partial "page-description.html" . | htmlUnescape | plainify | chomp -}}
+{{- $title := cond .IsHome .Site.Title (printf "%s | %s" .Title .Site.Title) -}}
+
+<link rel="canonical" href="{{ .Permalink }}">
+<link rel="sitemap" type="application/xml" title="Sitemap" href="{{ "sitemap.xml" | absURL }}">
+<link rel="alternate" type="text/markdown" title="llms.txt" href="{{ "llms.txt" | absURL }}">
+
 {{- /* Open Graph image. Per-page override via the page's `images` front
        matter; otherwise the ajq banner. (Twitter tags: twitter_cards.html.) */ -}}
 {{- $ogimg := "images/brand/ajq-banner.png" -}}
@@ -11,3 +19,45 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="ajq: grep for meaning">
+
+{{- $organization := dict
+  "@type" "Organization"
+  "@id" (printf "%s#organization" $siteURL)
+  "name" "ajq"
+  "url" $siteURL
+  "logo" (dict "@type" "ImageObject" "url" ("images/brand/ajq-logo.png" | absURL))
+  "sameAs" (slice .Site.Params.github_repo)
+-}}
+{{- $website := dict
+  "@type" "WebSite"
+  "@id" (printf "%s#website" $siteURL)
+  "url" $siteURL
+  "name" .Site.Title
+  "description" .Site.Params.description
+  "inLanguage" .Site.Language.Lang
+  "publisher" (dict "@id" (printf "%s#organization" $siteURL))
+-}}
+{{- $webpage := dict
+  "@type" "WebPage"
+  "@id" (printf "%s#webpage" .Permalink)
+  "url" .Permalink
+  "name" $title
+  "description" $description
+  "isPartOf" (dict "@id" (printf "%s#website" $siteURL))
+  "inLanguage" .Site.Language.Lang
+  "dateModified" (.Lastmod.Format "2006-01-02T15:04:05Z07:00")
+-}}
+{{- $software := dict
+  "@type" "SoftwareSourceCode"
+  "@id" (printf "%s#software" $siteURL)
+  "name" "ajq"
+  "description" .Site.Params.description
+  "url" $siteURL
+  "codeRepository" .Site.Params.github_repo
+  "programmingLanguage" "Go"
+  "runtimePlatform" (slice "Linux" "macOS" "Windows")
+  "license" "https://github.com/ricardocabral/ajq/blob/main/LICENSE"
+  "isPartOf" (dict "@id" (printf "%s#website" $siteURL))
+-}}
+{{- $schema := dict "@context" "https://schema.org" "@graph" (slice $organization $website $webpage $software) -}}
+<script type="application/ld+json">{{ $schema | jsonify | safeJS }}</script>

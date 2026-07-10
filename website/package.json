@@ -5,7 +5,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build": "hugo --gc --minify",
+    "build": "hugo --cleanDestinationDir --gc --minify",
     "serve": "hugo server"
   },
   "devDependencies": {

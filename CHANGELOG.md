@@ -22,6 +22,8 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 - Added a how-to guide for using ajq with JSON produced by complementary jq
   ecosystem adapters such as `jc`, `yq`/`xq`, and `fq`.
+- Added canonical and structured website metadata, explicit robots/sitemap
+  discovery, and a curated `/llms.txt` index for machine-facing documentation.
 
 ## [0.0.1] - 2026-07-09
 

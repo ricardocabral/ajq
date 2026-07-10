@@ -2,6 +2,9 @@
 title: Documentation
 linkTitle: Docs
 weight: 20
+description: >
+  Tutorials, how-to guides, reference material, and design notes for using ajq's
+  deterministic jq core and explicit semantic operators.
 menu:
   main:
     weight: 20

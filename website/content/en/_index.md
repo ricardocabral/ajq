@@ -1,5 +1,9 @@
 ---
 title: ajq
+description: >
+  ajq is a Go CLI that keeps ordinary jq deterministic while adding explicit,
+  schema-constrained semantic matching, classification, scoring, and extraction
+  for messy JSON streams.
 ---
 
 {{< blocks/cover title="ajq" image_anchor="top" height="full" color="dark" >}}

@@ -1,0 +1,58 @@
+# ajq
+
+> ajq is a Go CLI for JSON pipelines: it preserves deterministic jq execution
+> and adds explicit, schema-constrained semantic operations for matching,
+> classification, scoring, and extraction.
+
+Use ajq when ordinary jq filters are too literal for messy text, but you still
+need predictable JSON processing. Pure jq paths stay byte-reproducible and do
+not call AI backends. Semantic work is explicit, cache-keyed by backend, model,
+spec, and canonical value, and bounded by user-visible cost controls.
+
+## Start here
+
+- [Website home](https://ricardocabral.github.io/ajq/): Product overview, split-execution summary, comparison, and performance notes.
+- [Documentation index](https://ricardocabral.github.io/ajq/docs/): Entry point for tutorials, how-to guides, reference pages, and design explanations.
+- [Install ajq](https://ricardocabral.github.io/ajq/docs/how-to/install/): Release install script, Go install fallback, and local backend provisioning.
+- [Your first ajq pipeline](https://ricardocabral.github.io/ajq/docs/tutorials/first-pipeline/): First deterministic jq-compatible pipeline.
+- [Plan a semantic query](https://ricardocabral.github.io/ajq/docs/tutorials/explain-semantic-plan/): Use `--explain` to inspect semantic planning without contacting a model.
+
+## Core concepts
+
+- [Split execution](https://ricardocabral.github.io/ajq/docs/explanation/split-execution/): How ajq keeps jq deterministic and sends only fuzzy operations to a model.
+- [The determinism contract](https://ricardocabral.github.io/ajq/docs/explanation/determinism/): What byte reproducibility covers, and what depends on model/cache identity.
+- [The three-phase executor](https://ricardocabral.github.io/ajq/docs/explanation/three-phase-executor/): Harvest, resolve, execute, and deduplicated semantic judgements.
+- [Architecture](https://ricardocabral.github.io/ajq/docs/explanation/architecture/): Component-level data flow and backend contract.
+- [Project status](https://ricardocabral.github.io/ajq/docs/explanation/project-status/): Shipped capabilities and planned work.
+
+## Task guides
+
+- [Process NDJSON](https://ricardocabral.github.io/ajq/docs/how-to/process-ndjson/): Input framing for JSON, NDJSON, raw lines, and null input.
+- [Write a semantic filter](https://ricardocabral.github.io/ajq/docs/how-to/semantic-filter/): Fuzzy `=~` predicates and bounded semantic functions.
+- [Estimate model calls](https://ricardocabral.github.io/ajq/docs/how-to/estimate-model-calls/): Use `--explain` to budget cost and latency.
+- [Use cloud backends](https://ricardocabral.github.io/ajq/docs/how-to/use-cloud-backends/): Anthropic, OpenAI, and OpenRouter backend setup.
+- [Control semantic costs](https://ricardocabral.github.io/ajq/docs/how-to/control-costs/): Max-call caps, cache-aware planning, and run statistics.
+- [Manage the cache](https://ricardocabral.github.io/ajq/docs/how-to/manage-the-cache/): Inspect, bypass, and clear the judgement cache.
+- [Configure defaults](https://ricardocabral.github.io/ajq/docs/how-to/configure-defaults/): Backend, model, base URL, max-call, and cache settings.
+- [Use a larger model](https://ricardocabral.github.io/ajq/docs/how-to/use-a-larger-model/): Select larger local GGUF models.
+
+## Reference
+
+- [Command-line interface](https://ricardocabral.github.io/ajq/docs/reference/cli/): Invocation, global flags, subcommands, and exit codes.
+- [Input and output modes](https://ricardocabral.github.io/ajq/docs/reference/io-modes/): Framing and formatting behavior.
+- [Semantic functions](https://ricardocabral.github.io/ajq/docs/reference/semantic-functions/): `sem_*` vocabulary, `=~`/`!~` sugar, arities, return types, and limits.
+- [`--explain` output](https://ricardocabral.github.io/ajq/docs/reference/explain-output/): Plan report fields.
+- [Configuration](https://ricardocabral.github.io/ajq/docs/reference/configuration/): Config files, environment variables, precedence, and credential policy.
+- [Backends](https://ricardocabral.github.io/ajq/docs/reference/backends/): Backend names, defaults, required settings, and paid-call caps.
+
+## Markdown source
+
+- [README.md](https://raw.githubusercontent.com/ricardocabral/ajq/main/README.md): Public project summary, install notes, and quick start.
+- [Website docs source](https://github.com/ricardocabral/ajq/tree/main/website/content/en/docs): Markdown source for the published documentation.
+- [Contributing guide](https://raw.githubusercontent.com/ricardocabral/ajq/main/CONTRIBUTING.md): Contributor process and release gate.
+
+## Source and releases
+
+- [GitHub repository](https://github.com/ricardocabral/ajq): Source code, issues, and pull requests.
+- [Releases](https://github.com/ricardocabral/ajq/releases): Checksummed release archives.
+- [Sitemap](https://ricardocabral.github.io/ajq/sitemap.xml): Complete indexable page list.
