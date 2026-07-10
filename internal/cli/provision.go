@@ -2,11 +2,14 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
+	"github.com/ricardocabral/ajq/internal/config"
 	"github.com/ricardocabral/ajq/internal/provision"
 	"github.com/spf13/cobra"
 )
@@ -41,23 +44,40 @@ func resolveProvisionController(opts Options) ProvisionController {
 // local inference engine and default model are present in the ajq cache.
 func newProvisionCommand(opts Options) *cobra.Command {
 	var checkOnly bool
+	var jsonOutput bool
+	var modelID string
 	cmd := &cobra.Command{
 		Use:   "provision",
-		Short: "download or locate the local llama-server engine and default model",
-		Long:  "Provision the local inference assets used by --backend local: a platform-appropriate llama-server engine and the default GGUF model, cached under ~/.cache/ajq. Already-present assets (including a Homebrew llama-server on PATH or a previously cached model) are detected and left untouched.",
+		Short: "download or locate the local llama-server engine and selected model",
+		Long:  "Provision the local inference assets used by --backend local: a platform-appropriate llama-server engine and the selected GGUF model, cached under ~/.cache/ajq. Already-present assets (including a Homebrew llama-server on PATH or a previously cached model) are detected and left untouched.",
 		Example: `  # Safely inspect whether local assets are installed; does not download.
   ajq provision --check`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if jsonOutput && !checkOnly {
+				return &ExitError{Code: 2, Err: errors.New("--json requires --check; JSON provisioning is status-only")}
+			}
 			controller := resolveProvisionController(opts)
-			plan, err := controller.Plan()
+			plan, err := provisionPlanForCommand(cmd, controller, modelID)
 			if err != nil {
+				if jsonOutput {
+					return &ExitError{Code: 1, Err: errors.New("provisioning check unavailable")}
+				}
 				return &ExitError{Code: 1, Err: fmt.Errorf("provisioning check failed: %w", err)}
 			}
 
 			out := cmd.OutOrStdout()
+			if jsonOutput {
+				if err := writeProvisionStatusJSON(out, plan); err != nil {
+					return &ExitError{Code: 1, Err: fmt.Errorf("write provisioning JSON status: %w", err)}
+				}
+				if plan.NeedsProvisioning() {
+					return &ExitError{Code: 1, Silent: true}
+				}
+				return nil
+			}
 			if err := writeProvisionPlan(out, plan); err != nil {
 				return &ExitError{Code: 1, Err: fmt.Errorf("write provisioning plan: %w", err)}
 			}
@@ -92,7 +112,118 @@ func newProvisionCommand(opts Options) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&checkOnly, "check", false, "report provisioning status and exit non-zero if assets are missing, without downloading")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "print the versioned machine-readable provisioning status (requires --check)")
+	cmd.Flags().StringVar(&modelID, "model", "", "local catalog model or GGUF path to inspect/provision")
 	return cmd
+}
+
+func provisionPlanForCommand(cmd *cobra.Command, controller ProvisionController, modelID string) (provision.Plan, error) {
+	fileValues, err := config.LoadWithOptions(config.LoadOptions{Stderr: cmd.ErrOrStderr()})
+	if err != nil {
+		return provision.Plan{}, err
+	}
+	envValues, err := config.Env(os.Getenv)
+	if err != nil {
+		return provision.Plan{}, err
+	}
+	flags := config.Values{}
+	if cmd.Flags().Changed("model") {
+		flags.Model = modelID
+		flags.ModelSet = true
+	}
+	settings := config.Resolve(flags, envValues, fileValues, backendRegistryDefaultValues("local"))
+	resolved, err := resolveLocalModelRequest(settings.Model)
+	if err != nil {
+		return provision.Plan{}, err
+	}
+	modelName := resolved.Name
+	if resolved.PathLike {
+		modelName = ""
+		if production, ok := controller.(*provision.Provisioner); ok {
+			clone := *production
+			clone.ModelOverride = resolved.Path
+			controller = &clone
+		}
+	}
+	return controller.PlanModel(modelName)
+}
+
+// provisionStatusDocument is the deterministic v1 wire contract for
+// `ajq provision --check --json`.
+type provisionStatusDocument struct {
+	SchemaVersion string                  `json:"schema_version"`
+	Platform      provisionPlatformStatus `json:"platform"`
+	Ready         bool                    `json:"ready"`
+	Engine        provisionAssetStatus    `json:"engine"`
+	Model         provisionAssetStatus    `json:"model"`
+	Actions       []provisionAction       `json:"actions"`
+}
+
+type provisionPlatformStatus struct {
+	OS   string `json:"os"`
+	Arch string `json:"arch"`
+}
+
+type provisionAssetStatus struct {
+	Kind     string `json:"kind"`
+	Name     string `json:"name"`
+	Version  string `json:"version"`
+	Filename string `json:"filename"`
+	Present  bool   `json:"present"`
+	Path     string `json:"path"`
+	Source   string `json:"source,omitempty"`
+}
+
+type provisionAction struct {
+	ID      string `json:"id"`
+	Command string `json:"command"`
+}
+
+func writeProvisionStatusJSON(w io.Writer, plan provision.Plan) error {
+	document := provisionStatusDocument{
+		SchemaVersion: "1",
+		Platform:      provisionPlatformStatus{OS: plan.Platform.OS, Arch: plan.Platform.Arch},
+		Ready:         !plan.NeedsProvisioning(),
+		Engine:        provisionAssetStatusFor(plan.Engine),
+		Model:         provisionAssetStatusFor(plan.Model),
+		Actions:       provisionActions(plan),
+	}
+	return json.NewEncoder(w).Encode(document)
+}
+
+func provisionAssetStatusFor(status provision.AssetStatus) provisionAssetStatus {
+	asset := provisionAssetStatus{
+		Kind:     string(status.Asset.Kind),
+		Name:     status.Asset.Name,
+		Version:  status.Asset.Version,
+		Filename: status.Asset.Filename,
+		Present:  status.Present,
+		Path:     status.Path,
+	}
+	if status.Present {
+		switch strings.ToLower(status.Source) {
+		case "override", "bundle", "cache":
+			asset.Source = strings.ToLower(status.Source)
+		case "path":
+			asset.Source = "path"
+		default:
+			asset.Source = "unknown"
+		}
+	}
+	return asset
+}
+
+func provisionActions(plan provision.Plan) []provisionAction {
+	actions := make([]provisionAction, 0, 2)
+	modelMissing := !plan.Model.Present
+	defaultModel := plan.Model.Asset.Name == "" || plan.Model.Asset.Name == provision.DefaultModelName
+	if !plan.Engine.Present || (modelMissing && defaultModel) {
+		actions = append(actions, provisionAction{ID: "provision", Command: "ajq provision"})
+	}
+	if modelMissing && !defaultModel {
+		actions = append(actions, provisionAction{ID: "models_pull", Command: "ajq models pull " + plan.Model.Asset.Name})
+	}
+	return actions
 }
 
 // writeProvisionPlan renders a stable status block for each asset.
