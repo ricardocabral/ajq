@@ -20,6 +20,8 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added copy-pasteable root and discovery-command help examples, including the
+  deterministic `--backend mock` agent probe and `--explain` plan workflow.
 - Added problem-first how-to guides for filtering JSON by meaning, classifying
   JSON/NDJSON streams, and using ajq safely from coding agents.
 - Added a how-to guide for using ajq with JSON produced by complementary jq
