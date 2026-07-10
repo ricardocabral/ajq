@@ -30,7 +30,9 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 - Added a how-to guide for using ajq with JSON produced by complementary jq
   ecosystem adapters such as `jc`, `yq`/`xq`, and `fq`.
 - Added canonical and structured website metadata, explicit robots/sitemap
-  discovery, and a curated `/llms.txt` index for machine-facing documentation.
+  discovery, and curated `/llms.txt` and `/llms-full.txt` assets for
+  machine-facing documentation, including a safe agent workflow and public-only
+  expanded context.
 - Refined README, website home, release metadata, and `/llms.txt` positioning so
   ajq is described as semantic jq for fuzzy JSON filtering, semantic grep for
   JSON/NDJSON, and bounded classification without over-claiming unsupported

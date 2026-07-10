@@ -18,28 +18,23 @@ and `sem_norm` also support their documented three-phase contexts, while
 unbounded contexts fail loudly, so do not describe ajq as a general semantic
 extraction or redaction tool yet.
 
-## Start here
+## Safe Agent Workflow
 
-For a machine consumer, first run `ajq capabilities --json`. It is static
-introspection, not backend selection or validation: it does not load config or
-credentials, construct a backend, start a daemon, provision assets, or contact
-the network. Use its versioned contract to learn available modes, operators,
-backends, and cost/safety limits. Then run `ajq examples` for safe copy-paste
-commands. Semantic examples explicitly use `--backend mock`, so they require
-no API key, network, provisioning, or local model. Before a real semantic run,
-select a backend explicitly, use `--explain`, and set an appropriate
-`--max-calls` cap.
+1. Run `ajq --help` and `ajq capabilities --json` to discover the CLI and its
+   versioned static contract; capabilities does not load credentials, construct a
+   backend, provision assets, or contact a network.
+2. Run `ajq examples` for copy-pasteable workflows, then validate query shape
+   with a deterministic, no-network `--backend mock` semantic query. Mock does
+   not assess semantic quality on a production model.
+3. Run `--explain` with representative input to inspect the plan and estimated
+   calls; it exits without executing against a configured model/provider backend.
+4. Only then select a real backend explicitly and set a finite `--max-calls` cap.
+   Use `--no-cache` for private or one-off data when cache reads and writes must
+   both be bypassed; it is not a call limit.
 
-For machine-readable local readiness, use `ajq models list --json`, `ajq cache
-status --json`, and `ajq provision --check --json`. These versioned local-state
-probes do not create a backend or download assets; the provisioning probe writes
-JSON before its expected exit 1 when assets are missing.
-
-- [Website home](https://ricardocabral.github.io/ajq/): Product overview, split-execution summary, comparison, and performance notes.
-- [Documentation index](https://ricardocabral.github.io/ajq/docs/): Entry point for tutorials, how-to guides, reference pages, and design explanations.
-- [Install ajq](https://ricardocabral.github.io/ajq/docs/how-to/install/): Release install script, Go install fallback, and local backend provisioning.
-- [Your first ajq pipeline](https://ricardocabral.github.io/ajq/docs/tutorials/first-pipeline/): First deterministic jq-compatible pipeline.
-- [Plan a semantic query](https://ricardocabral.github.io/ajq/docs/tutorials/explain-semantic-plan/): Use `--explain` to inspect semantic planning without contacting a model.
+- [Agent-safe workflow](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/): Ordered mock, explain, capped-backend, and cache-bypass guidance.
+- [CLI reference](https://ricardocabral.github.io/ajq/docs/reference/cli/): Flags, discovery commands, subcommands, and exit behavior.
+- [Semantic functions](https://ricardocabral.github.io/ajq/docs/reference/semantic-functions/): Shipped vocabulary and limits; do not treat `sem_extract` or `sem_redact` as general transforms.
 
 ## Core concepts
 
