@@ -2,6 +2,29 @@
 
 `ajq` is `jq` for the AI era: a stream processor that keeps ordinary jq byte-deterministic and calls a language model only for explicit semantic operations such as fuzzy matching, classification, scoring, and normalization.
 
+## Usage
+
+```bash
+# Help and version
+ajq --help
+ajq --version
+
+# Pure jq over JSON stays deterministic
+printf '{"users":[{"name":"Ada"}]}' | ajq -r '.users[].name'
+# Ada
+
+# Semantic filter with the deterministic mock backend (no model, network, or API key)
+printf '[{"id":1,"msg":"please keep this"},{"id":2,"msg":"drop it"}]' \
+  | ajq --backend mock -c '.[] | select(.msg =~ "keep") | .id'
+# 1
+
+# Inspect semantic plan and estimated backend calls before running
+printf '[{"msg":"refund demanded"}]' \
+  | ajq --backend mock --explain '.[] | select(.msg =~ "angry/frustrated") | .msg'
+```
+
+Run `ajq provision` once before using `--backend local`; then the same semantic queries can run against the managed local llama.cpp backend.
+
 ## Install
 
 Use Homebrew, the release script for prebuilt archives, or Go source:
@@ -26,29 +49,6 @@ release workflow.
 | Local provisioning | `ajq provision` downloads or locates the llama.cpp engine and default GGUF model for `--backend local` on supported platforms. |
 | Model management | `ajq models list`, `ajq models pull`, and `ajq models use` manage checksum-pinned local GGUF catalog models. |
 | Determinism contract | Pure jq paths stay byte-reproducible; semantic results are schema-constrained and cache-keyed by backend/model/spec/value. |
-
-## Usage
-
-```bash
-# Help and version
-ajq --help
-ajq --version
-
-# Pure jq over JSON stays deterministic
-printf '{"users":[{"name":"Ada"}]}' | ajq -r '.users[].name'
-# Ada
-
-# Semantic filter with the deterministic mock backend (no model, network, or API key)
-printf '[{"id":1,"msg":"please keep this"},{"id":2,"msg":"drop it"}]' \
-  | ajq --backend mock -c '.[] | select(.msg =~ "keep") | .id'
-# 1
-
-# Inspect semantic plan and estimated backend calls before running
-printf '[{"msg":"refund demanded"}]' \
-  | ajq --backend mock --explain '.[] | select(.msg =~ "angry/frustrated") | .msg'
-```
-
-Run `ajq provision` once before using `--backend local`; then the same semantic queries can run against the managed local llama.cpp backend.
 
 ## Docs
 
