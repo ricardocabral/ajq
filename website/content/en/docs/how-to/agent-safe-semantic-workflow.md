@@ -42,7 +42,7 @@ Expected output with the mock backend:
 For routing tasks, keep outputs bounded with `sem_classify`:
 
 ```bash
-printf '{"id":1,"msg":"refund requested"}\n{"id":2,"msg":"profile updated"}\n' \
+printf '{"id":1,"msg":"billing question"}\n{"id":2,"msg":"bug report"}\n' \
   | ajq --backend mock -c '{id, route: sem_classify(.msg; "billing"; "bug"; "account")}'
 ```
 

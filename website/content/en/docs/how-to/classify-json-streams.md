@@ -17,7 +17,7 @@ Start with `--backend mock` to validate the jq expression without a model, provi
 API key:
 
 ```bash
-printf '[{"id":1,"text":"refund requested"},{"id":2,"text":"button is broken"}]' \
+printf '[{"id":1,"text":"billing question"},{"id":2,"text":"bug report"}]' \
   | ajq --backend mock -c '.[] | {id, route: sem_classify(.text; "billing"; "bug"; "feature")}'
 ```
 
@@ -37,7 +37,7 @@ ajq processes newline-delimited JSON as independent input frames, so it can clas
 streams without buffering the whole input:
 
 ```bash
-printf '{"id":1,"text":"refund requested"}\n{"id":2,"text":"button is broken"}\n' \
+printf '{"id":1,"text":"billing question"}\n{"id":2,"text":"bug report"}\n' \
   | ajq --backend mock -c '{id, route: sem_classify(.text; "billing"; "bug"; "feature")}'
 ```
 
@@ -51,11 +51,11 @@ backend:
 
 ```bash
 # Local model after `ajq provision`
-printf '{"id":1,"text":"refund requested"}\n{"id":2,"text":"button is broken"}\n' \
+printf '{"id":1,"text":"billing question"}\n{"id":2,"text":"bug report"}\n' \
   | ajq --backend local --max-calls 25 -c '{id, route: sem_classify(.text; "billing"; "bug"; "feature")}'
 
 # OpenAI-compatible backend, using OPENAI_API_KEY from the environment
-printf '{"id":1,"text":"refund requested"}\n{"id":2,"text":"button is broken"}\n' \
+printf '{"id":1,"text":"billing question"}\n{"id":2,"text":"bug report"}\n' \
   | ajq --backend openai --model gpt-4.1-mini --max-calls 25 \
       -c '{id, route: sem_classify(.text; "billing"; "bug"; "feature")}'
 ```
@@ -72,7 +72,7 @@ calls the backend, and later runs can reuse the persistent cache.
 Estimate the distinct judgement count first:
 
 ```bash
-printf '{"text":"refund requested"}\n{"text":"refund requested"}\n{"text":"button is broken"}\n' \
+printf '{"text":"billing question"}\n{"text":"billing question"}\n{"text":"bug report"}\n' \
   | ajq --explain '{route: sem_classify(.text; "billing"; "bug"; "feature")}'
 ```
 
