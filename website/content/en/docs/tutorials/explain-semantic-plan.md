@@ -144,6 +144,7 @@ Use `--backend local` or a cloud backend after following the matching how-to gui
 
 ## Next
 
+- Solve a concrete fuzzy search in [Filter JSON by meaning](../../how-to/filter-json-by-meaning/).
 - Learn the full fuzzy vocabulary in the [semantic functions reference](../../reference/semantic-functions/).
 - Understand the machinery in [The three-phase executor](../../explanation/three-phase-executor/).
 - See how to read every field in the [`--explain` output reference](../../reference/explain-output/).

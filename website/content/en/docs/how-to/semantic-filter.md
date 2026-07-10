@@ -100,5 +100,7 @@ cache](../manage-the-cache/) when you need to inspect, bypass, or clear those en
 
 ## Related
 
+- [Filter JSON by meaning](../filter-json-by-meaning/) — problem-first recipe for fuzzy record selection.
+- [Classify JSON and NDJSON streams](../classify-json-streams/) — bounded labels with `sem_classify`.
 - [Semantic functions reference](../../reference/semantic-functions/) — shipped function forms and current limitations.
 - [Backends reference](../../reference/backends/) — choose a real backend.

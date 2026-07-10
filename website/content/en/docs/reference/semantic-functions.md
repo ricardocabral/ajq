@@ -101,5 +101,7 @@ forms above.
 
 ## Related
 
+- [Filter JSON by meaning](../../how-to/filter-json-by-meaning/) — fuzzy `sem_match` selection from a concrete problem.
+- [Classify JSON and NDJSON streams](../../how-to/classify-json-streams/) — bounded `sem_classify` labels for records.
 - [Write a semantic filter](../../how-to/semantic-filter/) — task recipes using shipped forms.
 - [Split execution](../../explanation/split-execution/) — why ajq keeps jq as the parser.

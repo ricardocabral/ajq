@@ -36,6 +36,9 @@ tool yet.
 ## Task guides
 
 - [Process NDJSON](https://ricardocabral.github.io/ajq/docs/how-to/process-ndjson/): Input framing for JSON, NDJSON, raw lines, and null input.
+- [Filter JSON by meaning](https://ricardocabral.github.io/ajq/docs/how-to/filter-json-by-meaning/): Find records by topic or intent with explicit semantic predicates.
+- [Classify JSON and NDJSON streams](https://ricardocabral.github.io/ajq/docs/how-to/classify-json-streams/): Route records into fixed semantic labels with `sem_classify`.
+- [Use ajq safely from coding agents](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/): Start with mock and `--explain`, then cap and observe real model calls.
 - [Write a semantic filter](https://ricardocabral.github.io/ajq/docs/how-to/semantic-filter/): Fuzzy `=~` predicates, `sem_match`, and bounded `sem_classify` for semantic JSON filters.
 - [Estimate model calls](https://ricardocabral.github.io/ajq/docs/how-to/estimate-model-calls/): Use `--explain` to budget cost and latency.
 - [Use cloud backends](https://ricardocabral.github.io/ajq/docs/how-to/use-cloud-backends/): Anthropic, OpenAI, and OpenRouter backend setup.

@@ -66,5 +66,7 @@ printf 'whatever' | ajq -n -c '{generated: true}'
 
 ## Related
 
+- [Classify JSON and NDJSON streams](../classify-json-streams/) — add bounded semantic labels to streaming records.
+- [Filter JSON by meaning](../filter-json-by-meaning/) — fuzzy semantic selection over JSON fields.
 - [Input and output modes reference](../../reference/io-modes/) — every framing and
   formatting flag.
