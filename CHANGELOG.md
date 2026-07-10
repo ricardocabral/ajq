@@ -18,6 +18,8 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-07-10
+
 ### Added
 
 - Added an agent-discovery CLI surface: `ajq examples [topic]` provides
@@ -36,10 +38,6 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   discovery, and curated `/llms.txt` and `/llms-full.txt` assets for
   machine-facing documentation, including a safe agent workflow and public-only
   expanded context.
-- Refined README, website home, release metadata, and `/llms.txt` positioning so
-  ajq is described as semantic jq for fuzzy JSON filtering, semantic grep for
-  JSON/NDJSON, and bounded classification without over-claiming unsupported
-  extraction or redaction operators.
 
 ## [0.0.1] - 2026-07-09
 
