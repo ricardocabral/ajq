@@ -56,10 +56,65 @@ func TestHelp(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
-	for _, want := range []string{"ajq [query]", "--version", "--max-calls", "paid backends default to 100", "0 = unlimited"} {
+	for _, want := range []string{
+		"ajq [query]",
+		"--version",
+		"--max-calls",
+		"paid backends default to 100",
+		"0 = unlimited",
+		"Pure jq: deterministic and no backend required.",
+		"--backend mock",
+		"mock is deterministic and needs no model or network.",
+		"--explain",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("help output missing %q: %q", want, stdout)
 		}
+	}
+}
+
+func TestDiscoveryCommandHelpExamples(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{
+			name: "provision",
+			args: []string{"provision", "--help"},
+			want: []string{"Examples:", "ajq provision --check", "does not download"},
+		},
+		{
+			name: "models",
+			args: []string{"models", "--help"},
+			want: []string{"Examples:", "ajq models list", "whether they are installed"},
+		},
+		{
+			name: "cache",
+			args: []string{"cache", "--help"},
+			want: []string{"Examples:", "ajq cache status", "local semantic judgement cache"},
+		},
+		{
+			name: "daemon",
+			args: []string{"daemon", "--help"},
+			want: []string{"Examples:", "ajq daemon status", "without starting a model"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, stderr, err := run(tc.args...)
+			if err != nil {
+				t.Fatalf("%s --help returned error: %v", tc.name, err)
+			}
+			if stderr != "" {
+				t.Fatalf("%s --help stderr = %q", tc.name, stderr)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(stdout, want) {
+					t.Fatalf("%s help missing %q: %q", tc.name, want, stdout)
+				}
+			}
+		})
 	}
 }
 
