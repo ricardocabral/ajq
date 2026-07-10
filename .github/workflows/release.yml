@@ -50,12 +50,10 @@ jobs:
       - name: Run tests
         run: make test
 
-      - name: Install golangci-lint
-        shell: bash
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-            | sh -s -- -b "${GITHUB_WORKSPACE}/.bin" latest
-          echo "${GITHUB_WORKSPACE}/.bin" >> "${GITHUB_PATH}"
+      - name: Set up golangci-lint
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+        with:
+          version: v2.9.0
 
       - name: Run lint
         run: make lint

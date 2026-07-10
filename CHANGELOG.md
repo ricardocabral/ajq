@@ -18,6 +18,14 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-07-10
+
+### Fixed
+
+- Pinned the release workflow's golangci-lint setup to the validated version
+  used by CI, avoiding a failed release when the upstream latest installer
+  publishes mismatched checksums.
+
 ## [0.0.2] - 2026-07-10
 
 ### Added
