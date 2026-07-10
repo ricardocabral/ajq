@@ -63,6 +63,20 @@ func macProvisioner(cacheDir string) *Provisioner {
 	}
 }
 
+func TestNewUsesProductionDefaults(t *testing.T) {
+	pr := New()
+
+	if !reflect.DeepEqual(pr.Catalog, DefaultCatalog()) {
+		t.Fatalf("New() catalog = %+v, want production default", pr.Catalog)
+	}
+	if pr.Layout != DefaultLayout() {
+		t.Fatalf("New() layout = %+v, want %+v", pr.Layout, DefaultLayout())
+	}
+	if pr.Platform != CurrentPlatform() {
+		t.Fatalf("New() platform = %+v, want %+v", pr.Platform, CurrentPlatform())
+	}
+}
+
 func TestModelCatalogReturnsDefaultWhenUnset(t *testing.T) {
 	if got, want := (&Provisioner{}).ModelCatalog(), DefaultCatalog(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("ModelCatalog() = %+v, want default %+v", got, want)
