@@ -132,7 +132,11 @@ func TestModelsListJSONExactSingleCatalogRow(t *testing.T) {
 		"qwen2.5-1.5b": {Name: "qwen2.5-1.5b", Asset: provision.Asset{Kind: provision.KindModel, Name: "qwen2.5-1.5b", Version: "test", Filename: "tiny.gguf", Size: 10}, RAMNote: "tiny RAM"},
 	}}, Layout: provision.NewLayout(cacheDir)}
 	stdout, stderr, err := runCLIForModelsTest("", pr, "models", "list", "--json")
-	want := `{"schema_version":"1","active":{"state":"catalog","name":"qwen2.5-1.5b"},"models":[{"name":"qwen2.5-1.5b","active":true,"installed":false,"filename":"tiny.gguf","path":"` + filepath.Join(cacheDir, "models", "tiny.gguf") + `","size_bytes":10,"ram":"tiny RAM"}]}` + "\n"
+	modelPath, marshalErr := json.Marshal(filepath.Join(cacheDir, "models", "tiny.gguf"))
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	want := `{"schema_version":"1","active":{"state":"catalog","name":"qwen2.5-1.5b"},"models":[{"name":"qwen2.5-1.5b","active":true,"installed":false,"filename":"tiny.gguf","path":` + string(modelPath) + `,"size_bytes":10,"ram":"tiny RAM"}]}` + "\n"
 	if err != nil || stderr != "" || stdout != want {
 		t.Fatalf("exact models JSON = (%v, %q, %q), want %q", err, stdout, stderr, want)
 	}
