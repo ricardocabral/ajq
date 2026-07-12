@@ -20,6 +20,9 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added guarded Homebrew and WinGet publication automation and repeatable
+  clean-install smoke checks. Channel availability remains contingent on the
+  corresponding external package-manager verification.
 - Added a Diataxis how-to for making ajq available to coding agents through
   project guidance, including JSON-routing, safe semantic-validation, and
   cache-handling instructions.
@@ -35,13 +38,6 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   Codex GPT-5. It is recorded as one paired observation, not a general discovery-rate claim.
 - Added a bounded classification recipe for webhook events emitted as NDJSON.
 
-### Changed
-
-- Reframed the README, website landing page, and machine-facing documentation
-  around concrete JSON/NDJSON tasks and tool-selection boundaries: exact jq
-  work, semantic filtering, bounded classification, and limited extraction or
-  redaction contexts.
-
 ### Fixed
 
 - Semantic cache entries now distinguish `--base-url` endpoints, preventing
@@ -49,8 +45,6 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   deployment serving a model with the same name.
 - The real local-inference benchmark now authenticates its internal benchmark requests to the
   managed daemon, allowing authenticated benchmark runs to complete.
-- Replaced undocumented website inference-latency values with a source-linked five-run reference
-  measurement and reproducible benchmark workflow.
 
 ### Security
 

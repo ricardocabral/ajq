@@ -73,7 +73,9 @@ homebrew_casks:
       owner: ricardocabral
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    skip_upload: '{{ if index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+    # The release workflow enables uploads only after its credential preflight.
+    # Snapshot/PR builds do not set this marker and remain secret-free.
+    skip_upload: '{{ if eq (index .Env "HOMEBREW_CASK_UPLOAD") "1" }}false{{ else }}true{{ end }}'
     homepage: https://github.com/ricardocabral/ajq
     description: semantic jq for fuzzy JSON filtering and bounded classification
     url:

@@ -104,7 +104,6 @@ Everything beyond the quick start lives on the website:
 - [Classify JSON and NDJSON streams](https://ricardocabral.github.io/ajq/docs/how-to/classify-json-streams/)
 - [Semantic functions reference](https://ricardocabral.github.io/ajq/docs/reference/semantic-functions/)
 - [CLI reference](https://ricardocabral.github.io/ajq/docs/reference/cli/)
-- [Benchmark local inference](https://ricardocabral.github.io/ajq/docs/how-to/benchmark-local-inference/)
 - [Split execution](https://ricardocabral.github.io/ajq/docs/explanation/split-execution/) and [determinism](https://ricardocabral.github.io/ajq/docs/explanation/determinism/)
 
 ## Contributor verification
@@ -114,8 +113,6 @@ make test
 make build
 make website-build
 ```
-
-`make bench-phase2` runs the CI-safe benchmark harness with the deterministic mock backend. Real local-inference benchmarks are opt-in and require provisioned assets; use the [benchmark guide](https://ricardocabral.github.io/ajq/docs/how-to/benchmark-local-inference/) to capture versioned reports before publishing performance figures.
 
 ## License
 

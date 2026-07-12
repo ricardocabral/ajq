@@ -214,8 +214,7 @@ Reference run: Apple M3&nbsp;Pro (Metal), llama.cpp&nbsp;9910, Qwen2.5-1.5B&nbsp
 (SHA-256 <code>b4666107&hellip;5896f8c</code>), 64-record <code>sem_match</code> array with
 8 post-dedup judgements. Cold start ranged from 611–916&nbsp;ms; warm latency from
 84–95&nbsp;ms. These are workload-specific measurements, not a product guarantee.
-<a href="https://github.com/ricardocabral/ajq/tree/main/website/static/benchmarks/2026-07-12-m3-pro">Inspect the five raw JSON reports</a> or
-<a href="docs/how-to/benchmark-local-inference/">run the same workflow</a>.
+<a href="https://github.com/ricardocabral/ajq/tree/main/website/static/benchmarks/2026-07-12-m3-pro">Inspect the five raw JSON reports</a>.
 </div>
 {{% /blocks/section %}}
 

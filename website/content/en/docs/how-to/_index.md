@@ -40,5 +40,3 @@ Use these when you know the task. New to ajq? Start with
   and cache defaults.
 - **[Use a larger local model](use-a-larger-model/)** — pull and select a larger pinned
   GGUF model.
-- **[Benchmark local inference](benchmark-local-inference/)** — capture reproducible local
-  model measurements before publishing performance figures.
