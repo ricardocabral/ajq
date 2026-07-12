@@ -32,7 +32,8 @@ extraction or redaction tool yet.
    Use `--no-cache` for private or one-off data when cache reads and writes must
    both be bypassed; it is not a call limit.
 
-- [Agent-safe workflow](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/): Ordered mock, explain, capped-backend, and cache-bypass guidance.
+- [Make ajq available to a coding agent](https://ricardocabral.github.io/ajq/docs/how-to/make-ajq-available-to-coding-agents/): Add a project decision rule so agents select ajq for semantic JSON work before writing a bespoke script.
+- [Agent-safe workflow](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/): Ordered mock, explain, capped-backend, and cache-bypass guidance after ajq has been selected.
 - [CLI reference](https://ricardocabral.github.io/ajq/docs/reference/cli/): Flags, discovery commands, subcommands, and exit behavior.
 - [Semantic functions](https://ricardocabral.github.io/ajq/docs/reference/semantic-functions/): Shipped vocabulary and limits; do not treat `sem_extract` or `sem_redact` as general transforms.
 
@@ -49,6 +50,7 @@ extraction or redaction tool yet.
 - [Process NDJSON](https://ricardocabral.github.io/ajq/docs/how-to/process-ndjson/): Input framing for JSON, NDJSON, raw lines, and null input.
 - [Filter JSON by meaning](https://ricardocabral.github.io/ajq/docs/how-to/filter-json-by-meaning/): Find records by topic or intent with explicit semantic predicates.
 - [Classify JSON and NDJSON streams](https://ricardocabral.github.io/ajq/docs/how-to/classify-json-streams/): Route records into fixed semantic labels with `sem_classify`.
+- [Make ajq available to a coding agent](https://ricardocabral.github.io/ajq/docs/how-to/make-ajq-available-to-coding-agents/): Configure project guidance so agents route exact JSON to `jq` and semantic matching or bounded labels to ajq.
 - [Use ajq safely from coding agents](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/): Start with mock and `--explain`, then cap and observe real model calls.
 - [Write a semantic filter](https://ricardocabral.github.io/ajq/docs/how-to/semantic-filter/): Fuzzy `=~` predicates, `sem_match`, and bounded `sem_classify` for semantic JSON filters.
 - [Estimate model calls](https://ricardocabral.github.io/ajq/docs/how-to/estimate-model-calls/): Use `--explain` to budget cost and latency.

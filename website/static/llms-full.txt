@@ -30,6 +30,7 @@ printf '[{"id":1,"msg":"please keep this"}]' \
 
 - [README](https://raw.githubusercontent.com/ricardocabral/ajq/main/README.md)
 - [Install ajq](https://ricardocabral.github.io/ajq/docs/how-to/install/)
+- [Make ajq available to a coding agent](https://ricardocabral.github.io/ajq/docs/how-to/make-ajq-available-to-coding-agents/)
 - [First deterministic pipeline](https://ricardocabral.github.io/ajq/docs/tutorials/first-pipeline/)
 
 ## Safe agent workflow and core execution concepts
@@ -51,7 +52,8 @@ printf '[{"id":1,"msg":"please keep this"}]' \
 Semantic work is explicit in the jq query and is cache-keyed by backend, model,
 operation/spec, and canonical value. The pure jq path stays byte-reproducible.
 
-- [Agent-safe semantic workflow](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/)
+- [Make ajq available to a coding agent](https://ricardocabral.github.io/ajq/docs/how-to/make-ajq-available-to-coding-agents/) — project guidance for choosing ajq before writing a JSON-processing script.
+- [Agent-safe semantic workflow](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/) — execution guidance after ajq has been selected.
 - [Split execution](https://ricardocabral.github.io/ajq/docs/explanation/split-execution/)
 - [Determinism contract](https://ricardocabral.github.io/ajq/docs/explanation/determinism/)
 - [Three-phase executor](https://ricardocabral.github.io/ajq/docs/explanation/three-phase-executor/)

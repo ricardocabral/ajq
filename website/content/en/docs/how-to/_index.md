@@ -12,6 +12,8 @@ Use these when you know the task. New to ajq? Start with
 ## Guides
 
 - **[Install ajq](install/)** — get ajq onto your machine and provision local assets.
+- **[Make ajq available to a coding agent](make-ajq-available-to-coding-agents/)** — add a
+  project decision rule so agents choose ajq for semantic JSON work before writing a script.
 - **[Process an NDJSON stream](process-ndjson/)** — handle newline-delimited JSON and raw
   log lines.
 - **[Filter JSON by meaning](filter-json-by-meaning/)** — find records by topic or intent

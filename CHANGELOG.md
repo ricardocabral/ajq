@@ -18,6 +18,12 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+### Added
+
+- Added a Diataxis how-to for making ajq available to coding agents through
+  project guidance, including JSON-routing, safe semantic-validation, and
+  cache-handling instructions.
+
 ### Fixed
 
 - Semantic cache entries now distinguish `--base-url` endpoints, preventing
