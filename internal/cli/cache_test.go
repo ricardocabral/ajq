@@ -176,7 +176,11 @@ func TestCacheStatusJSONContract(t *testing.T) {
 	if err != nil || stderr != "" {
 		t.Fatalf("empty cache status JSON = (%v, %q)", err, stderr)
 	}
-	want := `{"schema_version":"1","availability":"available","path":"` + semanticcache.JudgementsDir(cacheDir) + `","entries":0,"bytes":0}` + "\n"
+	path, err := json.Marshal(semanticcache.JudgementsDir(cacheDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"schema_version":"1","availability":"available","path":` + string(path) + `,"entries":0,"bytes":0}` + "\n"
 	if stdout != want {
 		t.Fatalf("empty cache status JSON = %q, want %q", stdout, want)
 	}
@@ -198,7 +202,11 @@ func TestCacheStatusJSONContract(t *testing.T) {
 	if err == nil || ExitCode(err) != 1 || stderr != "" {
 		t.Fatalf("unavailable cache status JSON = (%v, %q)", err, stderr)
 	}
-	want = `{"schema_version":"1","availability":"unavailable","path":"` + location + `","entries":0,"bytes":0,"error":"status_unavailable"}` + "\n"
+	path, err = json.Marshal(location)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = `{"schema_version":"1","availability":"unavailable","path":` + string(path) + `,"entries":0,"bytes":0,"error":"status_unavailable"}` + "\n"
 	if stdout != want {
 		t.Fatalf("unavailable cache JSON = %q, want %q", stdout, want)
 	}

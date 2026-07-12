@@ -33,6 +33,14 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   workload details.
 - Added the first reviewed fresh-session `none` versus `local-guidance` routing baseline for
   Codex GPT-5. It is recorded as one paired observation, not a general discovery-rate claim.
+- Added a bounded classification recipe for webhook events emitted as NDJSON.
+
+### Changed
+
+- Reframed the README, website landing page, and machine-facing documentation
+  around concrete JSON/NDJSON tasks and tool-selection boundaries: exact jq
+  work, semantic filtering, bounded classification, and limited extraction or
+  redaction contexts.
 
 ### Fixed
 

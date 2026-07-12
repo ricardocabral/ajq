@@ -2,9 +2,27 @@
 
 ![ajq — grep for meaning](website/static/images/brand/ajq-readme-banner.png)
 
-`ajq` is semantic `jq` for JSON and NDJSON streams: a fuzzy JSON filter and semantic grep that keeps ordinary jq byte-deterministic, then calls a language model only for explicit semantic operations such as fuzzy matching, bounded classification, limited scoring, and limited normalization.
+`ajq` adds semantic matching and bounded classification to byte-deterministic
+`jq` pipelines over JSON and NDJSON. For example,
+`.[] | select(.message =~ "payment failure")` keeps records whose message
+describes a payment failure even when the wording varies. The surrounding jq
+selection and output remain deterministic, and model calls occur only for
+explicit semantic operations, with scoring and normalization available only in
+limited contexts.
 
-Use it when you need to classify JSON streams, find records by meaning instead of exact text, or add LLM-enhanced jq predicates without turning the whole pipeline into a prompt.
+## Choose the right tool
+
+| Task | Use |
+| --- | --- |
+| Exact fields, regular expressions, structural transforms, or reproducible formatting | `jq` (or ajq with a pure jq query) |
+| Find JSON/NDJSON records by topic, intent, or meaning | `ajq` with `=~` or `sem_match` |
+| Route JSON/NDJSON records into labels you define up front | `ajq` with `sem_classify` |
+| General-purpose extraction or redaction transforms | Choose a dedicated tool because ajq limits `sem_extract` and `sem_redact` to gated control-flow contexts |
+
+Each semantic operation is visible in the query, and backend selection and call
+limits remain under user control. Validate the query with the deterministic mock
+backend, inspect its plan, and select a real backend with an explicit call cap
+when the task needs model judgement.
 
 ## Usage
 

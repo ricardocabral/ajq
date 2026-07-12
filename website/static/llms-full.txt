@@ -10,9 +10,18 @@ the sections below.
 
 ## README and quick start
 
-ajq is useful when literal jq filters are insufficient for JSON or NDJSON text,
-but structural selection and output must remain predictable. Pure jq queries do
+ajq is useful for JSON and NDJSON tasks where a normal jq query selects the right
+field and the wording varies. It can find support tickets that ask for a refund,
+keep logs that describe a failure, and route records into fixed intent labels,
+with structural selection and output remaining predictable. Pure jq queries do
 not initialize a backend or make model calls.
+
+Use jq (or ajq with a pure jq query) for exact comparisons, regular expressions,
+structural transforms, and reproducible formatting. Use ajq's `=~` or
+`sem_match` for fuzzy selection, and `sem_classify` only for a fixed label set
+provided in the query. General-purpose extraction and redaction transforms
+require another tool because ajq limits `sem_extract` and `sem_redact` to gated
+control-flow contexts.
 
 ```bash
 # Discover commands and safe agent workflows.

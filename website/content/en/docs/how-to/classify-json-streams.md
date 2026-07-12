@@ -44,6 +44,20 @@ printf '{"id":1,"text":"billing question"}\n{"id":2,"text":"bug report"}\n' \
 This emits one compact JSON object per input record, which is convenient for queues,
 logs, and shell pipelines.
 
+## Route webhook events with bounded labels
+
+If a webhook receiver writes each event body as NDJSON, add a stable route before passing
+the stream to downstream workers:
+
+```bash
+printf '{"event":"invoice.payment_failed","data":{"message":"billing payment failed"}}\n{"event":"issue.created","data":{"message":"bug report: export crashes"}}\n' \
+  | ajq --backend mock -c '. + {route: sem_classify(.data.message; "billing"; "bug"; "other")}'
+```
+
+The command preserves each webhook event and adds a `route` value drawn from the three
+labels in the query. Replace the mock backend with a capped real backend when the event
+text requires semantic classification.
+
 ## Switch to a real classifier backend
 
 After the mock command produces the shape you need, run the same query with a real
