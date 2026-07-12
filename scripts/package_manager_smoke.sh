@@ -28,6 +28,7 @@ command -v "$brew_bin" >/dev/null 2>&1 || { printf 'required tool not found: bre
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+touch "$tmp/ajq.toml"
 
 cask_version() {
   "$brew_bin" info --cask --json=v2 ricardocabral/tap/ajq |
@@ -53,7 +54,8 @@ ajq_bin=$("$brew_bin" --prefix)/bin/ajq
 
 version_file="$tmp/version"
 printf 'ajq %s\n' "$version" >"$tmp/expected-version"
-"$ajq_bin" --version >"$version_file"
+env HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/config" AJQ_CONFIG="$tmp/ajq.toml" AJQ_CACHE_DIR="$tmp/cache" \
+  "$ajq_bin" --version >"$version_file"
 cmp -s "$tmp/expected-version" "$version_file" || {
   printf 'ajq version mismatch: expected exact ajq %s output\n' "$version" >&2
   exit 1

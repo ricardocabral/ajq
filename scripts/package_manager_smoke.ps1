@@ -69,16 +69,18 @@ $ajq = if ($env:AJQ_PACKAGE_EXECUTABLE) { $env:AJQ_PACKAGE_EXECUTABLE } else { J
 if (-not (Test-Path -LiteralPath $ajq -PathType Leaf)) { throw "installed WinGet executable not found: $ajq" }
 $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("ajq-package-smoke-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $temp | Out-Null
+New-Item -ItemType File -Path (Join-Path $temp 'ajq.toml') | Out-Null
 try {
+    $env:HOME = Join-Path $temp 'home'
+    $env:XDG_CONFIG_HOME = Join-Path $temp 'config'
+    $env:AJQ_CONFIG = Join-Path $temp 'ajq.toml'
+    $env:AJQ_CACHE_DIR = Join-Path $temp 'cache'
+
     $versionFile = Join-Path $temp 'version'
     Invoke-ProgramToFile $ajq @('--version') '' $versionFile
     $versionEvidence = Assert-ExactBytes $versionFile "ajq $version`n" 'ajq version'
     Write-Output "WinGet installed version: ajq $version"
 
-    $env:HOME = Join-Path $temp 'home'
-    $env:XDG_CONFIG_HOME = Join-Path $temp 'config'
-    $env:AJQ_CONFIG = Join-Path $temp 'ajq.toml'
-    $env:AJQ_CACHE_DIR = Join-Path $temp 'cache'
     $mockFile = Join-Path $temp 'mock-output'
     Invoke-ProgramToFile $ajq @('--backend', 'mock', '-c', '.[] | select(.msg =~ "refund") | .id') "[{`"id`":1,`"msg`":`"refund request`"},{`"id`":2,`"msg`":`"shipping update`"}]`n" $mockFile
     $mockEvidence = Assert-ExactBytes $mockFile "1`n" 'mock query'
