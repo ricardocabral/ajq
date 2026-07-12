@@ -20,7 +20,7 @@ $version = $Tag.Substring(1)
 $expectedAsset = "ajq_${version}_Windows_x86_64.zip"
 $release = Get-Content -Raw -LiteralPath $ReleaseJsonPath | ConvertFrom-Json
 if ($release.tagName -ne $Tag) {
-    throw "WinGet preflight release tag mismatch for $identifier: expected $Tag"
+    throw "WinGet preflight release tag mismatch for ${identifier}: expected $Tag"
 }
 $matches = @($release.assets | Where-Object { $_.name -ceq $expectedAsset })
 if ($matches.Count -ne 1) {
