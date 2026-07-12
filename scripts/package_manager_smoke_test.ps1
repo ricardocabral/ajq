@@ -29,7 +29,7 @@ $bytes = if ($Args[0] -eq '--version') {
         $env:WINGET_BIN = if ($mode -eq 'missing') { Join-Path $temp 'missing-winget.exe' } else { $winget }
         $env:AJQ_PACKAGE_EXECUTABLE = $ajq
         $env:WINGET_VERSION = if ($mode -eq 'version') { '9.9.9' } else { '1.2.3' }
-        $env:AJQ_VERSION_OUTPUT = if ($mode -eq 'version-output') { "ajq v1.2.3 suffix`n" } else { "ajq v1.2.3`n" }
+        $env:AJQ_VERSION_OUTPUT = if ($mode -eq 'version-output') { "ajq 1.2.3 suffix`n" } else { "ajq 1.2.3`n" }
         $env:QUERY_OUTPUT = switch ($mode) {
             'query' { "2`n" }
             'query-crlf' { "1`r`n" }
@@ -46,7 +46,7 @@ $bytes = if ($Args[0] -eq '--version') {
 
     $result = Invoke-Smoke 'success'
     if (-not $result.Success) { throw "smoke success failed: $($result.Output)" }
-    if ($result.Output -notmatch 'WinGet installed version: ajq v1\.2\.3') { throw 'success evidence omitted exact version' }
+    if ($result.Output -notmatch 'WinGet installed version: ajq 1\.2\.3') { throw 'success evidence omitted exact version' }
     if ($result.Output -notmatch 'WinGet mock stdout base64: MQo=') { throw 'success evidence omitted mock stdout bytes' }
     foreach ($command in @(
         'uninstall --id Ricardocabral.ajq --exact --silent',

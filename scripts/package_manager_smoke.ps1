@@ -72,8 +72,8 @@ New-Item -ItemType Directory -Path $temp | Out-Null
 try {
     $versionFile = Join-Path $temp 'version'
     Invoke-ProgramToFile $ajq @('--version') '' $versionFile
-    $versionEvidence = Assert-ExactBytes $versionFile "ajq v$version`n" 'ajq version'
-    Write-Output "WinGet installed version: ajq v$version"
+    $versionEvidence = Assert-ExactBytes $versionFile "ajq $version`n" 'ajq version'
+    Write-Output "WinGet installed version: ajq $version"
 
     $env:HOME = Join-Path $temp 'home'
     $env:XDG_CONFIG_HOME = Join-Path $temp 'config'
