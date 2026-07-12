@@ -1,0 +1,67 @@
+{
+  "schema_version": "1",
+  "corpus_version": "v1",
+  "run_id": "scorer-fixture-local-guidance-v1",
+  "result_kind": "scorer_fixture",
+  "recorded_at": "2026-07-12T00:00:00Z",
+  "artifact": {
+    "id": "local-guidance",
+    "version": "v1"
+  },
+  "agent": {
+    "name": "routing-scorer-fixture",
+    "version": "v1"
+  },
+  "responses": [
+    {
+      "scenario_id": "exact-structural-transform",
+      "selection": "jq",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "fuzzy-ndjson-filter",
+      "selection": "ajq",
+      "preflight": ["capabilities", "mock", "explain"],
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "bounded-intent-routing",
+      "selection": "ajq",
+      "preflight": ["capabilities", "mock", "explain"],
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "sensitive-one-off-data",
+      "selection": "ajq",
+      "uses_real_backend": false,
+      "uses_no_cache": true,
+      "discloses_semantic_data_boundary": true,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "unsupported-general-extraction-redaction",
+      "selection": "ask_for_authority",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "ajq-unavailable",
+      "selection": "ask_for_authority",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    }
+  ]
+}

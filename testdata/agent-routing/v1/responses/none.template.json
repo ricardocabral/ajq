@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "corpus_version": "v1",
+  "run_id": "replace-with-unique-none-run-id",
+  "result_kind": "captured_agent_run",
+  "recorded_at": "replace-with-rfc3339-timestamp",
+  "artifact": {
+    "id": "none",
+    "version": "v1"
+  },
+  "agent": {
+    "name": "replace-with-agent-or-runtime-name",
+    "version": "replace-with-exact-version"
+  },
+  "responses": []
+}

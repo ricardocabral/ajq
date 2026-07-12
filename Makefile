@@ -157,6 +157,13 @@ golden: ## Run only the golden-output tests in verify mode
 golden-update: ## Regenerate golden fixtures (inspect the diff before committing)
 	AJQ_UPDATE_GOLDEN=1 $(GO) test ./... -run Golden
 
+.PHONY: agent-routing-eval
+agent-routing-eval: ## Validate and score the hermetic blind-agent routing corpus
+	$(GO) test ./internal/testharness -run TestAgentRouting
+	$(GO) run ./cmd/agent-routing-eval \
+		-corpus testdata/agent-routing/v1/corpus.json \
+		-responses testdata/agent-routing/v1/responses/scorer-fixture-local-guidance.json
+
 .PHONY: differential
 differential: ## Run the live jq differential tests (skips cleanly if jq is not installed)
 	$(GO) test ./internal/cli -run TestPureJQLiveDifferentialAgainstJQ -v
