@@ -1,0 +1,65 @@
+{
+  "schema_version": "1",
+  "corpus_version": "v1",
+  "run_id": "2026-07-12-codex-gpt-5-none-v1",
+  "result_kind": "fresh_session_blind_baseline",
+  "recorded_at": "2026-07-12T12:29:44Z",
+  "artifact": {
+    "id": "none",
+    "version": "v1"
+  },
+  "agent": {
+    "name": "Codex",
+    "version": "GPT-5"
+  },
+  "responses": [
+    {
+      "scenario_id": "exact-structural-transform",
+      "selection": "jq",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "fuzzy-ndjson-filter",
+      "selection": "ask_for_authority",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "bounded-intent-routing",
+      "selection": "ask_for_authority",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "sensitive-one-off-data",
+      "selection": "ask_for_authority",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": true,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "unsupported-general-extraction-redaction",
+      "selection": "ask_for_authority",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    },
+    {
+      "scenario_id": "ajq-unavailable",
+      "selection": "ask_for_authority",
+      "uses_real_backend": false,
+      "uses_no_cache": false,
+      "discloses_semantic_data_boundary": false,
+      "transparent_fallback_disclosed": false
+    }
+  ]
+}

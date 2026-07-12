@@ -2,8 +2,10 @@ package bench
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,6 +30,15 @@ const (
 	EnvRealServer = "AJQ_BENCH_SERVER"
 	// EnvRealModel overrides the GGUF model path for the real bench.
 	EnvRealModel = "AJQ_BENCH_MODEL"
+	// EnvRealBenchMachine records an operator-supplied hardware label in a
+	// real-bench report, for example "Apple M3 Pro (Metal)".
+	EnvRealBenchMachine = "AJQ_BENCH_MACHINE"
+	// EnvRealBenchGitRevision records the source revision that produced a real
+	// benchmark report. The Makefile supplies it for standard runs.
+	EnvRealBenchGitRevision = "AJQ_BENCH_GIT_REVISION"
+	// EnvRealBenchReportDir optionally receives one JSON report per successful
+	// real benchmark run.
+	EnvRealBenchReportDir = "AJQ_BENCH_REPORT_DIR"
 )
 
 // Default real-bench asset locations. These match the assets provisioned by
@@ -146,6 +157,7 @@ type Environment struct {
 	Arch           string
 	NumCPU         int
 	MetalAvailable bool
+	ParallelSlots  int
 	ServerBinary   string
 	ServerVersion  string
 	ModelPath      string
@@ -161,6 +173,7 @@ func DescribeEnvironment(cfg RealConfig) Environment {
 		Arch:           runtime.GOARCH,
 		NumCPU:         runtime.NumCPU(),
 		MetalAvailable: metalLikely(),
+		ParallelSlots:  daemon.DefaultParallelSlots,
 		ServerBinary:   cfg.ServerBinaryPath,
 		ServerVersion:  probeServerVersion(cfg.ServerBinaryPath),
 		ModelPath:      cfg.ModelPath,
@@ -202,6 +215,7 @@ func probeServerVersion(binary string) string {
 
 type realDaemonManager interface {
 	EnsureRunning(ctx context.Context) error
+	APIKey() string
 	Stop(ctx context.Context) (bool, error)
 }
 
@@ -212,6 +226,9 @@ var newRealDaemonManager = func(cfg daemon.Config) realDaemonManager {
 // RealReport is the result of a real-inference benchmark run.
 type RealReport struct {
 	Environment Environment
+	// Provenance identifies the software, model bytes, and optional hardware
+	// label that produced this report.
+	Provenance RealProvenance
 	// ColdStart is the time to bring a stopped daemon to a healthy state.
 	ColdStart time.Duration
 	// WarmLatency is the time for a single judgement against the warm daemon.
@@ -243,6 +260,18 @@ type RealReport struct {
 	Hyperfine *HyperfineResult
 }
 
+// RealProvenance captures the reproducibility facts for one real benchmark
+// report. ModelSHA256 is calculated from the actual GGUF file, not inferred
+// from a catalog entry.
+type RealProvenance struct {
+	RecordedAt  time.Time
+	GoVersion   string
+	Machine     string
+	GitRevision string
+	ModelSHA256 string
+	ModelBytes  int64
+}
+
 // RunReal executes the real-inference benchmark against a warm local
 // llama-server. It measures cold start, warm single-judgement latency,
 // sequential vs bounded-parallel batch throughput, and the repeated-value cache
@@ -256,6 +285,11 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 		Environment: DescribeEnvironment(cfg),
 		Workload:    w.Name,
 	}
+	provenance, provenanceErr := captureRealProvenance(cfg)
+	if provenanceErr != nil {
+		return report, fmt.Errorf("capture benchmark provenance: %w", provenanceErr)
+	}
+	report.Provenance = provenance
 
 	dcfg := daemon.Config{
 		Host:             cfg.Host,
@@ -275,6 +309,7 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 		return report, fmt.Errorf("cold start: %w", err)
 	}
 	report.ColdStart = positiveDurationSince(coldStart)
+	apiKey := mgr.APIKey()
 	defer func() {
 		if _, stopErr := mgr.Stop(context.Background()); stopErr != nil {
 			cleanupErr := fmt.Errorf("cleanup stop: %w", stopErr)
@@ -289,6 +324,7 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 	sequentialBE := &localbackend.Backend{
 		BaseURL:            dcfg.BaseURL(),
 		ModelID:            semanticcache.DefaultModelID,
+		APIKey:             apiKey,
 		MaxConcurrency:     1,
 		DisablePromptCache: true,
 		// Daemon is already warm; no WarmFunc needed.
@@ -296,6 +332,7 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 	parallelBE := &localbackend.Backend{
 		BaseURL:            dcfg.BaseURL(),
 		ModelID:            semanticcache.DefaultModelID,
+		APIKey:             apiKey,
 		MaxConcurrency:     daemon.DefaultParallelSlots,
 		DisablePromptCache: true,
 		// Daemon is already warm; no WarmFunc needed.
@@ -346,6 +383,39 @@ func RunReal(ctx context.Context, cfg RealConfig, w Workload) (report RealReport
 	report.CachedBatchLatency = positiveDurationSince(cacheStart)
 
 	return report, nil
+}
+
+func captureRealProvenance(cfg RealConfig) (RealProvenance, error) {
+	provenance := RealProvenance{
+		RecordedAt:  time.Now().UTC(),
+		GoVersion:   runtime.Version(),
+		Machine:     strings.TrimSpace(os.Getenv(EnvRealBenchMachine)),
+		GitRevision: strings.TrimSpace(os.Getenv(EnvRealBenchGitRevision)),
+	}
+	if strings.TrimSpace(cfg.ModelPath) == "" {
+		return provenance, nil
+	}
+
+	info, err := os.Stat(cfg.ModelPath)
+	if err != nil {
+		return RealProvenance{}, fmt.Errorf("stat model %q: %w", cfg.ModelPath, err)
+	}
+	if info.IsDir() {
+		return RealProvenance{}, fmt.Errorf("model path %q is a directory", cfg.ModelPath)
+	}
+	file, err := os.Open(cfg.ModelPath)
+	if err != nil {
+		return RealProvenance{}, fmt.Errorf("open model %q: %w", cfg.ModelPath, err)
+	}
+	defer func() { _ = file.Close() }()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return RealProvenance{}, fmt.Errorf("hash model %q: %w", cfg.ModelPath, err)
+	}
+	provenance.ModelSHA256 = fmt.Sprintf("%x", hash.Sum(nil))
+	provenance.ModelBytes = info.Size()
+	return provenance, nil
 }
 
 // sampleJudgement builds a single sem_match judgement over a representative

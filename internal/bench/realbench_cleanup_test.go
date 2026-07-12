@@ -2,8 +2,12 @@ package bench
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 
@@ -48,6 +52,34 @@ func TestResolveThroughCacheWarmsThenReplaysWithoutBackend(t *testing.T) {
 	}
 	if be.calls != 1 {
 		t.Fatalf("backend calls after replay = %d, want warm call only", be.calls)
+	}
+}
+
+func TestCaptureRealProvenanceHashesActualModelBytes(t *testing.T) {
+	modelPath := filepath.Join(t.TempDir(), "model.gguf")
+	const modelBytes = "synthetic model bytes"
+	if err := os.WriteFile(modelPath, []byte(modelBytes), 0o600); err != nil {
+		t.Fatalf("write model: %v", err)
+	}
+	t.Setenv(EnvRealBenchMachine, "test machine")
+	t.Setenv(EnvRealBenchGitRevision, "test-revision")
+
+	provenance, err := captureRealProvenance(RealConfig{ModelPath: modelPath})
+	if err != nil {
+		t.Fatalf("captureRealProvenance: %v", err)
+	}
+	wantHash := sha256.Sum256([]byte(modelBytes))
+	if got, want := provenance.ModelSHA256, fmt.Sprintf("%x", wantHash); got != want {
+		t.Fatalf("ModelSHA256 = %q, want %q", got, want)
+	}
+	if got, want := provenance.ModelBytes, int64(len(modelBytes)); got != want {
+		t.Fatalf("ModelBytes = %d, want %d", got, want)
+	}
+	if got, want := provenance.Machine, "test machine"; got != want {
+		t.Fatalf("Machine = %q, want %q", got, want)
+	}
+	if got, want := provenance.GitRevision, "test-revision"; got != want {
+		t.Fatalf("GitRevision = %q, want %q", got, want)
 	}
 }
 

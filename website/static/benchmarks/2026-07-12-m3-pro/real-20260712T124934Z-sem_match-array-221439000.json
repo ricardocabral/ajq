@@ -1,0 +1,32 @@
+{
+  "schema_version": "1",
+  "provenance": {
+    "recorded_at": "2026-07-12T12:49:34.221439Z",
+    "go_version": "go1.26.5",
+    "machine": "Apple M3 Pro (Metal)",
+    "git_revision": "v0.0.3-20-ge3c91e8ce07a33358015e1968976166198e4c113",
+    "model_sha256": "b46661073c18e5b56a41fa320975f866a00def1ff08feef4718e013258896f8c",
+    "model_bytes": 1285494304
+  },
+  "environment": {
+    "os": "darwin",
+    "arch": "arm64",
+    "num_cpu": 11,
+    "metal_available": true,
+    "parallel_slots": 4,
+    "server_binary": "llama-server",
+    "server_version": "version: 9910 (f5525f7e7)",
+    "model_file": "qwen2.5-1.5b-instruct-q5_k_m.gguf",
+    "daemon_base_url": "http://127.0.0.1:8081",
+    "hyperfine_path": "hyperfine"
+  },
+  "workload": "sem_match/array",
+  "cold_start_nanos": 618030625,
+  "warm_latency_nanos": 84502708,
+  "sequential_batch_latency_nanos": 665629958,
+  "sequential_throughput_judgements_per_sec": 12.01868981984732,
+  "parallel_batch_latency_nanos": 626133667,
+  "parallel_throughput_judgements_per_sec": 12.776824537052088,
+  "batch_judgements": 8,
+  "cached_batch_nanos": 13834
+}

@@ -17,6 +17,7 @@ import (
 type fakeRealDaemonManager struct {
 	ensureErr   error
 	ensureCalls int
+	apiKey      string
 	stopErrs    []error
 	stopCalls   int
 }
@@ -24,6 +25,10 @@ type fakeRealDaemonManager struct {
 func (m *fakeRealDaemonManager) EnsureRunning(context.Context) error {
 	m.ensureCalls++
 	return m.ensureErr
+}
+
+func (m *fakeRealDaemonManager) APIKey() string {
+	return m.apiKey
 }
 
 func (m *fakeRealDaemonManager) Stop(context.Context) (bool, error) {
@@ -93,6 +98,27 @@ func TestRunRealInitialStopFailure(t *testing.T) {
 	}
 	if mgr.stopCalls != 1 {
 		t.Fatalf("Stop called %d times, want initial stop only", mgr.stopCalls)
+	}
+}
+
+func TestRunRealPassesManagedDaemonAPIKey(t *testing.T) {
+	const apiKey = "benchmark-test-api-key"
+	mgr := &fakeRealDaemonManager{apiKey: apiKey}
+	installFakeRealDaemonManager(t, mgr)
+	cfg := startRealBenchCompletionServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got, want := r.Header.Get("Authorization"), "Bearer "+apiKey; got != want {
+			http.Error(w, "missing managed daemon API key", http.StatusUnauthorized)
+			return
+		}
+		successfulCompletionHandler(t).ServeHTTP(w, r)
+	}))
+
+	w, err := GenerateArray("test", QuerySemMatch, 2)
+	if err != nil {
+		t.Fatalf("GenerateArray: %v", err)
+	}
+	if _, err := RunReal(context.Background(), cfg, w); err != nil {
+		t.Fatalf("RunReal: %v", err)
 	}
 }
 

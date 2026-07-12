@@ -182,35 +182,40 @@ filters and classification, deduplicated and cached.
 
 </div>
 
-<p class="text-center lead-tight">Latency and throughput from a Phase&nbsp;2 reference run on a
-local 1.5B model. Each fuzzy decision is a single small judgement, so cost and time track
-how many <em>fuzzy decisions</em> you make — not how big your input is.</p>
+<p class="text-center lead-tight">Local-model latency depends on the model, runtime, hardware,
+and repeated-value ratio. These are medians from five independent cold-start runs; see the raw
+reports before comparing them with your own workload.</p>
 
 <div class="bench-grid">
   <div class="bench-card">
-    <div class="bench-num">~1.43s</div>
-    <div class="bench-label">cold start: boot the local daemon and serve the first judgement</div>
+    <div class="bench-num">~611ms</div>
+    <div class="bench-label">median cold start, including model load and first readiness check</div>
   </div>
   <div class="bench-card">
     <div class="bench-num">~86ms</div>
-    <div class="bench-label">warm latency for a single fuzzy decision once the daemon is running</div>
+    <div class="bench-label">median warm latency for one fuzzy judgement</div>
   </div>
   <div class="bench-card">
-    <div class="bench-num">~16.3/s</div>
-    <div class="bench-label">sequential distinct judgements against the warm daemon</div>
+    <div class="bench-num">~11.9/s</div>
+    <div class="bench-label">median sequential throughput for 8 distinct judgements</div>
   </div>
   <div class="bench-card">
-    <div class="bench-num">~12&micro;s</div>
-    <div class="bench-label">cached replay of a repeated field value — no model call needed</div>
+    <div class="bench-num">~12.8/s</div>
+    <div class="bench-label">median bounded-parallel throughput (4 local slots)</div>
+  </div>
+  <div class="bench-card">
+    <div class="bench-num">~14.7&micro;s</div>
+    <div class="bench-label">median cached replay of the same judgement batch</div>
   </div>
 </div>
 
 <div class="bench-note">
-Measured on an Apple M3&nbsp;Pro (Metal) with llama.cpp&nbsp;9870 running
-Qwen2.5-1.5B&nbsp;Q5_K_M; your numbers will vary with model, machine, and how much your
-data repeats. Repeated values are deduplicated and cached, so a replay costs microseconds
-instead of a full judgement. Reproduce them on your own data with <code>--explain</code>,
-or dig into the details on <a href="https://github.com/ricardocabral/ajq">GitHub</a>.
+Reference run: Apple M3&nbsp;Pro (Metal), llama.cpp&nbsp;9910, Qwen2.5-1.5B&nbsp;Q5_K_M
+(SHA-256 <code>b4666107&hellip;5896f8c</code>), 64-record <code>sem_match</code> array with
+8 post-dedup judgements. Cold start ranged from 611–916&nbsp;ms; warm latency from
+84–95&nbsp;ms. These are workload-specific measurements, not a product guarantee.
+<a href="https://github.com/ricardocabral/ajq/tree/main/website/static/benchmarks/2026-07-12-m3-pro">Inspect the five raw JSON reports</a> or
+<a href="docs/how-to/benchmark-local-inference/">run the same workflow</a>.
 </div>
 {{% /blocks/section %}}
 

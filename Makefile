@@ -51,6 +51,11 @@ GORELEASER    := goreleaser
 # Coverage output file (gitignored).
 COVERAGE := coverage.out
 
+# Real benchmark metadata. Override BENCH_RUNS to collect independent reports
+# and set AJQ_BENCH_MACHINE / AJQ_BENCH_REPORT_DIR when publishing a result.
+BENCH_RUNS ?= 1
+BENCH_GIT_REVISION ?= $(shell git describe --always --dirty --abbrev=40 2>/dev/null || echo unknown)
+
 # Use bash with strict flags for recipe reliability.
 SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
@@ -157,6 +162,20 @@ golden: ## Run only the golden-output tests in verify mode
 golden-update: ## Regenerate golden fixtures (inspect the diff before committing)
 	AJQ_UPDATE_GOLDEN=1 $(GO) test ./... -run Golden
 
+.PHONY: agent-routing-eval
+agent-routing-eval: ## Validate and score the hermetic blind-agent routing corpus
+	$(GO) test ./internal/testharness -run TestAgentRouting
+	$(GO) run ./cmd/agent-routing-eval \
+		-corpus testdata/agent-routing/v1/corpus.json \
+		-responses testdata/agent-routing/v1/responses/scorer-fixture-local-guidance.json
+	$(GO) run ./cmd/agent-routing-eval \
+		-corpus testdata/agent-routing/v1/corpus.json \
+		-responses testdata/agent-routing/v1/responses/observed/2026-07-12-codex-gpt-5/local-guidance.json
+	$(GO) run ./cmd/agent-routing-eval \
+		-corpus testdata/agent-routing/v1/corpus.json \
+		-responses testdata/agent-routing/v1/responses/observed/2026-07-12-codex-gpt-5/none.json \
+		-enforce=false
+
 .PHONY: differential
 differential: ## Run the live jq differential tests (skips cleanly if jq is not installed)
 	$(GO) test ./internal/cli -run TestPureJQLiveDifferentialAgainstJQ -v
@@ -171,7 +190,7 @@ bench-phase2: ## Run the Phase 2.5 fake-mode bench harness (deterministic, CI-sa
 
 .PHONY: bench-phase2-real
 bench-phase2-real: ## Run the Phase 2.5 real local-inference bench (needs provisioned llama-server + model)
-	AJQ_BENCH_REAL=1 $(GO) test -v -run TestRealBench -timeout 5m ./internal/bench/...
+	AJQ_BENCH_REAL=1 AJQ_BENCH_GIT_REVISION=$(BENCH_GIT_REVISION) AJQ_BENCH_REPORT_DIR="$(abspath $(AJQ_BENCH_REPORT_DIR))" $(GO) test -count=$(BENCH_RUNS) -v -run TestRealBench -timeout 5m ./internal/bench/...
 
 ##@ Quality
 

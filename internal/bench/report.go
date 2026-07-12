@@ -3,6 +3,8 @@ package bench
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -77,14 +79,24 @@ func MetricsJSON(metrics []Metrics) ([]byte, error) {
 
 // realReportJSONView is the JSON-serializable projection of a RealReport.
 type realReportJSONView struct {
+	SchemaVersion string `json:"schema_version"`
+	Provenance    struct {
+		RecordedAt  string `json:"recorded_at"`
+		GoVersion   string `json:"go_version"`
+		Machine     string `json:"machine,omitempty"`
+		GitRevision string `json:"git_revision,omitempty"`
+		ModelSHA256 string `json:"model_sha256,omitempty"`
+		ModelBytes  int64  `json:"model_bytes,omitempty"`
+	} `json:"provenance"`
 	Environment struct {
 		OS             string `json:"os"`
 		Arch           string `json:"arch"`
 		NumCPU         int    `json:"num_cpu"`
 		MetalAvailable bool   `json:"metal_available"`
+		ParallelSlots  int    `json:"parallel_slots"`
 		ServerBinary   string `json:"server_binary"`
 		ServerVersion  string `json:"server_version"`
-		ModelPath      string `json:"model_path"`
+		ModelFile      string `json:"model_file"`
 		DaemonBaseURL  string `json:"daemon_base_url"`
 		HyperfinePath  string `json:"hyperfine_path"`
 	} `json:"environment"`
@@ -103,15 +115,23 @@ type realReportJSONView struct {
 // RealReportJSON serializes a real-inference report as indented JSON.
 func RealReportJSON(r RealReport) ([]byte, error) {
 	var v realReportJSONView
+	v.SchemaVersion = "1"
+	v.Provenance.RecordedAt = r.Provenance.RecordedAt.UTC().Format(time.RFC3339Nano)
+	v.Provenance.GoVersion = r.Provenance.GoVersion
+	v.Provenance.Machine = r.Provenance.Machine
+	v.Provenance.GitRevision = r.Provenance.GitRevision
+	v.Provenance.ModelSHA256 = r.Provenance.ModelSHA256
+	v.Provenance.ModelBytes = r.Provenance.ModelBytes
 	v.Environment.OS = r.Environment.OS
 	v.Environment.Arch = r.Environment.Arch
 	v.Environment.NumCPU = r.Environment.NumCPU
 	v.Environment.MetalAvailable = r.Environment.MetalAvailable
-	v.Environment.ServerBinary = r.Environment.ServerBinary
+	v.Environment.ParallelSlots = r.Environment.ParallelSlots
+	v.Environment.ServerBinary = reportPathBase(r.Environment.ServerBinary)
 	v.Environment.ServerVersion = r.Environment.ServerVersion
-	v.Environment.ModelPath = r.Environment.ModelPath
+	v.Environment.ModelFile = reportPathBase(r.Environment.ModelPath)
 	v.Environment.DaemonBaseURL = r.Environment.DaemonBaseURL
-	v.Environment.HyperfinePath = r.Environment.HyperfinePath
+	v.Environment.HyperfinePath = reportPathBase(r.Environment.HyperfinePath)
 	v.Workload = r.Workload
 	v.ColdStartNanos = r.ColdStart.Nanoseconds()
 	v.WarmLatencyNanos = r.WarmLatency.Nanoseconds()
@@ -125,6 +145,49 @@ func RealReportJSON(r RealReport) ([]byte, error) {
 		v.HyperfineMeanSecs = r.Hyperfine.MeanSeconds
 	}
 	return json.MarshalIndent(v, "", "  ")
+}
+
+// WriteRealReport writes a versioned JSON report to dir and returns its path.
+// The report timestamp and workload become part of the filename, and an
+// existing report is never overwritten.
+func WriteRealReport(dir string, r RealReport) (string, error) {
+	if strings.TrimSpace(dir) == "" {
+		return "", fmt.Errorf("real benchmark report directory is empty")
+	}
+	if r.Provenance.RecordedAt.IsZero() {
+		return "", fmt.Errorf("real benchmark report has no recorded_at timestamp")
+	}
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", fmt.Errorf("create real benchmark report directory: %w", err)
+	}
+
+	data, err := RealReportJSON(r)
+	if err != nil {
+		return "", fmt.Errorf("serialize real benchmark report: %w", err)
+	}
+	stamp := r.Provenance.RecordedAt.UTC()
+	workload := strings.NewReplacer("/", "-", "\\", "-", " ", "-").Replace(strings.TrimSpace(r.Workload))
+	if workload == "" {
+		workload = "workload"
+	}
+	name := fmt.Sprintf("real-%s-%s-%09d.json", stamp.Format("20060102T150405Z"), workload, stamp.Nanosecond())
+	path := filepath.Join(dir, name)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec // The filename is sanitized and the directory is an explicit benchmark-runner input.
+	if err != nil {
+		return "", fmt.Errorf("create real benchmark report %q: %w", path, err)
+	}
+	defer func() { _ = file.Close() }()
+	if _, err := file.Write(append(data, '\n')); err != nil {
+		return "", fmt.Errorf("write real benchmark report %q: %w", path, err)
+	}
+	return path, nil
+}
+
+func reportPathBase(path string) string {
+	if strings.TrimSpace(path) == "" {
+		return ""
+	}
+	return filepath.Base(path)
 }
 
 // FormatRealReport renders a real-inference benchmark report as stable,
