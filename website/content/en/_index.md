@@ -182,35 +182,16 @@ filters and classification, deduplicated and cached.
 
 </div>
 
-<p class="text-center lead-tight">Latency and throughput from a Phase&nbsp;2 reference run on a
-local 1.5B model. Each fuzzy decision is a single small judgement, so cost and time track
-how many <em>fuzzy decisions</em> you make — not how big your input is.</p>
-
-<div class="bench-grid">
-  <div class="bench-card">
-    <div class="bench-num">~1.43s</div>
-    <div class="bench-label">cold start: boot the local daemon and serve the first judgement</div>
-  </div>
-  <div class="bench-card">
-    <div class="bench-num">~86ms</div>
-    <div class="bench-label">warm latency for a single fuzzy decision once the daemon is running</div>
-  </div>
-  <div class="bench-card">
-    <div class="bench-num">~16.3/s</div>
-    <div class="bench-label">sequential distinct judgements against the warm daemon</div>
-  </div>
-  <div class="bench-card">
-    <div class="bench-num">~12&micro;s</div>
-    <div class="bench-label">cached replay of a repeated field value — no model call needed</div>
-  </div>
-</div>
+<p class="text-center lead-tight">Local-model latency depends on the model, runtime, hardware,
+and repeated-value ratio. ajq publishes inference figures only with versioned raw reports that
+identify those inputs.</p>
 
 <div class="bench-note">
-Measured on an Apple M3&nbsp;Pro (Metal) with llama.cpp&nbsp;9870 running
-Qwen2.5-1.5B&nbsp;Q5_K_M; your numbers will vary with model, machine, and how much your
-data repeats. Repeated values are deduplicated and cached, so a replay costs microseconds
-instead of a full judgement. Reproduce them on your own data with <code>--explain</code>,
-or dig into the details on <a href="https://github.com/ricardocabral/ajq">GitHub</a>.
+Reference inference figures are being regenerated with the public benchmark harness. Until a
+clean, versioned report set is published, treat local-model latency as workload-specific rather
+than a product guarantee. The deterministic mock harness remains useful for split-execution
+regression tracking, but it does not measure model inference.
+<a href="docs/how-to/benchmark-local-inference/">Capture a reproducible local benchmark</a>.
 </div>
 {{% /blocks/section %}}
 

@@ -3,6 +3,7 @@ package bench_test
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -65,6 +66,13 @@ func TestRealBench(t *testing.T) {
 	}
 	if report.ParallelBatchLatency <= 0 || report.ParallelThroughput <= 0 {
 		t.Fatalf("expected positive parallel batch metrics, got latency=%s throughput=%.2f", report.ParallelBatchLatency, report.ParallelThroughput)
+	}
+	if dir := strings.TrimSpace(os.Getenv(bench.EnvRealBenchReportDir)); dir != "" {
+		path, err := bench.WriteRealReport(dir, report)
+		if err != nil {
+			t.Fatalf("WriteRealReport: %v", err)
+		}
+		t.Logf("wrote real bench report: %s", path)
 	}
 
 	t.Logf("real bench report:\n%s", bench.FormatRealReport(report))

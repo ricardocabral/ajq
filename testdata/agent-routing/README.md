@@ -33,9 +33,10 @@ Run from a clean checkout:
 make agent-routing-eval
 ```
 
-The target validates every fixture, scores a checked-in scorer fixture, and
-prints a JSON report. It does not run an LLM, invoke ajq, read credentials,
-contact a provider, or need a local model. The equivalent focused test is:
+The target validates every fixture, scores the checked-in scorer fixture and
+observed baseline records, and prints JSON reports. It does not run an LLM,
+invoke ajq, read credentials, contact a provider, or need a local model. The
+equivalent focused test is:
 
 ```bash
 go test ./internal/testharness -run TestAgentRouting
@@ -98,16 +99,25 @@ unsupported claim from a vague summary. Resolve those fields from the command
 or explicit statement, and retain a transcript reference outside this public
 synthetic corpus if needed.
 
-## Current limitation and first empirical baseline
+## Scorer fixture and observed paired baseline
 
 The checked-in `scorer-fixture-local-guidance.json` is a scorer contract test,
 not a claim about a model's discovery rate. It proves that the corpus and
 thresholds are reproducible; it must not be presented as an observed agent
 result.
 
-The first empirical baseline is the paired `none` versus `local-guidance` run
-described above. Store a reviewed response record for each condition with the
-tested artifact and exact agent/runtime version. Future evidence may compare
-the installed-skill and public-docs fixtures, but it should remain opt-in and
-separate from default Go tests because model choice and provider runtime are
-non-deterministic.
+The first observed paired baseline is recorded under
+`v1/responses/observed/2026-07-12-codex-gpt-5/`. Two fresh Codex GPT-5 sessions
+received the same scenario order and fixture contents, with no repository or
+tool access. The `none` control received no ajq guidance; it scored 4/6 correct
+tool selections and 0/2 required safe preflights. The `local-guidance`
+treatment scored 6/6 and 2/2, with no false-positive ajq use, real-backend
+proposal, unsupported-capability claim, or policy violation.
+
+This is one reviewed paired observation per condition, not a discovery-rate
+claim or a statistically general result. The normalized records and a concise
+method note are checked in; the runner retains the session transcripts outside
+the public fixture corpus. Future evidence should repeat the same paired method
+with fresh sessions and may compare the installed-skill and public-docs
+artifacts. Keep those runs opt-in and separate from default Go tests because
+model choice and provider runtime are non-deterministic.

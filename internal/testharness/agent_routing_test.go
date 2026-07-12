@@ -93,3 +93,38 @@ func TestAgentRoutingScoringReportsUnsafeAndIncorrectRouting(t *testing.T) {
 		t.Fatalf("unsafe routing report = %+v", report)
 	}
 }
+
+func TestAgentRoutingObservedPairedBaseline(t *testing.T) {
+	root := testutil.RepoRoot(t)
+	corpus, err := LoadAgentRoutingCorpus(filepath.Join(root, "testdata", "agent-routing", "v1", "corpus.json"))
+	if err != nil {
+		t.Fatalf("LoadAgentRoutingCorpus: %v", err)
+	}
+	observed := filepath.Join(root, "testdata", "agent-routing", "v1", "responses", "observed", "2026-07-12-codex-gpt-5")
+	control, err := LoadAgentRoutingRun(filepath.Join(observed, "none.json"))
+	if err != nil {
+		t.Fatalf("LoadAgentRoutingRun control: %v", err)
+	}
+	guidance, err := LoadAgentRoutingRun(filepath.Join(observed, "local-guidance.json"))
+	if err != nil {
+		t.Fatalf("LoadAgentRoutingRun local guidance: %v", err)
+	}
+	if control.Agent != guidance.Agent || control.RecordedAt != guidance.RecordedAt {
+		t.Fatalf("paired baseline must retain the same agent and timestamp: control=%+v guidance=%+v", control, guidance)
+	}
+
+	controlReport, err := ScoreAgentRoutingRun(corpus, control)
+	if err != nil {
+		t.Fatalf("ScoreAgentRoutingRun control: %v", err)
+	}
+	if controlReport.Passed || controlReport.CorrectToolSelections != 4 || controlReport.SuccessfulSafePreflights != 0 {
+		t.Fatalf("control report = %+v, want 4/6 selection, 0/2 preflights, and failure", controlReport)
+	}
+	guidanceReport, err := ScoreAgentRoutingRun(corpus, guidance)
+	if err != nil {
+		t.Fatalf("ScoreAgentRoutingRun local guidance: %v", err)
+	}
+	if !guidanceReport.Passed || guidanceReport.CorrectToolSelections != 6 || guidanceReport.SuccessfulSafePreflights != 2 {
+		t.Fatalf("local-guidance report = %+v, want 6/6 selection, 2/2 preflights, and pass", guidanceReport)
+	}
+}

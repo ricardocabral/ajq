@@ -28,12 +28,21 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   package includes an optional `npx plugins` adapter for Claude Code and Cursor.
 - Documented plugin installation, fresh-workspace verification, CI provisioning,
   and the explicit mock → explain → capped-backend safety workflow.
+- Opt-in real local-inference benchmark runs can now write versioned JSON reports with the
+  actual GGUF SHA-256, runtime and source revision, optional hardware label, and measured
+  workload details.
+- Added the first reviewed fresh-session `none` versus `local-guidance` routing baseline for
+  Codex GPT-5. It is recorded as one paired observation, not a general discovery-rate claim.
 
 ### Fixed
 
 - Semantic cache entries now distinguish `--base-url` endpoints, preventing
   cached judgements from one compatible deployment being reused by another
   deployment serving a model with the same name.
+- The real local-inference benchmark now authenticates its internal benchmark requests to the
+  managed daemon, allowing authenticated benchmark runs to complete.
+- Removed website inference-latency figures that lacked versioned source reports; the site now
+  links to the reproducible benchmark workflow instead.
 
 ### Security
 
