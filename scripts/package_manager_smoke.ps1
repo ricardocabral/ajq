@@ -73,7 +73,7 @@ try {
     $versionFile = Join-Path $temp 'version'
     Invoke-ProgramToFile $ajq @('--version') '' $versionFile
     $versionEvidence = Assert-ExactBytes $versionFile "ajq v$version`n" 'ajq version'
-    Write-Host "WinGet installed version: ajq v$version"
+    Write-Output "WinGet installed version: ajq v$version"
 
     $env:HOME = Join-Path $temp 'home'
     $env:XDG_CONFIG_HOME = Join-Path $temp 'config'
@@ -82,8 +82,8 @@ try {
     $mockFile = Join-Path $temp 'mock-output'
     Invoke-ProgramToFile $ajq @('--backend', 'mock', '-c', '.[] | select(.msg =~ "refund") | .id') "[{`"id`":1,`"msg`":`"refund request`"},{`"id`":2,`"msg`":`"shipping update`"}]`n" $mockFile
     $mockEvidence = Assert-ExactBytes $mockFile "1`n" 'mock query'
-    Write-Host "WinGet mock stdout base64: $mockEvidence"
+    Write-Output "WinGet mock stdout base64: $mockEvidence"
 } finally {
     Remove-Item -Recurse -Force -ErrorAction Ignore -LiteralPath $temp
 }
-Write-Host "WinGet package smoke passed for $Tag"
+Write-Output "WinGet package smoke passed for $Tag"
