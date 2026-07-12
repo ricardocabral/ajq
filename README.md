@@ -120,3 +120,5 @@ make website-build
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+This project uses [gojq](https://github.com/itchyny/gojq), an implementation of jq in Go.
