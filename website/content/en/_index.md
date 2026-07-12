@@ -7,8 +7,8 @@ description: >
 
 {{< blocks/cover title="ajq" image_anchor="top" height="full" color="dark" >}}
 <div class="mx-auto">
-  <p class="cover-tagline h3 mt-2 mb-3">semantic grep for JSON.</p>
-  <p class="lead">Filter and classify messy JSON/NDJSON by meaning.<br>It's LLM-enhanced <code>jq</code> with a deterministic core.</p>
+  <p class="cover-tagline h3 mt-2 mb-3">Filter JSON by meaning. Route JSONL by intent.</p>
+  <p class="lead">When <code>jq</code> knows the shape but a text condition is too literal.<br>Explicit semantic predicates, deterministic core.</p>
 
   <div class="cover-code">
 <span class="tok-comment"># fuzzy JSON filter: keep jq deterministic, make only the predicate semantic</span><br>

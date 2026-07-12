@@ -29,6 +29,13 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 - Documented plugin installation, fresh-workspace verification, CI provisioning,
   and the explicit mock → explain → capped-backend safety workflow.
 
+### Changed
+
+- Reframed the README, website landing page, and machine-facing documentation
+  around concrete JSON/NDJSON tasks and tool-selection boundaries: exact jq
+  work, semantic filtering, bounded classification, and limited extraction or
+  redaction contexts.
+
 ### Fixed
 
 - Semantic cache entries now distinguish `--base-url` endpoints, preventing
