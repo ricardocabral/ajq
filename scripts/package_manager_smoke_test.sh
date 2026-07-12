@@ -9,6 +9,7 @@ mkdir -p "$tmp/prefix/bin"
 
 cat >"$tmp/prefix/bin/ajq" <<'EOF'
 #!/usr/bin/env bash
+[[ -f "${AJQ_CONFIG:-}" ]] || { printf 'missing isolated config\n' >&2; exit 42; }
 if [[ "$1" == --version ]]; then
   printf '%b' "${AJQ_VERSION_OUTPUT:-ajq 1.2.3\n}"
 else

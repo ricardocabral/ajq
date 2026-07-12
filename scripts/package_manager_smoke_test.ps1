@@ -15,6 +15,7 @@ if ($Args[0] -eq 'list') { Write-Output "Ricardocabral.ajq $env:WINGET_VERSION" 
     $ajq = Join-Path $temp 'ajq.ps1'
     @'
 param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
+if (-not (Test-Path -LiteralPath $env:AJQ_CONFIG -PathType Leaf)) { exit 42 }
 $bytes = if ($Args[0] -eq '--version') {
     [System.Text.Encoding]::UTF8.GetBytes($env:AJQ_VERSION_OUTPUT)
 } else {
