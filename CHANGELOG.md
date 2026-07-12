@@ -41,8 +41,8 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   deployment serving a model with the same name.
 - The real local-inference benchmark now authenticates its internal benchmark requests to the
   managed daemon, allowing authenticated benchmark runs to complete.
-- Removed website inference-latency figures that lacked versioned source reports; the site now
-  links to the reproducible benchmark workflow instead.
+- Replaced undocumented website inference-latency values with a source-linked five-run reference
+  measurement and reproducible benchmark workflow.
 
 ### Security
 

@@ -58,6 +58,14 @@ measurements into a guarantee for every model or input.
 If the checkout is dirty, commit the implementation first and rerun the collection. A report
 marked with a dirty revision is useful for local diagnosis but is not publishable reference data.
 
+## Current reference run
+
+The website's current reference figures are the median of five clean runs on an Apple M3 Pro
+(Metal) with llama.cpp 9910 and the 1.5B Q5_K_M model pinned to
+`b4666107…5896f8c`. The workload is a 64-record `sem_match` array with eight post-dedup
+judgements. Inspect the [five raw JSON reports](https://github.com/ricardocabral/ajq/tree/main/website/static/benchmarks/2026-07-12-m3-pro)
+before comparing them with different hardware, models, or data shapes.
+
 ## Related
 
 - [Estimate model calls before running](../estimate-model-calls/) for workload-specific call and
