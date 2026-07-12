@@ -97,9 +97,11 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
           shellcheck scripts/release_publish_preflight.sh scripts/release_publish_preflight_test.sh \
-            scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh scripts/release_smoke.sh
+            scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh scripts/release_smoke.sh \
+            scripts/release_workflow_test.sh
           scripts/release_publish_preflight_test.sh
           scripts/package_manager_smoke_test.sh
+          scripts/release_workflow_test.sh
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
             .github/workflows/ci.yml .github/workflows/release.yml \
             .github/workflows/winget.yml .github/workflows/package-manager-smoke.yml

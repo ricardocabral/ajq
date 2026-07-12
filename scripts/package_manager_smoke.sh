@@ -26,6 +26,9 @@ version=${tag#v}
 brew_bin=${BREW_BIN:-brew}
 command -v "$brew_bin" >/dev/null 2>&1 || { printf 'required tool not found: brew\n' >&2; exit 127; }
 
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
 cask_version() {
   "$brew_bin" info --cask --json=v2 ricardocabral/tap/ajq |
     python3 -c 'import json, sys; print(json.load(sys.stdin)["casks"][0]["version"])'
@@ -48,16 +51,23 @@ cask_version() {
 ajq_bin=$("$brew_bin" --prefix)/bin/ajq
 [[ -x "$ajq_bin" ]] || { printf 'installed Homebrew executable not found: %s\n' "$ajq_bin" >&2; exit 1; }
 
-actual_version=$("$ajq_bin" --version)
-[[ "$actual_version" == *"$version"* ]] || {
-  printf 'ajq version mismatch: expected %s, got %s\n' "$version" "$actual_version" >&2
+version_file="$tmp/version"
+printf 'ajq v%s\n' "$version" >"$tmp/expected-version"
+"$ajq_bin" --version >"$version_file"
+cmp -s "$tmp/expected-version" "$version_file" || {
+  printf 'ajq version mismatch: expected exact ajq v%s output\n' "$version" >&2
   exit 1
 }
+printf 'Homebrew installed version: %s\n' "$(tr -d '\n' <"$version_file")"
 
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
-actual=$(printf '[{"id":1,"msg":"refund request"},{"id":2,"msg":"shipping update"}]\n' |
+actual_file="$tmp/mock-output"
+printf '1\n' >"$tmp/expected-mock-output"
+printf '[{"id":1,"msg":"refund request"},{"id":2,"msg":"shipping update"}]\n' |
   env HOME="$tmp/home" XDG_CONFIG_HOME="$tmp/config" AJQ_CONFIG="$tmp/ajq.toml" AJQ_CACHE_DIR="$tmp/cache" \
-  "$ajq_bin" --backend mock -c '.[] | select(.msg =~ "refund") | .id')
-[[ "$actual" == '1' ]] || { printf 'mock query mismatch: expected 1, got %q\n' "$actual" >&2; exit 1; }
+  "$ajq_bin" --backend mock -c '.[] | select(.msg =~ "refund") | .id' >"$actual_file"
+cmp -s "$tmp/expected-mock-output" "$actual_file" || {
+  printf 'mock query mismatch: expected exact stdout bytes 1\\n\n' >&2
+  exit 1
+}
+printf 'Homebrew mock stdout base64: %s\n' "$(base64 <"$actual_file" | tr -d '\n')"
 printf 'Homebrew package smoke passed for %s\n' "$tag"

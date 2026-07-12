@@ -18,6 +18,7 @@ name: Release
       - scripts/release_smoke.sh
       - scripts/release_publish_preflight.sh
       - scripts/release_publish_preflight_test.sh
+      - scripts/release_workflow_test.sh
       - scripts/package_manager_smoke.sh
       - scripts/package_manager_smoke_test.sh
       - scripts/package_manager_smoke.ps1
@@ -28,13 +29,6 @@ name: Release
       - go.sum
       - cmd/ajq/**
       - internal/version/**
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing immutable release tag to republish, for example v1.2.3
-        required: true
-        type: string
-
 permissions:
   contents: read
 
@@ -62,8 +56,6 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_REF: ${{ github.ref }}
           EVENT_SHA: ${{ github.sha }}
-          DISPATCH_TAG: ${{ github.event.inputs.tag }}
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -82,20 +74,6 @@ jobs:
             git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
             [[ "$(git rev-parse "refs/tags/$tag^{commit}")" == "$(git rev-parse "$EVENT_SHA^{commit}")" ]] || {
               printf 'tag %s does not resolve to the triggering commit\n' "$tag" >&2
-              exit 1
-            }
-          else
-            tag="$DISPATCH_TAG"
-            [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-              printf 'release dispatch requires an existing vX.Y.Z tag, got %s\n' "$tag" >&2
-              exit 1
-            }
-            git ls-remote --exit-code --tags --refs origin "refs/tags/$tag" >/dev/null || {
-              printf 'release dispatch tag does not exist: %s\n' "$tag" >&2
-              exit 1
-            }
-            gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null || {
-              printf 'release dispatch requires an existing release for tag %s\n' "$tag" >&2
               exit 1
             }
           fi
@@ -137,9 +115,10 @@ jobs:
           sudo apt-get update && sudo apt-get install -y shellcheck
           shellcheck scripts/install.sh scripts/install_test.sh scripts/release_smoke.sh \
             scripts/release_publish_preflight.sh scripts/release_publish_preflight_test.sh \
-            scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh
+            scripts/release_workflow_test.sh scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh
           scripts/install_test.sh
           scripts/release_publish_preflight_test.sh
+          scripts/release_workflow_test.sh
           scripts/package_manager_smoke_test.sh
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
             .github/workflows/ci.yml .github/workflows/release.yml \
@@ -172,7 +151,7 @@ jobs:
 
   publish:
     name: Publish GitHub release
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs:
       - validate-release

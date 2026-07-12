@@ -15,7 +15,13 @@ if ($Args[0] -eq 'list') { Write-Output "Ricardocabral.ajq $env:WINGET_VERSION" 
     $ajq = Join-Path $temp 'ajq.ps1'
     @'
 param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
-if ($Args[0] -eq '--version') { Write-Output "ajq v$env:AJQ_VERSION" } else { $input | Out-Null; Write-Output $env:QUERY_OUTPUT }
+$bytes = if ($Args[0] -eq '--version') {
+    [System.Text.Encoding]::UTF8.GetBytes($env:AJQ_VERSION_OUTPUT)
+} else {
+    $input | Out-Null
+    [System.Text.Encoding]::UTF8.GetBytes($env:QUERY_OUTPUT)
+}
+[Console]::OpenStandardOutput().Write($bytes, 0, $bytes.Length)
 '@ | Set-Content -LiteralPath $ajq
 
     function Invoke-Smoke([string]$mode) {
@@ -23,11 +29,16 @@ if ($Args[0] -eq '--version') { Write-Output "ajq v$env:AJQ_VERSION" } else { $i
         $env:WINGET_BIN = if ($mode -eq 'missing') { Join-Path $temp 'missing-winget.exe' } else { $winget }
         $env:AJQ_PACKAGE_EXECUTABLE = $ajq
         $env:WINGET_VERSION = if ($mode -eq 'version') { '9.9.9' } else { '1.2.3' }
-        $env:AJQ_VERSION = '1.2.3'
-        $env:QUERY_OUTPUT = if ($mode -eq 'query') { '2' } else { '1' }
+        $env:AJQ_VERSION_OUTPUT = if ($mode -eq 'version-output') { "ajq v1.2.3 suffix`n" } else { "ajq v1.2.3`n" }
+        $env:QUERY_OUTPUT = switch ($mode) {
+            'query' { "2`n" }
+            'query-crlf' { "1`r`n" }
+            'query-extra-byte' { "1`n2`n" }
+            default { "1`n" }
+        }
         try {
-            & $smoke -Channel winget -Tag v1.2.3
-            return @{ Success = $true; Output = '' }
+            $output = (& $smoke -Channel winget -Tag v1.2.3 2>&1 | Out-String)
+            return @{ Success = $true; Output = $output }
         } catch {
             return @{ Success = $false; Output = $_.Exception.Message }
         }
@@ -35,6 +46,8 @@ if ($Args[0] -eq '--version') { Write-Output "ajq v$env:AJQ_VERSION" } else { $i
 
     $result = Invoke-Smoke 'success'
     if (-not $result.Success) { throw "smoke success failed: $($result.Output)" }
+    if ($result.Output -notmatch 'WinGet installed version: ajq v1\.2\.3') { throw 'success evidence omitted exact version' }
+    if ($result.Output -notmatch 'WinGet mock stdout base64: MQo=') { throw 'success evidence omitted mock stdout bytes' }
     foreach ($command in @(
         'uninstall --id Ricardocabral.ajq --exact --silent',
         'source update',
@@ -44,12 +57,16 @@ if ($Args[0] -eq '--version') { Write-Output "ajq v$env:AJQ_VERSION" } else { $i
     }
     $result = Invoke-Smoke 'version'
     if ($result.Success -or $result.Output -notmatch 'installed WinGet package version mismatch') { throw "version mismatch was not rejected: $($result.Output)" }
-    $result = Invoke-Smoke 'query'
-    if ($result.Success -or $result.Output -notmatch 'mock query mismatch') { throw "query mismatch was not rejected: $($result.Output)" }
+    $result = Invoke-Smoke 'version-output'
+    if ($result.Success -or $result.Output -notmatch 'ajq version mismatch') { throw "executable version suffix was not rejected: $($result.Output)" }
+    foreach ($mode in @('query', 'query-crlf', 'query-extra-byte')) {
+        $result = Invoke-Smoke $mode
+        if ($result.Success -or $result.Output -notmatch 'mock query mismatch') { throw "$mode was not rejected: $($result.Output)" }
+    }
     $result = Invoke-Smoke 'missing'
     if ($result.Success -or $result.Output -ne 'required tool not found: winget') { throw "missing tool was not rejected: $($result.Output)" }
     Write-Host 'package-manager smoke PowerShell tests passed'
 } finally {
     Remove-Item -Recurse -Force -ErrorAction Ignore -LiteralPath $temp
-    'WINGET_LOG', 'WINGET_BIN', 'AJQ_PACKAGE_EXECUTABLE', 'WINGET_VERSION', 'AJQ_VERSION', 'QUERY_OUTPUT' | ForEach-Object { Remove-Item "Env:$_" -ErrorAction Ignore }
+    'WINGET_LOG', 'WINGET_BIN', 'AJQ_PACKAGE_EXECUTABLE', 'WINGET_VERSION', 'AJQ_VERSION_OUTPUT', 'QUERY_OUTPUT' | ForEach-Object { Remove-Item "Env:$_" -ErrorAction Ignore }
 }

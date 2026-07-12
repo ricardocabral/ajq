@@ -20,6 +20,9 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added guarded Homebrew and WinGet publication automation and repeatable
+  clean-install smoke checks. Channel availability remains contingent on the
+  corresponding external package-manager verification.
 - Added a Diataxis how-to for making ajq available to coding agents through
   project guidance, including JSON-routing, safe semantic-validation, and
   cache-handling instructions.
