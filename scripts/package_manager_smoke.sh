@@ -52,10 +52,10 @@ ajq_bin=$("$brew_bin" --prefix)/bin/ajq
 [[ -x "$ajq_bin" ]] || { printf 'installed Homebrew executable not found: %s\n' "$ajq_bin" >&2; exit 1; }
 
 version_file="$tmp/version"
-printf 'ajq v%s\n' "$version" >"$tmp/expected-version"
+printf 'ajq %s\n' "$version" >"$tmp/expected-version"
 "$ajq_bin" --version >"$version_file"
 cmp -s "$tmp/expected-version" "$version_file" || {
-  printf 'ajq version mismatch: expected exact ajq v%s output\n' "$version" >&2
+  printf 'ajq version mismatch: expected exact ajq %s output\n' "$version" >&2
   exit 1
 }
 printf 'Homebrew installed version: %s\n' "$(tr -d '\n' <"$version_file")"

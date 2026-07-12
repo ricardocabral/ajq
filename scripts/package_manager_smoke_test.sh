@@ -10,7 +10,7 @@ mkdir -p "$tmp/prefix/bin"
 cat >"$tmp/prefix/bin/ajq" <<'EOF'
 #!/usr/bin/env bash
 if [[ "$1" == --version ]]; then
-  printf '%b' "${AJQ_VERSION_OUTPUT:-ajq v1.2.3\n}"
+  printf '%b' "${AJQ_VERSION_OUTPUT:-ajq 1.2.3\n}"
 else
   cat >/dev/null
   printf '%b' "${QUERY_OUTPUT:-1\n}"
@@ -50,8 +50,8 @@ expect_failure() {
 }
 
 : >"$tmp/brew.log"
-success_output=$(run_smoke env AJQ_VERSION_OUTPUT='ajq v1.2.3\n' QUERY_OUTPUT='1\n')
-[[ "$success_output" == *'Homebrew installed version: ajq v1.2.3'* ]] || { printf 'success evidence omitted exact version\n' >&2; exit 1; }
+success_output=$(run_smoke env AJQ_VERSION_OUTPUT='ajq 1.2.3\n' QUERY_OUTPUT='1\n')
+[[ "$success_output" == *'Homebrew installed version: ajq 1.2.3'* ]] || { printf 'success evidence omitted exact version\n' >&2; exit 1; }
 [[ "$success_output" == *'Homebrew mock stdout base64: MQo='* ]] || { printf 'success evidence omitted mock stdout bytes\n' >&2; exit 1; }
 for command in \
   'uninstall --cask --zap ricardocabral/tap/ajq' \
@@ -62,8 +62,8 @@ for command in \
 done
 
 expect_failure cask-version-mismatch 'Homebrew cask version mismatch' env CASK_VERSION=9.9.9
-expect_failure executable-version-prefix 'ajq version mismatch' env AJQ_VERSION_OUTPUT='prefix ajq v1.2.3\n'
-expect_failure executable-version-suffix 'ajq version mismatch' env AJQ_VERSION_OUTPUT='ajq v1.2.3 suffix\n'
+expect_failure executable-version-prefix 'ajq version mismatch' env AJQ_VERSION_OUTPUT='prefix ajq 1.2.3\n'
+expect_failure executable-version-suffix 'ajq version mismatch' env AJQ_VERSION_OUTPUT='ajq 1.2.3 suffix\n'
 expect_failure query-mismatch 'mock query mismatch' env QUERY_OUTPUT='2\n'
 expect_failure query-crlf 'mock query mismatch' env QUERY_OUTPUT='1\r\n'
 expect_failure query-extra-byte 'mock query mismatch' env QUERY_OUTPUT='1\n2\n'
