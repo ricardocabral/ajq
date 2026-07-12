@@ -7,8 +7,8 @@ description: >
 
 {{< blocks/cover title="ajq" image_anchor="top" height="full" color="dark" >}}
 <div class="mx-auto">
-  <p class="cover-tagline h3 mt-2 mb-3">Filter JSON by meaning. Route JSONL by intent.</p>
-  <p class="lead">When <code>jq</code> knows the shape but a text condition is too literal.<br>Explicit semantic predicates, deterministic core.</p>
+  <p class="cover-tagline h3 mt-2 mb-3">Filter JSON by meaning and route JSONL by intent.</p>
+  <p class="lead">Use explicit semantic predicates when <code>jq</code> knows the structure and the wording varies,<br>with ordinary jq execution remaining deterministic.</p>
 
   <div class="cover-code">
 <span class="tok-comment"># fuzzy JSON filter: keep jq deterministic, make only the predicate semantic</span><br>

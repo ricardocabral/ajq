@@ -2,15 +2,13 @@
 
 ![ajq — grep for meaning](website/static/images/brand/ajq-readme-banner.png)
 
-`ajq` is semantic `jq` for JSON and NDJSON streams. Use it when ordinary `jq`
-selects the right field but a text condition is too literal: find support tickets
-asking for a refund, keep log records that describe a failure, or route JSON lines
-into a fixed set of intent labels. It keeps ordinary jq byte-deterministic and
-calls a language model only for explicit semantic operations.
-
-The result is a fuzzy JSON filter and semantic grep—not a prompt over the whole
-document. Shipped semantic work includes fuzzy matching and bounded
-classification; scoring and normalization have limited supported contexts.
+`ajq` adds semantic matching and bounded classification to byte-deterministic
+`jq` pipelines over JSON and NDJSON. For example,
+`.[] | select(.message =~ "payment failure")` keeps records whose message
+describes a payment failure even when the wording varies. The surrounding jq
+selection and output remain deterministic, and model calls occur only for
+explicit semantic operations, with scoring and normalization available only in
+limited contexts.
 
 ## Choose the right tool
 
@@ -19,11 +17,12 @@ classification; scoring and normalization have limited supported contexts.
 | Exact fields, regular expressions, structural transforms, or reproducible formatting | `jq` (or ajq with a pure jq query) |
 | Find JSON/NDJSON records by topic, intent, or meaning | `ajq` with `=~` or `sem_match` |
 | Route JSON/NDJSON records into labels you define up front | `ajq` with `sem_classify` |
-| General-purpose extraction or redaction transforms | A different tool today—`sem_extract` and `sem_redact` are limited to gated control-flow contexts |
+| General-purpose extraction or redaction transforms | Choose a dedicated tool because ajq limits `sem_extract` and `sem_redact` to gated control-flow contexts |
 
-Semantic calls are always visible in the query and backend selection. Start with
-the deterministic mock backend, inspect the plan, then choose a real backend with
-an explicit call cap when the task needs model judgement.
+Each semantic operation is visible in the query, and backend selection and call
+limits remain under user control. Validate the query with the deterministic mock
+backend, inspect its plan, and select a real backend with an explicit call cap
+when the task needs model judgement.
 
 ## Usage
 

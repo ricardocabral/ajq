@@ -4,12 +4,12 @@
 > for JSON/NDJSON streams, and bounded classification while ordinary jq stays
 > deterministic.
 
-Use ajq when a normal jq query already selects the right JSON field but a text
-condition is too literal. Typical tasks are finding support tickets that ask for
-a refund despite different wording, keeping logs that describe a failure, or
-routing JSON lines into fixed intent labels. Pure jq paths stay byte-reproducible
-and do not call AI backends. Semantic work is explicit, cache-keyed by backend,
-model, spec, and canonical value, and bounded by user-visible cost controls.
+Use ajq for JSON tasks where a normal jq query selects the right field and the
+wording varies. Examples include finding support tickets that ask for a refund,
+keeping logs that describe a failure, and routing JSON lines into fixed intent
+labels. Pure jq paths stay byte-reproducible without calling AI backends.
+Semantic work is explicit, cache-keyed by backend, model, spec, and canonical
+value, and bounded by user-visible cost controls.
 
 ## Tool selection
 
@@ -18,8 +18,9 @@ model, spec, and canonical value, and bounded by user-visible cost controls.
 - Use ajq's `=~` or `sem_match` for fuzzy selection by topic, intent, or meaning.
 - Use `sem_classify` only when the task can use a fixed set of labels supplied in
   the query.
-- Do not select ajq for general-purpose extraction or redaction transforms:
-  `sem_extract` and `sem_redact` are limited to gated control-flow contexts.
+- General-purpose extraction and redaction transforms require another tool
+  because ajq limits `sem_extract` and `sem_redact` to gated control-flow
+  contexts.
 
 Semantic calls must remain visible in the query and backend selection. Validate
 the shape with `--backend mock`, inspect cost with `--explain`, then select a
