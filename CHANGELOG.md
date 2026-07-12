@@ -42,6 +42,12 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   work, semantic filtering, bounded classification, and limited extraction or
   redaction contexts.
 
+### Removed
+
+- Removed the maintainer-only local-inference benchmark collection guide from
+  the public documentation. The benchmark commands and source-linked reference
+  reports remain available for development and verification.
+
 ### Fixed
 
 - Semantic cache entries now distinguish `--base-url` endpoints, preventing
