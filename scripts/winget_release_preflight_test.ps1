@@ -33,7 +33,7 @@ try {
     $message = Invoke-Preflight 'synthetic-token' 'v1.2.3' @('ajq_1.2.3_Windows_x86_64.zip', 'ajq_1.2.3_Windows_x86_64.zip') $false
     if ($message -notmatch 'requires exactly one asset') { throw "unexpected duplicate-asset diagnostic: $message" }
     $output = Invoke-Preflight 'synthetic-token' 'v1.2.3' @('ajq_1.2.3_Windows_x86_64.zip') $true
-    if ($output -notmatch '(?m)^version=1.2.3$' -or $output -notmatch '(?m)^regex=\^ajq_1\.2\.3_Windows_x86_64\.zip\$$') { throw "unexpected preflight output: $output" }
+    if ($output -notmatch '(?m)^version=1.2.3\r?$' -or $output -notmatch '(?m)^regex=\^ajq_1\.2\.3_Windows_x86_64\.zip\$\r?$') { throw "unexpected preflight output: $output" }
     Write-Host 'winget release preflight tests passed'
 } finally {
     Remove-Item -Recurse -Force -ErrorAction Ignore -LiteralPath $temp
