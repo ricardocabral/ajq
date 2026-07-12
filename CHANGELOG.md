@@ -35,19 +35,6 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   Codex GPT-5. It is recorded as one paired observation, not a general discovery-rate claim.
 - Added a bounded classification recipe for webhook events emitted as NDJSON.
 
-### Changed
-
-- Reframed the README, website landing page, and machine-facing documentation
-  around concrete JSON/NDJSON tasks and tool-selection boundaries: exact jq
-  work, semantic filtering, bounded classification, and limited extraction or
-  redaction contexts.
-
-### Removed
-
-- Removed the maintainer-only local-inference benchmark collection guide from
-  the public documentation. The benchmark commands and source-linked reference
-  reports remain available for development and verification.
-
 ### Fixed
 
 - Semantic cache entries now distinguish `--base-url` endpoints, preventing
@@ -55,8 +42,6 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   deployment serving a model with the same name.
 - The real local-inference benchmark now authenticates its internal benchmark requests to the
   managed daemon, allowing authenticated benchmark runs to complete.
-- Replaced undocumented website inference-latency values with a source-linked five-run reference
-  measurement and reproducible benchmark workflow.
 
 ### Security
 
