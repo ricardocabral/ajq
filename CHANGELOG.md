@@ -28,6 +28,7 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   package includes an optional `npx plugins` adapter for Claude Code and Cursor.
 - Documented plugin installation, fresh-workspace verification, CI provisioning,
   and the explicit mock → explain → capped-backend safety workflow.
+- Added a bounded classification recipe for webhook events emitted as NDJSON.
 
 ### Changed
 
