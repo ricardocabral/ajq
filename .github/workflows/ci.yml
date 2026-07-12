@@ -80,6 +80,43 @@ jobs:
           shellcheck scripts/install.sh scripts/install_test.sh
           scripts/install_test.sh
 
+  package-manager-scripts:
+    name: Package-manager shell checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Go for actionlint
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate package-manager scripts and workflows
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck scripts/release_publish_preflight.sh scripts/release_publish_preflight_test.sh \
+            scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh scripts/release_smoke.sh
+          scripts/release_publish_preflight_test.sh
+          scripts/package_manager_smoke_test.sh
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
+            .github/workflows/ci.yml .github/workflows/release.yml \
+            .github/workflows/winget.yml .github/workflows/package-manager-smoke.yml
+
+  package-manager-powershell:
+    name: Package-manager PowerShell checks
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Test WinGet helpers and smoke script
+        shell: pwsh
+        run: |
+          ./scripts/winget_release_preflight_test.ps1
+          ./scripts/package_manager_smoke_test.ps1
+
   test:
     name: Unit tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

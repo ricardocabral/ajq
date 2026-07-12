@@ -8,10 +8,22 @@ name: Release
   pull_request:
     paths:
       - .goreleaser.yaml
+      - .github/workflows/ci.yml
       - .github/workflows/release.yml
+      - .github/workflows/winget.yml
+      - .github/workflows/package-manager-smoke.yml
       - Makefile
       - scripts/install.sh
       - scripts/install_test.sh
+      - scripts/release_smoke.sh
+      - scripts/release_publish_preflight.sh
+      - scripts/release_publish_preflight_test.sh
+      - scripts/package_manager_smoke.sh
+      - scripts/package_manager_smoke_test.sh
+      - scripts/package_manager_smoke.ps1
+      - scripts/package_manager_smoke_test.ps1
+      - scripts/winget_release_preflight.ps1
+      - scripts/winget_release_preflight_test.ps1
       - go.mod
       - go.sum
       - cmd/ajq/**
@@ -19,27 +31,89 @@ name: Release
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to publish, for example v1.2.3
+        description: Existing immutable release tag to republish, for example v1.2.3
         required: true
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  validate-release:
+    name: Validate release identity
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.identity.outputs.ref }}
+      tag: ${{ steps.identity.outputs.tag }}
+      version: ${{ steps.identity.outputs.version }}
+    steps:
+      - name: Check out triggering revision
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate canonical release tag
+        id: identity
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_SHA: ${{ github.sha }}
+          DISPATCH_TAG: ${{ github.event.inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            printf 'ref=%s\n' "$EVENT_SHA" >> "$GITHUB_OUTPUT"
+            printf 'tag=\nversion=\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$EVENT_NAME" == push ]]; then
+            [[ "$EVENT_REF" =~ ^refs/tags/(v[0-9]+\.[0-9]+\.[0-9]+)$ ]] || {
+              printf 'release publish requires a vX.Y.Z tag, got %s\n' "$EVENT_REF" >&2
+              exit 1
+            }
+            tag="${BASH_REMATCH[1]}"
+            git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
+            [[ "$(git rev-parse "refs/tags/$tag^{commit}")" == "$(git rev-parse "$EVENT_SHA^{commit}")" ]] || {
+              printf 'tag %s does not resolve to the triggering commit\n' "$tag" >&2
+              exit 1
+            }
+          else
+            tag="$DISPATCH_TAG"
+            [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+              printf 'release dispatch requires an existing vX.Y.Z tag, got %s\n' "$tag" >&2
+              exit 1
+            }
+            git ls-remote --exit-code --tags --refs origin "refs/tags/$tag" >/dev/null || {
+              printf 'release dispatch tag does not exist: %s\n' "$tag" >&2
+              exit 1
+            }
+            gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null || {
+              printf 'release dispatch requires an existing release for tag %s\n' "$tag" >&2
+              exit 1
+            }
+          fi
+
+          printf 'ref=refs/tags/%s\n' "$tag" >> "$GITHUB_OUTPUT"
+          printf 'tag=%s\nversion=%s\n' "$tag" "${tag#v}" >> "$GITHUB_OUTPUT"
+
   quality:
     name: Test and lint
     runs-on: ubuntu-latest
+    needs:
+      - validate-release
     steps:
       - name: Check out repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ needs.validate-release.outputs.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
@@ -58,13 +132,18 @@ jobs:
       - name: Run lint
         run: make lint
 
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-
-      - name: Check install scripts
+      - name: Check package-manager scripts and workflows
         run: |
-          shellcheck scripts/install.sh scripts/install_test.sh
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck scripts/install.sh scripts/install_test.sh scripts/release_smoke.sh \
+            scripts/release_publish_preflight.sh scripts/release_publish_preflight_test.sh \
+            scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh
           scripts/install_test.sh
+          scripts/release_publish_preflight_test.sh
+          scripts/package_manager_smoke_test.sh
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
+            .github/workflows/ci.yml .github/workflows/release.yml \
+            .github/workflows/winget.yml .github/workflows/package-manager-smoke.yml
 
   release-dry-run:
     name: GoReleaser snapshot dry-run
@@ -96,6 +175,7 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     needs:
+      - validate-release
       - quality
     permissions:
       contents: write
@@ -106,13 +186,18 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ needs.validate-release.outputs.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Preflight Homebrew cask publication
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: scripts/release_publish_preflight.sh
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
@@ -123,6 +208,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          HOMEBREW_CASK_UPLOAD: "1"
 
       - name: Attest release provenance
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
