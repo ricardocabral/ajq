@@ -50,6 +50,20 @@ go install github.com/ricardocabral/ajq/cmd/ajq@latest
 The Homebrew cask is published to the public `ricardocabral/tap` tap by the
 release workflow.
 
+### Coding-agent skill
+
+Install the ajq routing skill for Codex from this repository's marketplace:
+
+```bash
+codex plugin marketplace add ricardocabral/ajq
+codex plugin add ajq@ajq
+```
+
+The optional `npx plugins add ricardocabral/ajq` adapter currently targets
+Claude Code and Cursor. See the [coding-agent skill installation
+guide](https://ricardocabral.github.io/ajq/docs/how-to/install-agent-plugin/)
+for pinned, workspace, CI, and verification flows.
+
 ## Status
 
 | Area | What works today |

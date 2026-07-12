@@ -23,6 +23,11 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 - Added a Diataxis how-to for making ajq available to coding agents through
   project guidance, including JSON-routing, safe semantic-validation, and
   cache-handling instructions.
+- Added a public, native Codex marketplace containing the `ajq` routing skill
+  for semantic JSON/NDJSON filtering and bounded classification. The same
+  package includes an optional `npx plugins` adapter for Claude Code and Cursor.
+- Documented plugin installation, fresh-workspace verification, CI provisioning,
+  and the explicit mock → explain → capped-backend safety workflow.
 
 ### Fixed
 

@@ -1,0 +1,34 @@
+{
+  "name": "ajq",
+  "version": "0.1.0",
+  "description": "Route JSON and NDJSON semantic filtering and bounded classification tasks to ajq safely.",
+  "author": {
+    "name": "Ricardo Niederberger Cabral",
+    "url": "https://github.com/ricardocabral"
+  },
+  "homepage": "https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/",
+  "repository": "https://github.com/ricardocabral/ajq",
+  "license": "MIT",
+  "keywords": [
+    "jq",
+    "json",
+    "ndjson",
+    "semantic-filtering",
+    "classification"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ajq",
+    "shortDescription": "Safe semantic jq workflows for JSON and NDJSON.",
+    "longDescription": "Routes semantic JSON filtering and bounded classification to ajq while preserving explicit backends, deterministic jq paths, and finite cost caps.",
+    "developerName": "Ricardo Niederberger Cabral",
+    "category": "Productivity",
+    "capabilities": [],
+    "websiteURL": "https://ricardocabral.github.io/ajq/",
+    "defaultPrompt": [
+      "Use ajq to safely filter this JSON by meaning.",
+      "Classify these JSON lines with ajq and bounded labels.",
+      "Plan this ajq semantic query before running a model."
+    ]
+  }
+}

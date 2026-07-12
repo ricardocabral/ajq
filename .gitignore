@@ -22,7 +22,12 @@ prototype/
 .vscode/
 
 # Local assistant/tool state
-.agents/
+# Keep the versioned Codex marketplace catalog while ignoring all other local
+# agent state and skills.
+.agents/*
+!.agents/plugins/
+.agents/plugins/*
+!.agents/plugins/marketplace.json
 .claude/
 .pi/
 AGENTS.md

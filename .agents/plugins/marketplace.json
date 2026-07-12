@@ -1,0 +1,20 @@
+{
+  "name": "ajq",
+  "interface": {
+    "displayName": "Ajq"
+  },
+  "plugins": [
+    {
+      "name": "ajq",
+      "source": {
+        "source": "local",
+        "path": "./plugins/ajq"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

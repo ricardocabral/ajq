@@ -22,6 +22,8 @@ Use these when you know the task. New to ajq? Start with
   fixed set of semantic labels.
 - **[Use ajq safely from coding agents](agent-safe-semantic-workflow/)** — start with mock
   and `--explain`, then cap and observe real model calls.
+- **[Install the ajq coding-agent skill](install-agent-plugin/)** — add the native Codex
+  marketplace or the optional Claude Code and Cursor adapter.
 - **[Use ajq with other data formats](use-other-data-formats/)** — pipe JSON from
   complementary jq ecosystem adapters into ajq.
 - **[Write a semantic filter](semantic-filter/)** — use fuzzy `=~` predicates and bounded
