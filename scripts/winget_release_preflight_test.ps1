@@ -29,7 +29,7 @@ try {
     $message = Invoke-Preflight 'synthetic-token' 'not-a-tag' @('ajq_1.2.3_Windows_x86_64.zip') $false
     if ($message -notmatch 'WinGet preflight requires a vX.Y.Z tag') { throw "unexpected tag diagnostic: $message" }
     $message = Invoke-Preflight 'synthetic-token' 'v1.2.3' @() $false
-    if ($message -notmatch 'Ricardocabral.ajq tag v1.2.3 requires exactly one asset ajq_1.2.3_Windows_x86_64.zip') { throw "unexpected no-asset diagnostic: $message" }
+    if ($message -notmatch 'RicardoCabral.ajq tag v1.2.3 requires exactly one asset ajq_1.2.3_Windows_x86_64.zip') { throw "unexpected no-asset diagnostic: $message" }
     $message = Invoke-Preflight 'synthetic-token' 'v1.2.3' @('ajq_1.2.3_Windows_x86_64.zip', 'ajq_1.2.3_Windows_x86_64.zip') $false
     if ($message -notmatch 'requires exactly one asset') { throw "unexpected duplicate-asset diagnostic: $message" }
     $output = Invoke-Preflight 'synthetic-token' 'v1.2.3' @('ajq_1.2.3_Windows_x86_64.zip') $true

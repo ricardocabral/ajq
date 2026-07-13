@@ -69,13 +69,13 @@ function Invoke-WinGet([string]$Operation, [string[]]$Arguments) {
     return $output
 }
 
-$packageArguments = @('list', '--id', 'Ricardocabral.ajq', '--exact')
+$packageArguments = @('list', '--id', 'RicardoCabral.ajq', '--exact')
 $existing = Invoke-WinGet 'list before cleanup' $packageArguments
 if ($existing -notmatch '(?im)no (installed )?package found matching input criteria') {
-    [void](Invoke-WinGet 'uninstall' @('uninstall', '--id', 'Ricardocabral.ajq', '--exact', '--silent'))
+    [void](Invoke-WinGet 'uninstall' @('uninstall', '--id', 'RicardoCabral.ajq', '--exact', '--silent'))
 }
 [void](Invoke-WinGet 'source update' @('source', 'update'))
-[void](Invoke-WinGet 'install' @('install', '--id', 'Ricardocabral.ajq', '--exact', '--version', $version, '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements', '--silent'))
+[void](Invoke-WinGet 'install' @('install', '--id', 'RicardoCabral.ajq', '--exact', '--version', $version, '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements', '--silent'))
 $installed = Invoke-WinGet 'list after install' $packageArguments
 if ($installed -notmatch "(?m)\b$([regex]::Escape($version))\b") { throw "installed WinGet package version mismatch: expected $version" }
 
