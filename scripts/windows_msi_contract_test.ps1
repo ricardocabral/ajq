@@ -6,6 +6,7 @@ $contract = Join-Path $repoRoot 'scripts/windows_msi_contract.ps1'
 $wix = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'build/windows/ajq.wxs')
 $workflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
 $goreleaser = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.goreleaser.yaml')
+$msiFinalizer = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/windows_msi_finalize.ps1')
 
 function Get-Contract([string]$Tag) {
     $result = @{}
@@ -21,9 +22,10 @@ if ($first.version -ne '0.0.7' -or $first.product_code -cne '{7DA9CC6C-417F-5E58
     throw "unexpected deterministic contract for v0.0.7: $($first | ConvertTo-Json -Compress)"
 }
 $repeat = Get-Contract 'v0.0.7'
-if ($repeat.product_code -cne $first.product_code) { throw 'same MSI version did not reproduce ProductCode' }
+if ($repeat.product_code -cne $first.product_code -or $repeat.package_code -cne $first.package_code) { throw 'same MSI version did not reproduce deterministic MSI codes' }
+if ($first.package_code -ceq $first.product_code) { throw 'MSI package code must be distinct from ProductCode' }
 $next = Get-Contract 'v0.0.8'
-if ($next.product_code -ceq $first.product_code) { throw 'different MSI versions must have different ProductCodes' }
+if ($next.product_code -ceq $first.product_code -or $next.package_code -ceq $first.package_code) { throw 'different MSI versions must have different deterministic codes' }
 if ($next.zip_asset -cne 'ajq_0.0.8_Windows_x86_64.zip' -or $next.msi_asset -cne 'ajq_0.0.8_Windows_x86_64.msi') {
     throw 'MSI asset contract is not case-sensitive canonical Windows x64 naming'
 }
@@ -54,6 +56,15 @@ foreach ($needle in @(
 }
 
 foreach ($needle in @(
+    '$summary.Property(9) = $PackageCode',
+    '$summary.Property(12) = $reproducibleTime',
+    '$summary.Property(13) = $reproducibleTime',
+    "[datetime]'2000-01-01T00:00:00'"
+)) {
+    if (-not $msiFinalizer.Contains($needle)) { throw "MSI finalizer is missing reproducibility control: $needle" }
+}
+
+foreach ($needle in @(
     'name: Create draft GitHub release',
     'name: Build Windows x64 MSI',
     'name: Finalize checksums, attest, and publish',
@@ -67,6 +78,17 @@ foreach ($needle in @(
     'refusing to replace assets on published release',
     'replacing deterministic assets on existing draft',
     'name: Publish Homebrew cask after release finalization',
+    'Build-ReproducibleMsi',
+    'windows_msi_finalize.ps1 -MsiPath $out -PackageCode $env:PACKAGE_CODE',
+    'same verified inputs produced different unsigned MSI bytes',
+    'expected_assets=(',
+    'draft release must contain exactly one %s',
+    'ajq_${RELEASE_VERSION}_Darwin_arm64.tar.gz',
+    'ajq_${RELEASE_VERSION}_Darwin_x86_64.tar.gz',
+    'ajq_${RELEASE_VERSION}_Linux_arm64.tar.gz',
+    'ajq_${RELEASE_VERSION}_Linux_x86_64.tar.gz',
+    'ajq_${RELEASE_VERSION}_Windows_x86_64.zip',
+    'ajq_${RELEASE_VERSION}_Windows_x86_64.msi',
     'gh release edit "$RELEASE_TAG" --draft=false',
     'dist/*.msi'
 )) {

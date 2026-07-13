@@ -30,6 +30,14 @@ grep -Fq 'dotnet tool install --global wix --version 4.0.5' "$workflow" || {
   printf 'Release workflow must pin WiX 4.0.5\n' >&2
   exit 1
 }
+grep -Fq 'same verified inputs produced different unsigned MSI bytes' "$workflow" || {
+  printf 'Release workflow must reject non-reproducible MSI retries\n' >&2
+  exit 1
+}
+grep -Fq 'draft release must contain exactly one %s' "$workflow" || {
+  printf 'Release workflow must require exact archive assets before publication\n' >&2
+  exit 1
+}
 grep -Fq 'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.' "$workflow" || {
   printf 'Release workflow must retain the credential-safe unsigned MSI warning\n' >&2
   exit 1
