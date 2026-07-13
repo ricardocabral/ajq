@@ -41,6 +41,10 @@ type Options struct {
 	// support three-phase windowing. It does not affect pure-jq execution or any
 	// semantic backend, model, cache, or cost settings.
 	Stream bool
+	// IterativeHarvest is an internal test and benchmark hook for the
+	// non-default staged predicate prototype. The CLI deliberately does not set
+	// it; unsupported plans continue through the normal executor.
+	IterativeHarvest bool
 }
 
 // ErrInvalidWindowBytes reports a negative direct engine window budget.
@@ -70,6 +74,9 @@ const (
 	// ExecutionModeUserStream reports supported semantic execution selected by
 	// Options.Stream to run inline instead of in three-phase windows.
 	ExecutionModeUserStream ExecutionMode = "user-stream"
+	// ExecutionModeIterativeHarvest reports the internal opt-in staged predicate
+	// prototype. It is never selected by default or by a public CLI option.
+	ExecutionModeIterativeHarvest ExecutionMode = "iterative-harvest"
 	// ExecutionModeInterleaved is retained as a source-compatible alias for
 	// planner-required interleaved execution.
 	ExecutionModeInterleaved = ExecutionModePlannerInterleaved
@@ -173,6 +180,11 @@ func Execute(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Option
 		}
 		if opts.Stream {
 			return executeInterleaved(ctx, stdin, stdout, opts, len(semanticPlan.Semantic), ExecutionModeUserStream)
+		}
+		if opts.IterativeHarvest {
+			if stages, ok := plan.IterativeStages(opts.Query, semanticPlan); ok {
+				return executeIterative(ctx, stdin, stdout, opts, len(semanticPlan.Semantic), stages)
+			}
 		}
 		return executeThreePhase(ctx, stdin, stdout, opts, len(semanticPlan.Semantic))
 	}
