@@ -52,14 +52,28 @@ func normalizedWindowBytes(windowBytes int64) (int64, error) {
 	return windowBytes, nil
 }
 
+// ExecutionMode identifies the executor path used for a run.
+type ExecutionMode string
+
+const (
+	ExecutionModePureJQ             ExecutionMode = "pure-jq"
+	ExecutionModeThreePhaseWindowed ExecutionMode = "three-phase-windowed"
+	ExecutionModeInterleaved        ExecutionMode = "interleaved"
+)
+
 // RunStats summarizes per-run accounting. InputFrames counts frames read from
 // stdin. SemanticCallSites counts static semantic plan nodes. HarvestedJudgements
 // counts semantic judgements collected during split harvest. PostDedupBackendCalls
 // counts individual judgements sent to Backend.Judge after cache hits and
-// duplicate-in-frame deduplication. CacheHits counts cache lookups that avoided a
-// backend judgement; duplicate dedup skips are not cache hits. Elapsed is wall
-// time spent in Execute.
+// duplicate deduplication. CacheHits counts cache lookups that avoided a backend
+// judgement; duplicate dedup skips are not cache hits. WindowBytes, WindowCount,
+// and OversizedWindowCount are populated only for three-phase-windowed runs.
+// Elapsed is wall time spent in Execute.
 type RunStats struct {
+	ExecutionMode         ExecutionMode
+	WindowBytes           int64
+	WindowCount           int64
+	OversizedWindowCount  int64
 	InputFrames           int64
 	SemanticCallSites     int
 	HarvestedJudgements   int
@@ -151,7 +165,7 @@ func Execute(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Option
 		return Result{}, &CompileError{Err: err}
 	}
 
-	stats := RunStats{SemanticCallSites: len(semanticPlan.Semantic)}
+	stats := RunStats{ExecutionMode: ExecutionModePureJQ, SemanticCallSites: len(semanticPlan.Semantic)}
 	return executeProgram(ctx, stdin, stdout, opts, program, &stats)
 }
 
@@ -160,7 +174,7 @@ func rewriteQuery(query string) (string, error) {
 }
 
 func executeInterleaved(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Options, callSites int) (Result, error) {
-	stats := RunStats{SemanticCallSites: callSites}
+	stats := RunStats{ExecutionMode: ExecutionModeInterleaved, SemanticCallSites: callSites}
 	program, err := compileInterleavedWithStats(ctx, opts.Query, opts.Backend, opts.SemanticModelID, opts.SemanticCache, &stats, opts.MaxCalls, opts.MaxCallsDefaultPaid)
 	if err != nil {
 		return Result{RunStats: stats}, err
@@ -169,8 +183,11 @@ func executeInterleaved(ctx context.Context, stdin io.Reader, stdout io.Writer, 
 }
 
 func executeThreePhase(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Options, callSites int) (Result, error) {
-	stats := RunStats{SemanticCallSites: callSites}
+	stats := RunStats{ExecutionMode: ExecutionModeThreePhaseWindowed, SemanticCallSites: callSites}
 	windowBytes, err := normalizedWindowBytes(opts.WindowBytes)
+	if err == nil {
+		stats.WindowBytes = windowBytes
+	}
 	if err != nil {
 		return Result{RunStats: stats}, err
 	}
@@ -198,6 +215,7 @@ func executeThreePhase(ctx context.Context, stdin io.Reader, stdout io.Writer, o
 			// The iterator stops at the failing frame. Its returned window is the
 			// already-harvested prefix, which must retain the historical output
 			// behavior before that frame's error is reported.
+			recordWindowStats(&stats, window, true, harvestErr.Frame.Bytes > windowBytes)
 			stats.InputFrames += int64(len(window.Frames) + 1)
 			prefixErr := resolveAndExecuteWindow(ctx, stdout, opts, program, &result, window.Frames)
 			window.Release()
@@ -219,6 +237,7 @@ func executeThreePhase(ctx context.Context, stdin io.Reader, stdout io.Writer, o
 			return result, fmt.Errorf("input error: %w", err)
 		}
 
+		recordWindowStats(&stats, window, false, false)
 		stats.InputFrames += int64(len(window.Frames))
 		result.RunStats = stats
 		err = resolveAndExecuteWindow(ctx, stdout, opts, program, &result, window.Frames)
@@ -231,11 +250,30 @@ func executeThreePhase(ctx context.Context, stdin io.Reader, stdout io.Writer, o
 	}
 }
 
-func resolveAndExecuteWindow(ctx context.Context, stdout io.Writer, opts Options, program *threePhaseProgram, result *Result, frames []input.Frame) error {
-	if err := program.resolve(ctx); err != nil {
-		return &RuntimeError{Frame: resolveErrorFrame(err, frames), Err: err}
+func recordWindowStats(stats *RunStats, window input.Window, harvestFailed, failedOversized bool) {
+	if stats == nil || (len(window.Frames) == 0 && !harvestFailed) {
+		return
 	}
-	for i := range frames {
+	stats.WindowCount++
+	if window.Oversized || failedOversized {
+		stats.OversizedWindowCount++
+	}
+}
+
+func resolveAndExecuteWindow(ctx context.Context, stdout io.Writer, opts Options, program *threePhaseProgram, result *Result, frames []input.Frame) error {
+	err := program.resolve(ctx)
+	limit := len(frames)
+	if err != nil {
+		var resolveErr *semanticResolveError
+		if !errors.As(err, &resolveErr) || resolveErr.executeBefore < 0 {
+			return &RuntimeError{Frame: resolveErrorFrame(err, frames), Err: err}
+		}
+		limit = 0
+		for limit < len(frames) && frames[limit].Index < resolveErr.executeBefore {
+			limit++
+		}
+	}
+	for i := 0; i < limit; i++ {
 		frame := &frames[i]
 		runResult, err := program.execute(frame.Value, func(value any) error {
 			result.Emitted = true
@@ -252,6 +290,9 @@ func resolveAndExecuteWindow(ctx context.Context, stdout io.Writer, opts Options
 		// A window may contain a large frame; drop its value as soon as ordered
 		// execution is done rather than retaining it until the next window.
 		frame.Value = nil
+	}
+	if err != nil {
+		return &RuntimeError{Frame: resolveErrorFrame(err, frames), Err: err}
 	}
 	return nil
 }

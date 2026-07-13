@@ -53,9 +53,13 @@ func (e *SemanticInvariantError) Error() string {
 
 // semanticResolveError preserves the zero-based source frame for a
 // deterministic error raised while resolving a batch of collected judgements.
+// executeBefore is exclusive: frames before it have all values necessary for
+// ordered execution; a negative value means no frame from the window is safe
+// to execute.
 type semanticResolveError struct {
-	frame int64
-	err   error
+	frame         int64
+	executeBefore int64
+	err           error
 }
 
 func (e *semanticResolveError) Error() string { return e.err.Error() }
@@ -467,7 +471,13 @@ func (rt *semanticRuntime) resolve(ctx context.Context) error {
 	for i, judgement := range rt.collected {
 		key, err := semanticcache.KeyForJudgement(judgement)
 		if err != nil {
-			return rt.resolveError(i, err)
+			// No batch has been dispatched. Only frames before the first uncached
+			// judgement can be known to be executable from cache.
+			prefix := rt.frameForCollected(i)
+			if len(pendingFrames) != 0 && pendingFrames[0] < prefix {
+				prefix = pendingFrames[0]
+			}
+			return &semanticResolveError{frame: rt.frameForCollected(i), executeBefore: prefix, err: err}
 		}
 		if _, ok := rt.cache.Get(key); ok {
 			if rt.stats != nil {
@@ -491,29 +501,45 @@ func (rt *semanticRuntime) resolve(ctx context.Context) error {
 		spent = rt.stats.PostDedupBackendCalls
 	}
 	if err := checkMaxCalls(rt.maxCalls, spent, len(pending), rt.maxCallsDefaultPaid); err != nil {
-		return &semanticResolveError{frame: pendingFrames[0], err: err}
+		return &semanticResolveError{frame: pendingFrames[0], executeBefore: -1, err: err}
 	}
 	if rt.stats != nil {
 		rt.stats.PostDedupBackendCalls += len(pending)
 	}
 	results, err := rt.backend.Judge(ctx, append([]backend.Judgement(nil), pending...))
 	if err != nil {
-		return &semanticResolveError{frame: pendingFrames[0], err: err}
+		return &semanticResolveError{frame: pendingFrames[0], executeBefore: -1, err: err}
 	}
 	if len(results) != len(pending) {
-		return &semanticResolveError{frame: pendingFrames[0], err: fmt.Errorf("backend returned %d results for %d judgements", len(results), len(pending))}
+		return &semanticResolveError{frame: pendingFrames[0], executeBefore: -1, err: fmt.Errorf("backend returned %d results for %d judgements", len(results), len(pending))}
 	}
 	for i, judgement := range pending {
 		result := results[i]
 		if result.Error != "" {
-			return &semanticResolveError{frame: pendingFrames[i], err: fmt.Errorf("backend result %d for %s: %s", i, judgement.Op, result.Error)}
+			return rt.resultResolveError(i, fmt.Errorf("backend result %d for %s: %s", i, judgement.Op, result.Error), pendingFrames, pendingKeys, results)
 		}
 		if err := validateResult(judgement, result); err != nil {
-			return &semanticResolveError{frame: pendingFrames[i], err: fmt.Errorf("backend result %d for %s: %w", i, judgement.Op, err)}
+			return rt.resultResolveError(i, fmt.Errorf("backend result %d for %s: %w", i, judgement.Op, err), pendingFrames, pendingKeys, results)
 		}
+	}
+	for i, result := range results {
 		rt.cache.Set(pendingKeys[i], result)
 	}
 	return nil
+}
+
+// resultResolveError commits only validated results needed by frames before the
+// failing frame. Results from the failed frame are intentionally not cached.
+func (rt *semanticRuntime) resultResolveError(failing int, err error, frames []int64, keys []semanticcache.Key, results []backend.Result) error {
+	failingFrame := frames[failing]
+	for i := 0; i < failing; i++ {
+		if frames[i] < failingFrame {
+			// The preceding results were validated in resolve before it reached
+			// the failing item, and only earlier source frames are executable.
+			rt.cache.Set(keys[i], results[i])
+		}
+	}
+	return &semanticResolveError{frame: failingFrame, executeBefore: failingFrame, err: err}
 }
 
 func (rt *semanticRuntime) frameForCollected(index int) int64 {
