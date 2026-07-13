@@ -86,14 +86,10 @@ foreach ($needle in @(
 }
 
 foreach ($needle in @(
-    'MsiSummaryInfoSetProperty',
-    'MsiSummaryInfoPersist',
-    'MsiSummaryInfoGetProperty',
-    'VT_LPSTR = 30',
-    'VT_FILETIME = 64',
-    '[Ajq.MsiSummaryInfo]::Normalize($resolvedPath, $PackageCode, $reproducibleTime)',
-    '[Ajq.MsiSummaryInfo]::PackageCode($resolvedPath)',
-    "[datetime]'2000-01-01T00:00:00'"
+    'PackageCode must be an upper-case braced GUID',
+    'MSI summary stream left intact',
+    'two-build SHA-256 comparison',
+    'without mutating the MSI'
 )) {
     if (-not $msiFinalizer.Contains($needle)) { throw "MSI finalizer is missing reproducibility control: $needle" }
 }
