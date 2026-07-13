@@ -59,7 +59,7 @@ function Assert-ExactOutput([string]$Path, [string[]]$Arguments, [string]$Input,
     if ($process.ExitCode -ne 0) { throw "$Description failed: $($process.StandardError.ReadToEnd())" }
     $actual = [Convert]::ToBase64String($memory.ToArray())
     $expected = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Expected))
-    if ($actual -cne $expected) { throw "$Description did not produce exact expected bytes" }
+    if ($actual -cne $expected) { throw "$Description did not produce exact expected bytes (actual base64: $actual; expected base64: $expected)" }
     return $actual
 }
 
