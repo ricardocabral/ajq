@@ -9,8 +9,8 @@ description: >
 ajq has shipped its deterministic jq spine, semantic planning and supported semantic
 execution, local inference, bounded-parallel local daemon transport, Phase 3
 backend/cloud controls, first-run local asset provisioning, local model management, the
-persistent judgement cache, and checksummed release archives with a no-sudo install
-script. Scale-out windowing/streaming remains planned.
+persistent judgement cache, byte-budgeted semantic windows, and checksummed release
+archives with a no-sudo install script. Richer streaming capabilities remain planned.
 
 ## What ajq does today
 
@@ -30,7 +30,10 @@ script. Scale-out windowing/streaming remains planned.
   interleaved fallback. Standalone `sem_extract` and `sem_redact` are registered but
   currently fail as unsupported in three-phase execution.
 - **Three-phase executor** — harvest / resolve / execute with deduplication and cache
-  identity based on op, spec, model, and canonical value.
+  identity based on op, spec, model, and canonical value. Supported semantic NDJSON and
+  raw streams use complete-frame byte-budgeted windows (256 KiB by default), preserving
+  source order without retaining the complete stream; pure-jq and interleaved paths stay
+  streaming.
 - **Local inference** — a lazy `llama-server` daemon with idle timeout and
   `ajq daemon status|stop`; local requests use bounded parallelism while preserving result
   ordering.
@@ -60,7 +63,7 @@ polish.
 | **1 — Split-execution core** | Planner, desugar, semantic predicates, bounded classification, guarded executor. | ✅ Shipped with explicit unbounded value-op limits |
 | **2 — Local inference** | `llama-server` backend, daemon lifecycle, GBNF/schema constraints, provisioning. | ✅ Shipped |
 | **3 — Backends & cloud** | Ollama, OpenAI/OpenRouter, Anthropic, config/env selection, cost controls. | ✅ Shipped |
-| **4 — Scale & chunking** | Windowed execution and richer streaming remain planned; persistent cache and bounded local parallelism are shipped. | 🟡 Partial |
+| **4 — Scale & chunking** | Byte-budgeted complete-frame windows for supported three-phase semantic streams, persistent cache, and bounded local parallelism are shipped. Richer streaming remains planned. | 🟡 Partial |
 | **5 — Polish & distribution** | Models subcommand, release archives/install script, and Homebrew tap publishing are shipped; standalone build, GPU auto-detect, richer vocabulary, and additional package managers remain planned. | 🟡 Partial |
 
 ## Follow along

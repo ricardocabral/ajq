@@ -33,6 +33,32 @@ printf '{"a":1}\n{"a":2}\n' | ajq -c '.a, (.a + 10)'
 
 There's no whole-stream buffering in this mode, so it handles inputs larger than memory.
 
+### Semantic NDJSON windows
+
+For a supported three-phase semantic query, ajq groups **complete input frames** into
+byte-budgeted windows before resolving semantic judgements. The default budget is 262144
+bytes (256 KiB). ajq harvests every frame in one window, deduplicates and cache-resolves
+its judgements once, then executes and emits those frames in their original order.
+
+A window never splits a JSON value or raw line. ajq retains at most the current window,
+one complete-frame lookahead, and bounded framing buffers—not the whole stream. A single
+record larger than the budget is accepted as a one-frame oversized window, so that record
+itself can require more memory than the configured budget.
+
+Use a larger budget to find duplicates across more nearby records and reduce backend
+batches; the trade-off is that output waits until its full window has been harvested and
+resolved. Use a smaller positive budget when lower first-record latency matters:
+
+```bash
+# Keep semantic windows near 64 KiB for this invocation.
+producer | ajq --backend local --window-bytes 65536 \
+  'select(.message =~ "payment failure")'
+```
+
+Persistent cache entries remain reusable across windows. Pure-jq queries and semantic
+queries that require interleaved execution keep their existing per-frame streaming paths;
+this setting does not window them.
+
 ## Raw lines (awk mode)
 
 To treat each input line as a plain string instead of JSON, use `-R` / `--raw-input`. The

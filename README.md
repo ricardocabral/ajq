@@ -92,6 +92,7 @@ for pinned, workspace, CI, and verification flows.
 | Local provisioning | `ajq provision` downloads or locates the llama.cpp engine and default GGUF model for `--backend local` on supported platforms. |
 | Model management | `ajq models list`, `ajq models pull`, and `ajq models use` manage checksum-pinned local GGUF catalog models. |
 | Semantic operators | Fuzzy matching (`=~` / `sem_match`) and bounded `sem_classify` ship for filters and labels; `sem_score` and `sem_norm` are limited to supported contexts. Standalone `sem_extract` and `sem_redact` are registered but currently unsupported. |
+| Semantic NDJSON windows | Supported three-phase semantic streams use complete-frame, byte-budgeted windows (256 KiB by default) to batch and deduplicate judgements without buffering the complete stream. `--window-bytes`, `AJQ_WINDOW_BYTES`, or TOML `window_bytes` tune the budget. |
 | Determinism contract | Pure jq paths stay byte-reproducible and never contact AI backends; only explicit semantic operators make schema-constrained, cache-keyed model calls by backend/model/spec/value. |
 
 ## Docs
