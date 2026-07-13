@@ -30,4 +30,12 @@ grep -Fq 'Initial registration is intentionally manual:' "$winget_workflow" || {
   printf 'WinGet workflow must retain the manual initial-submission path\n' >&2
   exit 1
 }
+grep -Fq 'identifier: RicardoCabral.ajq' "$winget_workflow" || {
+  printf 'WinGet workflow must retain the canonical existing-upstream identifier casing\n' >&2
+  exit 1
+}
+if grep -Fq 'Ricardocabral.ajq' "$winget_workflow"; then
+  printf 'WinGet workflow must not reintroduce the rejected identifier casing\n' >&2
+  exit 1
+fi
 printf 'release workflow dispatch guard tests passed\n'

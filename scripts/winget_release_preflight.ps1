@@ -7,7 +7,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$identifier = 'Ricardocabral.ajq'
+$identifier = 'RicardoCabral.ajq'
 
 if ($Tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
     throw "WinGet preflight requires a vX.Y.Z tag, got $Tag"

@@ -14,7 +14,7 @@ $global:LASTEXITCODE = 0
 if ($env:WINGET_FAIL_OPERATION -and $Args[0] -eq $env:WINGET_FAIL_OPERATION) { $global:LASTEXITCODE = 9; return }
 if ($Args[0] -eq 'list') {
     if ($env:WINGET_ABSENT -eq '1') { Write-Output 'No installed package found matching input criteria.' }
-    else { Write-Output "Ricardocabral.ajq $env:WINGET_VERSION" }
+    else { Write-Output "RicardoCabral.ajq $env:WINGET_VERSION" }
 }
 '@ | Set-Content -LiteralPath $winget
     $ajq = Join-Path $temp 'ajq.ps1'
@@ -58,9 +58,9 @@ $bytes = if ($Args[0] -eq '--version') {
     if ($result.Output -notmatch 'WinGet installed version: ajq 1\.2\.3') { throw 'success evidence omitted exact version' }
     if ($result.Output -notmatch 'WinGet mock stdout base64: MQo=') { throw 'success evidence omitted mock stdout bytes' }
     foreach ($command in @(
-        'uninstall --id Ricardocabral.ajq --exact --silent',
+        'uninstall --id RicardoCabral.ajq --exact --silent',
         'source update',
-        'install --id Ricardocabral.ajq --exact --version 1.2.3 --source winget --accept-package-agreements --accept-source-agreements --silent'
+        'install --id RicardoCabral.ajq --exact --version 1.2.3 --source winget --accept-package-agreements --accept-source-agreements --silent'
     )) {
         if (-not (Select-String -LiteralPath $env:WINGET_LOG -SimpleMatch $command -Quiet)) { throw "missing winget construction: $command" }
     }
