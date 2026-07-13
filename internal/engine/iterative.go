@@ -13,20 +13,38 @@ import (
 	"github.com/ricardocabral/ajq/internal/jq"
 	"github.com/ricardocabral/ajq/internal/output"
 	"github.com/ricardocabral/ajq/internal/plan"
-	"github.com/ricardocabral/ajq/internal/semantics"
 )
 
-// iterativeProgram runs a recognized linear predicate chain one call site at a
-// time. It deliberately shares semanticRuntime with the normal executor so
-// cache keys, validation, call IDs, and run-global accounting remain common.
+// iterativeProgram runs an AST-recognized linear predicate chain one call site
+// at a time. reservation preserves the normal permissive harvest order for
+// cap and result-error-prefix parity; overlay keeps stage results private until
+// the entire window is known to be executable.
 type iterativeProgram struct {
-	stageProgram   *jq.Program
-	executeProgram *jq.Program
-	runtime        *semanticRuntime
-	stages         []plan.CallID
-	stageIndex     map[plan.CallID]int
-	active         int
+	stageProgram       *jq.Program
+	executeProgram     *jq.Program
+	reservation        *threePhaseProgram
+	runtime            *semanticRuntime
+	stages             []plan.CallID
+	stageIndex         map[plan.CallID]int
+	active             int
+	overlay            map[semanticcache.Key]backend.Result
+	reservationEntries []iterativeReservation
 }
+
+type iterativeReservation struct {
+	key       semanticcache.Key
+	judgement backend.Judgement
+	frame     int64
+}
+
+type iterativeStageFailure struct {
+	key   semanticcache.Key
+	frame int64
+	err   error
+}
+
+func (e *iterativeStageFailure) Error() string { return e.err.Error() }
+func (e *iterativeStageFailure) Unwrap() error { return e.err }
 
 func compileIterative(query string, be backend.Backend, modelID string, store *semanticcache.Store, stats *RunStats, stages plan.IterativePlan) (*iterativeProgram, error) {
 	if be == nil {
@@ -42,21 +60,33 @@ func compileIterative(query string, be backend.Backend, modelID string, store *s
 	if blockingDiagnostics(diagnostics) {
 		return nil, &PlanError{Diagnostics: diagnostics}
 	}
+	reservation, err := compileThreePhaseWithOptions(query, be, modelID, store)
+	if err != nil {
+		return nil, err
+	}
 	rt := newSemanticRuntime(be, modelID, store, instrumented.Plan)
 	rt.stats = stats
-	p := &iterativeProgram{runtime: rt, stages: append([]plan.CallID(nil), stages.Stages...), stageIndex: map[plan.CallID]int{}}
+	p := &iterativeProgram{
+		reservation: reservation,
+		runtime:     rt,
+		stages:      make([]plan.CallID, len(stages.Stages)),
+		stageIndex:  make(map[plan.CallID]int, len(stages.Stages)),
+		overlay:     make(map[semanticcache.Key]backend.Result),
+	}
+	for i, stage := range stages.Stages {
+		p.stages[i] = stage.CallID
+	}
 	for i, id := range p.stages {
 		p.stageIndex[id] = i
 	}
-	stageProgram, err := jq.CompileWithOptions(instrumented.InstrumentedQuery, p.stageOptions()...)
+	p.stageProgram, err = jq.CompileWithOptions(instrumented.InstrumentedQuery, p.stageOptions()...)
 	if err != nil {
 		return nil, &CompileError{Err: err}
 	}
-	executeProgram, err := jq.CompileWithOptions(instrumented.InstrumentedQuery, rt.executeOptions()...)
+	p.executeProgram, err = jq.CompileWithOptions(instrumented.InstrumentedQuery, p.executeOptions()...)
 	if err != nil {
 		return nil, &CompileError{Err: err}
 	}
-	p.stageProgram, p.executeProgram = stageProgram, executeProgram
 	return p, nil
 }
 
@@ -69,9 +99,22 @@ func (p *iterativeProgram) stageOptions() []gojq.CompilerOption {
 		case "sem_classify":
 			opts = append(opts, gojq.WithIterFunction(node.InternalName, node.Arity, node.Arity, p.stageClassify(node)))
 		default:
-			// IterativeStages excludes value operators. Keep compilation total so a
-			// future analyzer regression fails at runtime rather than calling a backend.
-			opts = append(opts, gojq.WithFunction(node.InternalName, node.Arity, node.Arity, func(any, []any) any { return fmt.Errorf("unsupported iterative semantic operator %s", node.Op) }))
+			opts = append(opts, gojq.WithFunction(node.InternalName, node.Arity, node.Arity, func(any, []any) any {
+				return fmt.Errorf("unsupported iterative semantic operator")
+			}))
+		}
+	}
+	return opts
+}
+
+func (p *iterativeProgram) executeOptions() []gojq.CompilerOption {
+	opts := make([]gojq.CompilerOption, 0, len(p.runtime.plannedOrder))
+	for _, node := range p.runtime.plannedOrder {
+		switch node.Op {
+		case "sem_match":
+			opts = append(opts, gojq.WithFunction(node.InternalName, node.Arity, node.Arity, p.executeMatch(node)))
+		case "sem_classify":
+			opts = append(opts, gojq.WithIterFunction(node.InternalName, node.Arity, node.Arity, p.executeClassify(node)))
 		}
 	}
 	return opts
@@ -89,20 +132,19 @@ func (p *iterativeProgram) stageMatch(node plan.SemNode) func(any, []any) gojq.I
 			return gojq.NewIter[any](err)
 		}
 		if index == p.active {
-			key, err := semanticcache.KeyForJudgement(judgement)
+			result, hit, err := p.lookup(judgement)
 			if err != nil {
 				return gojq.NewIter[any](err)
 			}
-			if result, ok := p.runtime.cache.Get(key); ok {
-				if p.runtime.stats != nil {
-					p.runtime.stats.CacheHits++
-				}
+			if hit {
+				p.runtime.stats.CacheHits++
 				return gojq.NewIter[any](result.Value)
 			}
 			p.runtime.appendJudgement(judgement)
+			// The active gate is deliberately permissive until its one batch resolves.
 			return gojq.NewIter[any](true)
 		}
-		result, err := p.cached(judgement)
+		result, _, err := p.lookup(judgement)
 		if err != nil {
 			return gojq.NewIter[any](err)
 		}
@@ -115,35 +157,25 @@ func (p *iterativeProgram) stageClassify(node plan.SemNode) func(any, []any) goj
 		p.runtime.recordWitness(node.ID, semanticPhaseHarvest, node.Op, node.Source)
 		index := p.stageIndex[node.ID]
 		if index > p.active {
-			values := make([]any, len(node.Specs))
-			for i := range node.Specs {
-				values[i] = node.Specs[i]
-			}
-			return gojq.NewIter(values...)
+			return gojq.NewIter(p.labels(node)...)
 		}
 		judgement, err := p.runtime.judgementFromPlannedCall(node.ID, node.Op, value, args)
 		if err != nil {
 			return gojq.NewIter[any](err)
 		}
 		if index == p.active {
-			key, err := semanticcache.KeyForJudgement(judgement)
+			result, hit, err := p.lookup(judgement)
 			if err != nil {
 				return gojq.NewIter[any](err)
 			}
-			if result, ok := p.runtime.cache.Get(key); ok {
-				if p.runtime.stats != nil {
-					p.runtime.stats.CacheHits++
-				}
+			if hit {
+				p.runtime.stats.CacheHits++
 				return gojq.NewIter[any](result.Value)
 			}
 			p.runtime.appendJudgement(judgement)
-			values := make([]any, len(node.Specs))
-			for i := range node.Specs {
-				values[i] = node.Specs[i]
-			}
-			return gojq.NewIter(values...)
+			return gojq.NewIter(p.labels(node)...)
 		}
-		result, err := p.cached(judgement)
+		result, _, err := p.lookup(judgement)
 		if err != nil {
 			return gojq.NewIter[any](err)
 		}
@@ -151,16 +183,99 @@ func (p *iterativeProgram) stageClassify(node plan.SemNode) func(any, []any) goj
 	}
 }
 
-func (p *iterativeProgram) cached(judgement backend.Judgement) (backend.Result, error) {
+func (p *iterativeProgram) labels(node plan.SemNode) []any {
+	values := make([]any, len(node.Specs))
+	for i := range node.Specs {
+		values[i] = node.Specs[i]
+	}
+	return values
+}
+
+func (p *iterativeProgram) executeMatch(node plan.SemNode) func(any, []any) any {
+	return func(value any, args []any) any {
+		p.runtime.recordWitness(node.ID, semanticPhaseExecute, node.Op, node.Source)
+		judgement, err := p.runtime.judgementFromCall(node.Op, value, args)
+		if err != nil {
+			return err
+		}
+		result, _, err := p.lookup(judgement)
+		if err != nil {
+			return err
+		}
+		return result.Value
+	}
+}
+
+func (p *iterativeProgram) executeClassify(node plan.SemNode) func(any, []any) gojq.Iter {
+	return func(value any, args []any) gojq.Iter {
+		p.runtime.recordWitness(node.ID, semanticPhaseExecute, node.Op, node.Source)
+		judgement, err := p.runtime.judgementFromPlannedCall(node.ID, node.Op, value, args)
+		if err != nil {
+			return gojq.NewIter[any](err)
+		}
+		result, _, err := p.lookup(judgement)
+		if err != nil {
+			return gojq.NewIter[any](err)
+		}
+		return gojq.NewIter[any](result.Value)
+	}
+}
+
+func (p *iterativeProgram) lookup(judgement backend.Judgement) (backend.Result, bool, error) {
 	key, err := semanticcache.KeyForJudgement(judgement)
 	if err != nil {
-		return backend.Result{}, err
+		return backend.Result{}, false, err
+	}
+	if result, ok := p.overlay[key]; ok {
+		return result, true, nil
 	}
 	result, ok := p.runtime.cache.Get(key)
-	if !ok {
-		return backend.Result{}, fmt.Errorf("iterative stage cache miss for %s", judgement.Op)
+	return result, ok, nil
+}
+
+func (p *iterativeProgram) resetWindow() {
+	p.runtime.releaseCollected()
+	p.reservation.releaseWindow()
+	for key := range p.overlay {
+		delete(p.overlay, key)
 	}
-	return result, nil
+	p.reservationEntries = nil
+}
+
+// reserve records normal three-phase harvest order without resolving or writing
+// cache. This makes max-call rejection conservative and gives result failures
+// the same cache-prefix order as the reference executor.
+func (p *iterativeProgram) reserve(ctx context.Context, frames []input.Frame) error {
+	p.reservationEntries = p.reservationEntries[:0]
+	seen := make(map[semanticcache.Key]struct{})
+	for i, judgement := range p.reservation.runtime.collected {
+		key, err := semanticcache.KeyForJudgement(judgement)
+		if err != nil {
+			return &semanticResolveError{frame: p.reservation.runtime.frameForCollected(i), executeBefore: -1, err: err}
+		}
+		if _, ok := p.runtime.cache.Get(key); ok {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		p.reservationEntries = append(p.reservationEntries, iterativeReservation{key: key, judgement: judgement, frame: p.reservation.runtime.frameForCollected(i)})
+	}
+	spent := 0
+	if p.runtime.stats != nil {
+		spent = p.runtime.stats.PostDedupBackendCalls
+	}
+	if err := checkMaxCalls(p.runtime.maxCalls, spent, len(p.reservationEntries), p.runtime.maxCallsDefaultPaid); err != nil {
+		frame := int64(0)
+		if len(p.reservationEntries) != 0 {
+			frame = p.reservationEntries[0].frame
+		}
+		return &semanticResolveError{frame: frame, executeBefore: -1, err: err}
+	}
+	_ = ctx
+	_ = frames
+	return nil
 }
 
 func (p *iterativeProgram) runStage(ctx context.Context, frames []input.Frame, active int) error {
@@ -181,11 +296,134 @@ func (p *iterativeProgram) runStage(ctx context.Context, frames []input.Frame, a
 			p.runtime.discardCollectedFrom(before, before)
 			return &RuntimeError{Frame: frames[i].Index + 1, Err: err}
 		}
-		if p.runtime.stats != nil {
-			p.runtime.stats.HarvestedJudgements += len(p.runtime.collected) - before
+		p.runtime.stats.HarvestedJudgements += len(p.runtime.collected) - before
+	}
+	return p.resolveStage(ctx)
+}
+
+// resolveStage dispatches one cache-deduplicated active-stage batch. Successful
+// values enter only the overlay; shared-cache writes happen at the window commit.
+func (p *iterativeProgram) resolveStage(ctx context.Context) error {
+	if len(p.runtime.collected) == 0 {
+		return nil
+	}
+	seen := make(map[semanticcache.Key]struct{}, len(p.runtime.collected))
+	pending := make([]backend.Judgement, 0, len(p.runtime.collected))
+	keys := make([]semanticcache.Key, 0, len(p.runtime.collected))
+	frames := make([]int64, 0, len(p.runtime.collected))
+	for i, judgement := range p.runtime.collected {
+		key, err := semanticcache.KeyForJudgement(judgement)
+		if err != nil {
+			return &semanticResolveError{frame: p.runtime.frameForCollected(i), executeBefore: -1, err: err}
+		}
+		if _, ok := p.overlay[key]; ok {
+			continue
+		}
+		if _, ok := p.runtime.cache.Get(key); ok {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		pending, keys, frames = append(pending, judgement), append(keys, key), append(frames, p.runtime.frameForCollected(i))
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	if p.runtime.stats != nil {
+		p.runtime.stats.PostDedupBackendCalls += len(pending)
+	}
+	results, err := p.runtime.backend.Judge(ctx, append([]backend.Judgement(nil), pending...))
+	if err != nil {
+		return &semanticResolveError{frame: frames[0], executeBefore: -1, err: err}
+	}
+	if len(results) != len(pending) {
+		return &semanticResolveError{frame: frames[0], executeBefore: -1, err: fmt.Errorf("backend returned %d results for %d judgements", len(results), len(pending))}
+	}
+	for i, result := range results {
+		if result.Error != "" {
+			return &iterativeStageFailure{key: keys[i], frame: frames[i], err: fmt.Errorf("backend result %d for %s: %s", i, pending[i].Op, result.Error)}
+		}
+		if err := validateResult(pending[i], result); err != nil {
+			return &iterativeStageFailure{key: keys[i], frame: frames[i], err: fmt.Errorf("backend result %d for %s: %w", i, pending[i].Op, err)}
+		}
+		p.overlay[keys[i]] = result
+	}
+	return nil
+}
+
+// completePrefix resolves only reservation keys before a stage-result failure.
+// It intentionally uses the permissive reservation list, not actual survivors,
+// because the normal three-phase harvest caches rejected-candidate descendants.
+func (p *iterativeProgram) completePrefix(ctx context.Context, failing semanticcache.Key) (int, error) {
+	cutoff := -1
+	for i, entry := range p.reservationEntries {
+		if entry.key == failing {
+			cutoff = i
+			break
 		}
 	}
-	return p.runtime.resolve(ctx)
+	if cutoff < 0 {
+		return -1, fmt.Errorf("iterative reservation missing failed judgement")
+	}
+	var pending []iterativeReservation
+	for _, entry := range p.reservationEntries[:cutoff] {
+		if _, ok := p.overlay[entry.key]; ok {
+			continue
+		}
+		if _, ok := p.runtime.cache.Get(entry.key); ok {
+			continue
+		}
+		pending = append(pending, entry)
+	}
+	if len(pending) == 0 {
+		return cutoff, nil
+	}
+	if p.runtime.stats != nil {
+		p.runtime.stats.PostDedupBackendCalls += len(pending)
+	}
+	judgements := make([]backend.Judgement, len(pending))
+	for i := range pending {
+		judgements[i] = pending[i].judgement
+	}
+	results, err := p.runtime.backend.Judge(ctx, judgements)
+	if err != nil {
+		return -1, &semanticResolveError{frame: pending[0].frame, executeBefore: -1, err: err}
+	}
+	if len(results) != len(pending) {
+		return -1, &semanticResolveError{frame: pending[0].frame, executeBefore: -1, err: fmt.Errorf("backend returned %d results for %d judgements", len(results), len(pending))}
+	}
+	for i, result := range results {
+		if result.Error != "" {
+			return p.reservationIndex(pending[i].key), &iterativeStageFailure{key: pending[i].key, frame: pending[i].frame, err: fmt.Errorf("backend result %d for %s: %s", i, pending[i].judgement.Op, result.Error)}
+		}
+		if err := validateResult(pending[i].judgement, result); err != nil {
+			return p.reservationIndex(pending[i].key), &iterativeStageFailure{key: pending[i].key, frame: pending[i].frame, err: fmt.Errorf("backend result %d for %s: %w", i, pending[i].judgement.Op, err)}
+		}
+		p.overlay[pending[i].key] = result
+	}
+	return cutoff, nil
+}
+
+func (p *iterativeProgram) reservationIndex(key semanticcache.Key) int {
+	for i, entry := range p.reservationEntries {
+		if entry.key == key {
+			return i
+		}
+	}
+	return -1
+}
+
+func (p *iterativeProgram) flush(cutoff int) {
+	if cutoff < 0 || cutoff > len(p.reservationEntries) {
+		cutoff = len(p.reservationEntries)
+	}
+	for _, entry := range p.reservationEntries[:cutoff] {
+		if result, ok := p.overlay[entry.key]; ok {
+			p.runtime.cache.Set(entry.key, result)
+		}
+	}
 }
 
 func (p *iterativeProgram) execute(frame input.Frame, emit func(any) error) (jq.RunResult, error) {
@@ -195,6 +433,68 @@ func (p *iterativeProgram) execute(frame input.Frame, emit func(any) error) (jq.
 		err = invariant
 	}
 	return result, err
+}
+
+func (p *iterativeProgram) executePrefix(ctx context.Context, stdout io.Writer, opts Options, result *Result, frames []input.Frame, before int64) error {
+	for i := range frames {
+		if before >= 0 && frames[i].Index >= before {
+			break
+		}
+		if err := ctxErr(ctx); err != nil {
+			return err
+		}
+		frame := &frames[i]
+		runResult, err := p.execute(*frame, func(value any) error {
+			result.Emitted, result.Last = true, value
+			return output.WriteValue(stdout, value, opts.Output)
+		})
+		if err != nil {
+			return &RuntimeError{Frame: frame.Index + 1, Err: err}
+		}
+		if runResult.Emitted {
+			result.Emitted, result.Last = true, runResult.Last
+		}
+		frame.Value = nil
+	}
+	return nil
+}
+
+func (p *iterativeProgram) processWindow(ctx context.Context, stdout io.Writer, opts Options, result *Result, frames []input.Frame) error {
+	if err := p.reserve(ctx, frames); err != nil {
+		return err
+	}
+	for stage := range p.stages {
+		err := p.runStage(ctx, frames, stage)
+		if err == nil {
+			continue
+		}
+		var failed *iterativeStageFailure
+		if !errors.As(err, &failed) {
+			return err
+		}
+		cutoff, prefixErr := p.completePrefix(ctx, failed.key)
+		if prefixErr != nil {
+			if cutoff < 0 {
+				return prefixErr
+			}
+			p.flush(cutoff)
+			var prefixFailure *iterativeStageFailure
+			if errors.As(prefixErr, &prefixFailure) {
+				if err := p.executePrefix(ctx, stdout, opts, result, frames, prefixFailure.frame); err != nil {
+					return err
+				}
+				return &semanticResolveError{frame: prefixFailure.frame, executeBefore: prefixFailure.frame, err: prefixFailure.err}
+			}
+			return prefixErr
+		}
+		p.flush(cutoff)
+		if err := p.executePrefix(ctx, stdout, opts, result, frames, failed.frame); err != nil {
+			return err
+		}
+		return &semanticResolveError{frame: failed.frame, executeBefore: failed.frame, err: failed.err}
+	}
+	p.flush(-1)
+	return p.executePrefix(ctx, stdout, opts, result, frames, -1)
 }
 
 func executeIterative(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Options, callSites int, stages plan.IterativePlan) (Result, error) {
@@ -217,44 +517,38 @@ func executeIterative(ctx context.Context, stdin io.Reader, stdout io.Writer, op
 	}
 	result := Result{RunStats: stats}
 	for {
-		window, err := windows.Next(ctx)
-		if errors.Is(err, io.EOF) {
+		program.resetWindow()
+		program.reservation.beginWindow()
+		window, nextErr := windows.NextWith(ctx, func(frame input.Frame) error {
+			return program.reservation.harvestAppend(frame.Value, frame.Index)
+		})
+		var frameErr *input.WindowFrameError
+		if errors.As(nextErr, &frameErr) {
+			recordWindowStats(&stats, window, true, frameErr.Frame.Bytes > windowBytes)
+			stats.InputFrames += int64(len(window.Frames) + 1)
+		} else if errors.Is(nextErr, io.EOF) {
 			return result, nil
+		} else if nextErr != nil {
+			program.resetWindow()
+			return result, nextErr
+		} else {
+			recordWindowStats(&stats, window, false, false)
+			stats.InputFrames += int64(len(window.Frames))
 		}
-		if err != nil {
-			return result, err
-		}
-		recordWindowStats(&stats, window, false, false)
-		stats.InputFrames += int64(len(window.Frames))
-		for stage := range program.stages {
-			if err := program.runStage(ctx, window.Frames, stage); err != nil {
-				window.Release()
-				program.runtime.releaseCollected()
-				result.RunStats = stats
-				return result, &RuntimeError{Frame: resolveErrorFrame(err, window.Frames), Err: err}
-			}
-		}
-		for i := range window.Frames {
-			frame := &window.Frames[i]
-			runResult, err := program.execute(*frame, func(value any) error {
-				result.Emitted, result.Last = true, value
-				return output.WriteValue(stdout, value, opts.Output)
-			})
-			if err != nil {
-				window.Release()
-				program.runtime.releaseCollected()
-				result.RunStats = stats
-				return result, &RuntimeError{Frame: frame.Index + 1, Err: err}
-			}
-			if runResult.Emitted {
-				result.Emitted, result.Last = true, runResult.Last
-			}
-			frame.Value = nil
-		}
+		prefixErr := program.processWindow(ctx, stdout, opts, &result, window.Frames)
+		prefixFrame := resolveErrorFrame(prefixErr, window.Frames)
 		window.Release()
-		program.runtime.releaseCollected()
+		program.resetWindow()
 		result.RunStats = stats
+		if prefixErr != nil {
+			var runtimeErr *RuntimeError
+			if errors.As(prefixErr, &runtimeErr) {
+				return result, prefixErr
+			}
+			return result, &RuntimeError{Frame: prefixFrame, Err: prefixErr}
+		}
+		if frameErr != nil {
+			return result, &RuntimeError{Frame: frameErr.Frame.Index + 1, Err: frameErr.Err}
+		}
 	}
 }
-
-var _ = semantics.ReturnBool

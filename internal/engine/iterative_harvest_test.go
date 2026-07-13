@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -68,6 +69,53 @@ func TestIterativeHarvestIsDefaultOffAndFallsBack(t *testing.T) {
 	}
 	if result.RunStats.ExecutionMode == ExecutionModeIterativeHarvest {
 		t.Fatalf("unsupported query selected iterative mode")
+	}
+}
+
+func TestIterativeHarvestConservativelyRejectsCapBeforeDispatch(t *testing.T) {
+	backend := &recordingBackend{}
+	_, err := Execute(context.Background(), strings.NewReader(`[{"first":"yes","second":"yes"},{"first":"no","second":"no"}]`), ioDiscard{}, Options{
+		Query: `.[] | select(sem_match(.first; "yes")) | select(sem_match(.second; "yes"))`, InputMode: input.ModeAuto, Backend: backend,
+		IterativeHarvest: true, MaxCalls: 1,
+	})
+	var capErr *MaxCallsExceededError
+	if !errors.As(err, &capErr) {
+		t.Fatalf("Execute error = %T %[1]v, want MaxCallsExceededError", err)
+	}
+	if len(backend.batches) != 0 {
+		t.Fatalf("cap rejection dispatched %#v", backend.batches)
+	}
+}
+
+func TestIterativeHarvestResultErrorCompletesAndEmitsReservationPrefix(t *testing.T) {
+	backend := &recordingBackend{results: func(batch []backend.Judgement) []backend.Result {
+		results := make([]backend.Result, len(batch))
+		for i, judgement := range batch {
+			if judgement.Value == "boom" {
+				results[i].Error = "synthetic failure"
+				continue
+			}
+			results[i].Value = true
+		}
+		return results
+	}}
+	var stdout bytes.Buffer
+	_, err := Execute(context.Background(), strings.NewReader("{\"id\":1,\"first\":\"yes\",\"second\":\"second\"}\n{\"id\":2,\"first\":\"boom\",\"second\":\"never\"}\n"), &stdout, Options{
+		Query: `. | select(sem_match(.first; "yes")) | select(sem_match(.second; "second")) | .id`, InputMode: input.ModeAuto, Output: output.Options{Compact: true}, Backend: backend,
+		IterativeHarvest: true,
+	})
+	var runtimeErr *RuntimeError
+	if !errors.As(err, &runtimeErr) || runtimeErr.Frame != 2 {
+		t.Fatalf("Execute error = %T %[1]v, want frame-2 RuntimeError", err)
+	}
+	if stdout.String() != "1\n" {
+		t.Fatalf("stdout = %q, want completed prefix", stdout.String())
+	}
+	if len(backend.batches) != 2 || len(backend.batches[0]) != 2 || len(backend.batches[1]) != 1 {
+		t.Fatalf("batches = %#v, want active batch plus one reservation-prefix completion", backend.batches)
+	}
+	if backend.batches[1][0].Value != "second" || backend.batches[1][0].Op != "sem_match" {
+		t.Fatalf("prefix completion = %#v, want first frame's second gate", backend.batches[1][0])
 	}
 }
 

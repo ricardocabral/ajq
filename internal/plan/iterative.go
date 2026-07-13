@@ -9,7 +9,17 @@ import (
 // accepted by the internal iterative-harvest prototype. Stages are in jq pipe
 // order and refer to the normal planner CallIDs.
 type IterativePlan struct {
-	Stages []CallID
+	// Stages is AST-backed gate metadata in jq pipe order. Keeping the call ID
+	// with its planned operation prevents the executor from inferring stage
+	// shape from source text or planner walk order alone.
+	Stages []IterativeStage
+}
+
+// IterativeStage identifies one admitted select gate.
+type IterativeStage struct {
+	CallID CallID
+	Op     string
+	Source Source
 }
 
 // IterativeStages recognizes the prototype's safe linear predicate corpus from
@@ -25,14 +35,15 @@ func IterativeStages(src string, semantic Plan) (IterativePlan, bool) {
 	if len(parts) < 3 || !prototypePrefix(parts[0]) || !prototypeTerminal(parts[len(parts)-1]) {
 		return IterativePlan{}, false
 	}
-	stages := make([]CallID, 0, len(parts)-2)
+	stages := make([]IterativeStage, 0, len(parts)-2)
 	next := 0
 	for _, part := range parts[1 : len(parts)-1] {
 		id, ok := prototypeGate(part, semantic.Semantic, &next)
 		if !ok {
 			return IterativePlan{}, false
 		}
-		stages = append(stages, id)
+		node := semantic.Semantic[next-1]
+		stages = append(stages, IterativeStage{CallID: id, Op: node.Op, Source: node.Source})
 	}
 	if len(stages) == 0 || next != len(semantic.Semantic) {
 		return IterativePlan{}, false
@@ -56,7 +67,15 @@ func singleTerm(q *gojq.Query) *gojq.Term {
 
 func prototypePrefix(q *gojq.Query) bool {
 	t := singleTerm(q)
-	if t == nil || (t.Type != gojq.TermTypeIdentity && (t.Type != gojq.TermTypeIndex || !literalField(t.Index))) || len(t.SuffixList) == 0 {
+	if t == nil || (t.Type != gojq.TermTypeIdentity && (t.Type != gojq.TermTypeIndex || !literalField(t.Index))) {
+		return false
+	}
+	// A bare identity is the safe NDJSON counterpart to a single trailing []
+	// iterator; both produce one stable candidate per input frame/value.
+	if t.Type == gojq.TermTypeIdentity && len(t.SuffixList) == 0 {
+		return true
+	}
+	if len(t.SuffixList) == 0 {
 		return false
 	}
 	iter := 0
