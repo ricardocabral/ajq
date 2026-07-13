@@ -15,6 +15,9 @@ $contract = @{}
 }
 if ((Split-Path -Leaf $MsiPath) -cne $contract.msi_asset) { throw "MSI filename must be exactly $($contract.msi_asset)" }
 if (-not (Test-Path -LiteralPath $MsiPath -PathType Leaf)) { throw "MSI not found: $MsiPath" }
+# msiexec receives an absolute, quoted package path; unlike COM database APIs,
+# it does not reliably resolve a workflow-relative MSI path.
+$MsiPath = (Resolve-Path -LiteralPath $MsiPath).Path
 $hashBefore = (Get-FileHash -LiteralPath $MsiPath -Algorithm SHA256).Hash.ToUpperInvariant()
 if ($ExpectedSha256 -and $hashBefore -cne $ExpectedSha256.ToUpperInvariant()) { throw 'MSI SHA-256 does not match the recorded draft/build hash' }
 
