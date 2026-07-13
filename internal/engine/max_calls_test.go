@@ -162,8 +162,8 @@ func TestMaxCallsCumulativeAcrossWindows(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected cumulative cap error")
 	}
-	if len(be.Inputs()) != 1 || result.RunStats.PostDedupBackendCalls != 1 {
-		t.Fatalf("backend inputs=%d stats=%#v, want one successful judgement before cumulative abort", len(be.Inputs()), result.RunStats)
+	if len(be.Inputs()) != 1 || result.RunStats.PostDedupBackendCalls != 1 || result.RunStats.PostDedupBackendCalls > 1 {
+		t.Fatalf("backend inputs=%d stats=%#v, want one successful judgement and no cap overspend before cumulative abort", len(be.Inputs()), result.RunStats)
 	}
 }
 
