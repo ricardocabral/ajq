@@ -150,7 +150,7 @@ func executionLine(semanticPlan *planpkg.Plan, stream bool) string {
 }
 
 func semanticStdinLine(estimate *Estimate) string {
-	if estimate == nil || estimate.Status == EstimateStatusUnavailableNoInput || estimate.Status == EstimateStatusUnavailablePureJQ || estimate.Status == EstimateStatusUnavailableUserStream {
+	if estimate == nil || estimate.Status != EstimateStatusAvailable {
 		return "stdin: not harvested"
 	}
 	return "stdin: harvested for estimates"

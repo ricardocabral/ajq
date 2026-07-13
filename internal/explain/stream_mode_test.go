@@ -1,6 +1,7 @@
 package explain_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ricardocabral/ajq/internal/explain"
@@ -39,6 +40,23 @@ const wantStreamExplain = "ajq explain v1\n" +
 	"    gated: n/a\n" +
 	"    execution: user-stream-inline\n" +
 	"    subgraph: semantic\n"
+
+func TestUnavailableEstimatesDoNotClaimHarvest(t *testing.T) {
+	for _, status := range []string{
+		explain.EstimateStatusUnavailableInterleaved,
+		explain.EstimateStatusUnavailableInvalid,
+		explain.EstimateStatusUnavailableHarvest,
+	} {
+		t.Run(status, func(t *testing.T) {
+			query := `sem_match(.msg; "keep")`
+			semanticPlan := buildPlan(t, query)
+			got := explain.String(explain.Plan{Query: query, SemanticPlan: &semanticPlan, Estimate: &explain.Estimate{Status: status}})
+			if !strings.Contains(got, "stdin: not harvested\n") {
+				t.Fatalf("unavailable status %q claims stdin harvest:\n%s", status, got)
+			}
+		})
+	}
+}
 
 func TestStreamExplainGolden(t *testing.T) {
 	query := `sem_match(.msg; "keep")`
