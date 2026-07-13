@@ -20,6 +20,9 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added byte-budgeted semantic NDJSON windows with `--window-bytes`,
+  `AJQ_WINDOW_BYTES`, and TOML `window_bytes` configuration, plus window-mode
+  statistics for configured budgets, formed windows, and oversized records.
 - Added a Diataxis how-to for making ajq available to coding agents through
   project guidance, including JSON-routing, safe semantic-validation, and
   cache-handling instructions.

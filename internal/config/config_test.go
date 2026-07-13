@@ -41,14 +41,14 @@ func TestLoadAJQConfigOverrideReadsExplicitPath(t *testing.T) {
 			if path != "/tmp/custom-ajq.toml" {
 				t.Fatalf("ReadFile path = %q", path)
 			}
-			return []byte("backend = \"mock\"\nmodel = \"m-file\"\nbase_url = \"http://file\"\nmax_calls = 7\nno_cache = true\n"), nil
+			return []byte("backend = \"mock\"\nmodel = \"m-file\"\nbase_url = \"http://file\"\nmax_calls = 7\nwindow_bytes = 8192\nno_cache = true\n"), nil
 		},
 		Stderr: &stderr,
 	})
 	if err != nil {
 		t.Fatalf("LoadWithOptions returned error: %v", err)
 	}
-	if !values.BackendSet || values.Backend != "mock" || !values.ModelSet || values.Model != "m-file" || !values.BaseURLSet || values.BaseURL != "http://file" || !values.MaxCallsSet || values.MaxCalls != 7 || !values.NoCacheSet || !values.NoCache {
+	if !values.BackendSet || values.Backend != "mock" || !values.ModelSet || values.Model != "m-file" || !values.BaseURLSet || values.BaseURL != "http://file" || !values.MaxCallsSet || values.MaxCalls != 7 || !values.WindowBytesSet || values.WindowBytes != 8192 || !values.NoCacheSet || !values.NoCache {
 		t.Fatalf("values not fully decoded: %+v", values)
 	}
 	if stderr.String() != "" {
@@ -101,25 +101,25 @@ func TestLoadReadAndParseErrorsSurface(t *testing.T) {
 }
 
 func TestResolvePrecedenceForEveryField(t *testing.T) {
-	defaults := Values{Backend: "default-backend", BackendSet: true, Model: "default-model", ModelSet: true, BaseURL: "http://default", BaseURLSet: true, MaxCalls: 1, MaxCallsSet: true, NoCache: true, NoCacheSet: true}
-	file := Values{Backend: "file-backend", BackendSet: true, Model: "file-model", ModelSet: true, BaseURL: "http://file", BaseURLSet: true, MaxCalls: 2, MaxCallsSet: true, NoCache: false, NoCacheSet: true}
-	env := Values{Backend: "env-backend", BackendSet: true, Model: "env-model", ModelSet: true, BaseURL: "http://env", BaseURLSet: true, MaxCalls: 3, MaxCallsSet: true}
-	flags := Values{Backend: "flag-backend", BackendSet: true, Model: "flag-model", ModelSet: true, BaseURL: "http://flag", BaseURLSet: true, MaxCalls: 0, MaxCallsSet: true, NoCache: false, NoCacheSet: true}
+	defaults := Values{Backend: "default-backend", BackendSet: true, Model: "default-model", ModelSet: true, BaseURL: "http://default", BaseURLSet: true, MaxCalls: 1, MaxCallsSet: true, WindowBytes: 1024, WindowBytesSet: true, NoCache: true, NoCacheSet: true}
+	file := Values{Backend: "file-backend", BackendSet: true, Model: "file-model", ModelSet: true, BaseURL: "http://file", BaseURLSet: true, MaxCalls: 2, MaxCallsSet: true, WindowBytes: 2048, WindowBytesSet: true, NoCache: false, NoCacheSet: true}
+	env := Values{Backend: "env-backend", BackendSet: true, Model: "env-model", ModelSet: true, BaseURL: "http://env", BaseURLSet: true, MaxCalls: 3, MaxCallsSet: true, WindowBytes: 4096, WindowBytesSet: true}
+	flags := Values{Backend: "flag-backend", BackendSet: true, Model: "flag-model", ModelSet: true, BaseURL: "http://flag", BaseURLSet: true, MaxCalls: 0, MaxCallsSet: true, WindowBytes: 8192, WindowBytesSet: true, NoCache: false, NoCacheSet: true}
 
 	got := Resolve(flags, env, file, defaults)
-	want := Settings{Backend: "flag-backend", Model: "flag-model", BaseURL: "http://flag", BaseURLExplicit: true, MaxCalls: 0, NoCache: false}
+	want := Settings{Backend: "flag-backend", Model: "flag-model", BaseURL: "http://flag", BaseURLExplicit: true, MaxCalls: 0, WindowBytes: 8192, NoCache: false}
 	if got != want {
 		t.Fatalf("Resolve() = %+v, want %+v", got, want)
 	}
 
 	got = Resolve(Values{}, env, file, defaults)
-	want = Settings{Backend: "env-backend", Model: "env-model", BaseURL: "http://env", BaseURLExplicit: true, MaxCalls: 3, NoCache: false}
+	want = Settings{Backend: "env-backend", Model: "env-model", BaseURL: "http://env", BaseURLExplicit: true, MaxCalls: 3, WindowBytes: 4096, NoCache: false}
 	if got != want {
 		t.Fatalf("Resolve(no flags) = %+v, want %+v", got, want)
 	}
 
 	got = Resolve(Values{}, Values{}, Values{}, defaults)
-	want = Settings{Backend: "default-backend", Model: "default-model", BaseURL: "http://default", BaseURLExplicit: false, MaxCalls: 1, NoCache: true}
+	want = Settings{Backend: "default-backend", Model: "default-model", BaseURL: "http://default", BaseURLExplicit: false, MaxCalls: 1, WindowBytes: 1024, NoCache: true}
 	if got != want {
 		t.Fatalf("Resolve(no flags) = %+v, want %+v", got, want)
 	}
@@ -136,6 +136,8 @@ func TestEnvReadsOnlyAJQSettings(t *testing.T) {
 			return "http://env"
 		case "AJQ_MAX_CALLS":
 			return "7"
+		case "AJQ_WINDOW_BYTES":
+			return "8192"
 		case "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY":
 			t.Fatalf("Env should not read provider credential %s", key)
 		}
@@ -144,7 +146,7 @@ func TestEnvReadsOnlyAJQSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Env returned error: %v", err)
 	}
-	if values.Backend != "mock" || values.Model != "env-model" || values.BaseURL != "http://env" || values.MaxCalls != 7 || !values.MaxCallsSet {
+	if values.Backend != "mock" || values.Model != "env-model" || values.BaseURL != "http://env" || values.MaxCalls != 7 || !values.MaxCallsSet || values.WindowBytes != 8192 || !values.WindowBytesSet {
 		t.Fatalf("Env() = %+v", values)
 	}
 }

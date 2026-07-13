@@ -29,10 +29,10 @@ func (s Shape) String() string {
 func FormatMetrics(metrics []Metrics) string {
 	var b strings.Builder
 	w := tabwriter.NewWriter(&b, 0, 2, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "workload\tshape\twindow_bytes\tframes\tharvested\tpost_dedup\tbatches\tdedup_ratio\tduration")
+	_, _ = fmt.Fprintln(w, "workload\tshape\twindow_bytes\twindows\toversized_windows\tframes\tharvested\tpost_dedup\tbatches\tdedup_ratio\tduration")
 	for _, m := range metrics {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\t%d\t%d\t%.3f\t%s\n",
-			m.Workload, m.Shape, m.WindowBytes, m.Frames,
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%.3f\t%s\n",
+			m.Workload, m.Shape, m.WindowBytes, m.WindowCount, m.OversizedWindowCount, m.Frames,
 			m.HarvestedJudgements, m.PostDedupJudgements, m.BackendBatches,
 			m.DedupRatio, m.Duration.Round(time.Microsecond))
 	}
@@ -44,16 +44,17 @@ func FormatMetrics(metrics []Metrics) string {
 // snake_case keys and a string shape so downstream comparison tooling is not
 // coupled to Go field names or enum ordinals.
 type metricsJSONView struct {
-	Workload            string  `json:"workload"`
-	Shape               string  `json:"shape"`
-	WindowBytes         int     `json:"window_bytes"`
-	Frames              int     `json:"frames"`
-	HarvestedJudgements int     `json:"harvested_judgements"`
-	PostDedupJudgements int     `json:"post_dedup_judgements"`
-	BackendBatches      int     `json:"backend_batches"`
-	DedupRatio          float64 `json:"dedup_ratio"`
-	DurationNanos       int64   `json:"duration_nanos"`
-	EstimateStatus      string  `json:"estimate_status"`
+	Workload             string  `json:"workload"`
+	Shape                string  `json:"shape"`
+	WindowBytes          int64   `json:"window_bytes"`
+	WindowCount          int64   `json:"window_count"`
+	OversizedWindowCount int64   `json:"oversized_window_count"`
+	Frames               int64   `json:"frames"`
+	HarvestedJudgements  int     `json:"harvested_judgements"`
+	PostDedupJudgements  int     `json:"post_dedup_judgements"`
+	BackendBatches       int     `json:"backend_batches"`
+	DedupRatio           float64 `json:"dedup_ratio"`
+	DurationNanos        int64   `json:"duration_nanos"`
 }
 
 // MetricsJSON serializes fake-mode metrics as indented JSON for run-over-run
@@ -62,16 +63,17 @@ func MetricsJSON(metrics []Metrics) ([]byte, error) {
 	views := make([]metricsJSONView, len(metrics))
 	for i, m := range metrics {
 		views[i] = metricsJSONView{
-			Workload:            m.Workload,
-			Shape:               m.Shape.String(),
-			WindowBytes:         m.WindowBytes,
-			Frames:              m.Frames,
-			HarvestedJudgements: m.HarvestedJudgements,
-			PostDedupJudgements: m.PostDedupJudgements,
-			BackendBatches:      m.BackendBatches,
-			DedupRatio:          m.DedupRatio,
-			DurationNanos:       m.Duration.Nanoseconds(),
-			EstimateStatus:      m.EstimateStatus,
+			Workload:             m.Workload,
+			Shape:                m.Shape.String(),
+			WindowBytes:          m.WindowBytes,
+			WindowCount:          m.WindowCount,
+			OversizedWindowCount: m.OversizedWindowCount,
+			Frames:               m.Frames,
+			HarvestedJudgements:  m.HarvestedJudgements,
+			PostDedupJudgements:  m.PostDedupJudgements,
+			BackendBatches:       m.BackendBatches,
+			DedupRatio:           m.DedupRatio,
+			DurationNanos:        m.Duration.Nanoseconds(),
 		}
 	}
 	return json.MarshalIndent(views, "", "  ")

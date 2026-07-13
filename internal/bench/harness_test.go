@@ -2,13 +2,13 @@ package bench_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/ricardocabral/ajq/internal/bench"
-	"github.com/ricardocabral/ajq/internal/engine"
 )
 
-func TestRunFakeProducesMetrics(t *testing.T) {
+func TestRunFakeProducesActualWindowMetrics(t *testing.T) {
 	ctx := context.Background()
 	workloads, err := bench.StandardWorkloads(32)
 	if err != nil {
@@ -21,89 +21,71 @@ func TestRunFakeProducesMetrics(t *testing.T) {
 			if err != nil {
 				t.Fatalf("RunFake(%s): %v", w.Name, err)
 			}
-			if m.EstimateStatus != engine.ExplainEstimateAvailable {
-				t.Fatalf("estimate status = %q, want %q", m.EstimateStatus, engine.ExplainEstimateAvailable)
+			if m.Frames == 0 || m.HarvestedJudgements == 0 || m.PostDedupJudgements == 0 {
+				t.Fatalf("missing actual execution counters: %+v", m)
 			}
-			if m.Frames == 0 {
-				t.Fatalf("expected at least one frame, got 0")
+			if m.PostDedupJudgements > m.HarvestedJudgements || m.BackendBatches <= 0 {
+				t.Fatalf("invalid actual execution counters: %+v", m)
 			}
-			if m.HarvestedJudgements == 0 {
-				t.Fatalf("expected harvested judgements > 0")
-			}
-			if m.PostDedupJudgements == 0 {
-				t.Fatalf("expected post-dedup judgements > 0")
-			}
-			if m.PostDedupJudgements > m.HarvestedJudgements {
-				t.Fatalf("post-dedup %d exceeds harvested %d", m.PostDedupJudgements, m.HarvestedJudgements)
-			}
-			if m.WindowBytes == 0 {
-				t.Fatalf("expected non-zero window bytes")
-			}
-			if m.Duration <= 0 {
-				t.Fatalf("expected positive duration, got %v", m.Duration)
+			if m.WindowBytes == 0 || m.WindowCount == 0 || m.Duration <= 0 {
+				t.Fatalf("missing window/duration metrics: %+v", m)
 			}
 		})
 	}
 }
 
-// TestDedupCollapsesRepeatedValues verifies that array workloads drawing from a
-// bounded vocabulary collapse to at most the distinct-value count after dedup,
-// which is the effect Phase 4 window sizing depends on.
-func TestDedupCollapsesRepeatedValues(t *testing.T) {
-	// Many records, few distinct messages -> heavy dedup.
-	w, err := bench.GenerateArray("dedup", bench.QuerySemMatch, 200)
-	if err != nil {
-		t.Fatalf("GenerateArray: %v", err)
-	}
-	m, err := bench.RunFake(context.Background(), w)
-	if err != nil {
-		t.Fatalf("RunFake: %v", err)
-	}
-	if m.PostDedupJudgements > w.Distinct {
-		t.Fatalf("post-dedup %d exceeds distinct vocabulary %d", m.PostDedupJudgements, w.Distinct)
-	}
-	if m.HarvestedJudgements <= m.PostDedupJudgements {
-		t.Fatalf("expected dedup to reduce judgements: harvested=%d post=%d", m.HarvestedJudgements, m.PostDedupJudgements)
-	}
-	if m.DedupRatio <= 0 || m.DedupRatio >= 1 {
-		t.Fatalf("expected 0 < dedup ratio < 1, got %v", m.DedupRatio)
+func TestNDJSONWindowEvidenceUsesActualExecution(t *testing.T) {
+	// The smaller budget creates several windows while the larger one allows all
+	// frames into one. The repeated values prove dedup within the first window;
+	// later windows reuse the same run's cache and need no extra Judge batches.
+	input := []byte(strings.Repeat(`{"id":1,"msg":"urgent"}`+"\n", 6))
+	for _, tc := range []struct {
+		name       string
+		budget     int64
+		wantWindow int64
+	}{
+		{name: "small", budget: 64, wantWindow: 3},
+		{name: "large", budget: 1024, wantWindow: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := bench.RunFake(context.Background(), bench.Workload{
+				Name: "ndjson-" + tc.name, Query: `select(sem_match(.msg; "urgent")) | .id`,
+				Input: input, Shape: bench.ShapeNDJSON, WindowBytes: tc.budget, Records: 6, Distinct: 1,
+			})
+			if err != nil {
+				t.Fatalf("RunFake: %v", err)
+			}
+			if m.WindowBytes != tc.budget || m.WindowCount != tc.wantWindow {
+				t.Fatalf("budget/windows = %d/%d, want %d/%d", m.WindowBytes, m.WindowCount, tc.budget, tc.wantWindow)
+			}
+			if m.HarvestedJudgements != 6 || m.PostDedupJudgements != 1 || m.BackendBatches != 1 {
+				t.Fatalf("dedup/batches = harvested %d post %d batches %d, want 6/1/1", m.HarvestedJudgements, m.PostDedupJudgements, m.BackendBatches)
+			}
+		})
 	}
 }
 
-// TestArrayBatchesSingleWindow confirms an array workload resolves in one
-// backend batch (a single window). For NDJSON, each frame is its own window but
-// the per-run cache persists across frames, so the number of backend batches
-// collapses to the distinct-value count rather than the frame count — the
-// cross-window cache effect Phase 4 relies on.
-func TestArrayBatchesSingleWindow(t *testing.T) {
-	array, err := bench.GenerateArray("array", bench.QuerySemMatch, 16)
+func TestStandardWorkloadsIncludeOversizedWindowEvidence(t *testing.T) {
+	workloads, err := bench.StandardWorkloads(8)
 	if err != nil {
-		t.Fatalf("GenerateArray: %v", err)
+		t.Fatal(err)
 	}
-	am, err := bench.RunFake(context.Background(), array)
+	var oversized bench.Workload
+	for _, w := range workloads {
+		if w.Name == "sem_match/ndjson/oversized" {
+			oversized = w
+			break
+		}
+	}
+	if oversized.Name == "" {
+		t.Fatalf("standard workloads omit oversized NDJSON scenario")
+	}
+	m, err := bench.RunFake(context.Background(), oversized)
 	if err != nil {
-		t.Fatalf("RunFake array: %v", err)
+		t.Fatal(err)
 	}
-	if am.BackendBatches != 1 {
-		t.Fatalf("array workload backend batches = %d, want 1", am.BackendBatches)
-	}
-
-	nd, err := bench.GenerateNDJSON("ndjson", `select(sem_match(.msg; "urgent")) | .id`, 16)
-	if err != nil {
-		t.Fatalf("GenerateNDJSON: %v", err)
-	}
-	nm, err := bench.RunFake(context.Background(), nd)
-	if err != nil {
-		t.Fatalf("RunFake ndjson: %v", err)
-	}
-	if nm.Frames != 16 {
-		t.Fatalf("ndjson frames = %d, want 16", nm.Frames)
-	}
-	if nm.BackendBatches != nd.Distinct {
-		t.Fatalf("ndjson backend batches = %d, want distinct-value count %d (cross-frame cache)", nm.BackendBatches, nd.Distinct)
-	}
-	if nm.BackendBatches >= nm.Frames {
-		t.Fatalf("expected cross-frame cache to reduce batches below frames: batches=%d frames=%d", nm.BackendBatches, nm.Frames)
+	if m.WindowBytes != 64 || m.WindowCount != 1 || m.OversizedWindowCount != 1 || m.BackendBatches != 1 {
+		t.Fatalf("oversized metrics = %+v, want one 64-byte oversized window and one batch", m)
 	}
 }
 
@@ -126,8 +108,6 @@ func BenchmarkFakeStandardWorkloads(b *testing.B) {
 	}
 }
 
-// BenchmarkFakeDedupScaling measures how split-execution cost scales with the
-// harvested-to-distinct ratio, informing window-size tuning.
 func BenchmarkFakeDedupScaling(b *testing.B) {
 	ctx := context.Background()
 	for _, n := range []int{16, 64, 256} {

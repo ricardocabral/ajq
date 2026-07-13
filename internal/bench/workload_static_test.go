@@ -114,13 +114,17 @@ func TestStandardWorkloadsPreserveStaticMetadata(t *testing.T) {
 		"sem_classify/array",
 		"sem_score/array",
 		"sem_norm/array",
-		"sem_match/ndjson",
+		"sem_match/ndjson/window-256",
+		"sem_match/ndjson/window-4096",
+		"sem_match/ndjson/oversized",
 	}
 	wantQueries := []string{
 		bench.QuerySemMatch,
 		bench.QuerySemClassify,
 		bench.QuerySemScore,
 		bench.QuerySemNorm,
+		`select(sem_match(.msg; "urgent")) | .id`,
+		`select(sem_match(.msg; "urgent")) | .id`,
 		`select(sem_match(.msg; "urgent")) | .id`,
 	}
 	wantShapes := []bench.Shape{
@@ -129,13 +133,19 @@ func TestStandardWorkloadsPreserveStaticMetadata(t *testing.T) {
 		bench.ShapeArray,
 		bench.ShapeArray,
 		bench.ShapeNDJSON,
+		bench.ShapeNDJSON,
+		bench.ShapeNDJSON,
 	}
 
 	if len(workloads) != len(wantNames) {
 		t.Fatalf("StandardWorkloads len = %d, want %d", len(workloads), len(wantNames))
 	}
 	for i, w := range workloads {
-		if w.Name != wantNames[i] || w.Query != wantQueries[i] || w.Shape != wantShapes[i] || w.Records != 64 || w.Distinct != 8 {
+		wantRecords, wantDistinct := 64, 8
+		if w.Name == "sem_match/ndjson/oversized" {
+			wantRecords, wantDistinct = 1, 1
+		}
+		if w.Name != wantNames[i] || w.Query != wantQueries[i] || w.Shape != wantShapes[i] || w.Records != wantRecords || w.Distinct != wantDistinct {
 			t.Fatalf("StandardWorkloads[%d] = name=%q query=%q shape=%v records=%d distinct=%d", i, w.Name, w.Query, w.Shape, w.Records, w.Distinct)
 		}
 	}
@@ -144,7 +154,7 @@ func TestStandardWorkloadsPreserveStaticMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StandardWorkloads(3): %v", err)
 	}
-	if got := recordsAndDistinct(custom); !reflect.DeepEqual(got, [][2]int{{3, 3}, {3, 3}, {3, 3}, {3, 3}, {3, 3}}) {
+	if got := recordsAndDistinct(custom); !reflect.DeepEqual(got, [][2]int{{3, 3}, {3, 3}, {3, 3}, {3, 3}, {3, 3}, {3, 3}, {1, 1}}) {
 		t.Fatalf("StandardWorkloads(3) records/distinct = %v", got)
 	}
 }

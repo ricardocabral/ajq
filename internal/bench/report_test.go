@@ -23,7 +23,7 @@ func TestFormatMetricsIncludesTuningFields(t *testing.T) {
 	}
 	text := bench.FormatMetrics(metrics)
 	// The window-tuning field labels Phase 4 depends on must be present.
-	for _, field := range []string{"window_bytes", "frames", "harvested", "post_dedup", "batches", "dedup_ratio", "duration"} {
+	for _, field := range []string{"window_bytes", "windows", "oversized_windows", "frames", "harvested", "post_dedup", "batches", "dedup_ratio", "duration"} {
 		if !strings.Contains(text, field) {
 			t.Fatalf("formatted metrics missing field %q:\n%s", field, text)
 		}
@@ -57,7 +57,7 @@ func TestMetricsJSONRoundTrips(t *testing.T) {
 		t.Fatalf("json has %d entries, want %d", len(decoded), len(metrics))
 	}
 	first := decoded[0]
-	for _, key := range []string{"workload", "shape", "window_bytes", "frames", "harvested_judgements", "post_dedup_judgements", "backend_batches", "dedup_ratio", "duration_nanos"} {
+	for _, key := range []string{"workload", "shape", "window_bytes", "window_count", "oversized_window_count", "frames", "harvested_judgements", "post_dedup_judgements", "backend_batches", "dedup_ratio", "duration_nanos"} {
 		if _, ok := first[key]; !ok {
 			t.Fatalf("json entry missing key %q: %v", key, first)
 		}
