@@ -196,10 +196,10 @@ func defaultScripts() map[string][]scriptResponse {
 	}
 }
 
+// requestAwareResponse maps the judgement value embedded in every supported
+// protocol's prompt to a scripted response. Concurrent requests may arrive in
+// any order, so protocol conformance cannot assign responses by arrival order.
 func (s *ScriptedServer) requestAwareResponse(caseName string, body []byte) (scriptResponse, bool) {
-	if s.protocol != ProtocolLocal {
-		return scriptResponse{}, false
-	}
 	text := string(body)
 	responses := map[string][]struct {
 		contains string

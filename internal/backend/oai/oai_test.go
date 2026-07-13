@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -326,6 +327,118 @@ func TestOpenAIBackendInvalidContractIsPerItemErrorWithoutHTTP(t *testing.T) {
 	}
 	if len(cap.requests) != 0 {
 		t.Fatalf("requests = %d, want none", len(cap.requests))
+	}
+}
+
+func TestOpenAIBackendConcurrentOrderBoundItemErrorsAndRetries(t *testing.T) {
+	var mu sync.Mutex
+	inFlight, peak := 0, 0
+	attempts := map[string]int{}
+	startedSlow := make(chan struct{})
+	releaseSlow := make(chan struct{})
+	var startOnce, releaseOnce sync.Once
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		prompt := string(body)
+		mu.Lock()
+		inFlight++
+		if inFlight > peak {
+			peak = inFlight
+		}
+		mu.Unlock()
+		defer func() {
+			mu.Lock()
+			inFlight--
+			mu.Unlock()
+		}()
+
+		switch {
+		case strings.Contains(prompt, "Value: slow"):
+			startOnce.Do(func() { close(startedSlow) })
+			<-releaseSlow
+			_, _ = io.WriteString(w, openAIResponse("true"))
+		case strings.Contains(prompt, "Value: item-error"):
+			<-startedSlow
+			releaseOnce.Do(func() { close(releaseSlow) })
+			_, _ = io.WriteString(w, openAIResponse(`"not-a-bool"`))
+		case strings.Contains(prompt, "Value: retry"):
+			mu.Lock()
+			attempts["retry"]++
+			attempt := attempts["retry"]
+			mu.Unlock()
+			if attempt == 1 {
+				http.Error(w, "retry status", http.StatusTooManyRequests)
+				return
+			}
+			if attempt == 2 {
+				http.Error(w, "retry status", http.StatusInternalServerError)
+				return
+			}
+			_, _ = io.WriteString(w, openAIResponse("true"))
+		default:
+			t.Errorf("unexpected prompt")
+		}
+	}))
+	t.Cleanup(srv.Close)
+	be := baseBackend(srv)
+	be.MaxConcurrency = 2
+	be.RetrySleep = func(context.Context, time.Duration) error { return nil }
+	batch := []backend.Judgement{
+		{Op: "sem_match", Return: semantics.ReturnBool, Specs: []string{"x"}, Value: "slow"},
+		{Op: "sem_match", Return: semantics.ReturnBool, Specs: []string{"x"}, Value: "item-error"},
+		{Op: "sem_match", Return: semantics.ReturnBool, Specs: []string{"x"}, Value: "retry"},
+	}
+	results, err := be.Judge(context.Background(), batch)
+	if err != nil {
+		t.Fatalf("Judge returned error: %v", err)
+	}
+	if len(results) != 3 || results[0].Value != true || results[1].Error == "" || results[2].Value != true {
+		t.Fatalf("ordered results = %#v, want [true item-error true]", results)
+	}
+	mu.Lock()
+	gotPeak, gotAttempts := peak, attempts["retry"]
+	mu.Unlock()
+	if gotPeak != 2 {
+		t.Fatalf("peak requests = %d, want exact bound 2", gotPeak)
+	}
+	if gotAttempts != 3 {
+		t.Fatalf("retry attempts = %d, want 429 + 5xx + success", gotAttempts)
+	}
+}
+
+func TestOpenAIBackendConcurrentTransportFailureCancelsSibling(t *testing.T) {
+	waitStarted := make(chan struct{})
+	waitCancelled := make(chan struct{})
+	var waitOnce sync.Once
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "Value: wait") {
+			waitOnce.Do(func() { close(waitStarted) })
+			<-r.Context().Done()
+			close(waitCancelled)
+			return
+		}
+		<-waitStarted
+		http.Error(w, `{"error":{"message":"provider-secret-response"}}`, http.StatusBadRequest)
+	}))
+	t.Cleanup(srv.Close)
+	be := baseBackend(srv)
+	be.MaxConcurrency = 2
+	results, err := be.Judge(context.Background(), []backend.Judgement{
+		{Op: "sem_match", Return: semantics.ReturnBool, Specs: []string{"x"}, Value: "fail"},
+		{Op: "sem_match", Return: semantics.ReturnBool, Specs: []string{"x"}, Value: "wait"},
+	})
+	if err == nil || len(results) != 0 {
+		t.Fatalf("Judge = (%#v, %v), want nil results and whole-batch error", results, err)
+	}
+	if !strings.Contains(err.Error(), "judgement 0 (sem_match)") || strings.Contains(err.Error(), "provider-secret-response") || strings.Contains(err.Error(), "test-key") {
+		t.Fatalf("unsafe or unindexed error: %v", err)
+	}
+	select {
+	case <-waitCancelled:
+	case <-time.After(time.Second):
+		t.Fatal("admitted sibling did not receive cancellation")
 	}
 }
 

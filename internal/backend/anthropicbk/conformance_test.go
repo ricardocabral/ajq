@@ -9,6 +9,15 @@ import (
 )
 
 func TestAnthropicBackendConformance(t *testing.T) {
+	runConformance(t, 0)
+}
+
+func TestAnthropicBackendConcurrentConformance(t *testing.T) {
+	runConformance(t, 2)
+}
+
+func runConformance(t *testing.T, maxConcurrency int) {
+	t.Helper()
 	t.Setenv(APIKeyEnv, "test-key")
 	server := conformance.NewScriptedServer(t, conformance.ProtocolAnthropic)
 	conformance.Run(t, func(serverURL string) backend.Backend {
@@ -16,6 +25,7 @@ func TestAnthropicBackendConformance(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New returned error: %v", err)
 		}
+		be.MaxConcurrency = maxConcurrency
 		return be
 	}, conformance.WithScriptedServer(server))
 }
