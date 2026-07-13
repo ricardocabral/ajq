@@ -156,6 +156,65 @@ func TestWindowIteratorCallbackStopsBeforeLaterFrames(t *testing.T) {
 	}
 }
 
+func TestJSONFramerReleasesOversizedDecoderBuffer(t *testing.T) {
+	const oversizedBytes = 12 << 20
+	reader, writer := io.Pipe()
+	writeDone := make(chan error, 1)
+	go func() {
+		defer writer.Close()
+		if _, err := io.WriteString(writer, `{"value":"`); err != nil {
+			writeDone <- err
+			return
+		}
+		chunk := strings.Repeat("x", 64<<10)
+		for remaining := oversizedBytes; remaining > 0; remaining -= len(chunk) {
+			part := chunk
+			if remaining < len(part) {
+				part = part[:remaining]
+			}
+			if _, err := io.WriteString(writer, part); err != nil {
+				writeDone <- err
+				return
+			}
+		}
+		if _, err := io.WriteString(writer, `"}`+"\n"); err != nil {
+			writeDone <- err
+			return
+		}
+		for i := 0; i < 1024; i++ {
+			if _, err := io.WriteString(writer, `{"value":"small"}`+"\n"); err != nil {
+				writeDone <- err
+				return
+			}
+		}
+		writeDone <- nil
+	}()
+
+	runtime.GC()
+	var before runtime.MemStats
+	runtime.ReadMemStats(&before)
+	framer := input.NewFramer(reader, input.ModeAuto)
+	for {
+		frame, err := framer.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		frame.Value = nil
+	}
+	if err := <-writeDone; err != nil {
+		t.Fatal(err)
+	}
+	runtime.GC()
+	var after runtime.MemStats
+	runtime.ReadMemStats(&after)
+	if after.Alloc > before.Alloc && after.Alloc-before.Alloc > 8<<20 {
+		t.Fatalf("ModeAuto framer retained %d bytes after an oversized JSON frame", after.Alloc-before.Alloc)
+	}
+}
+
 func TestWindowIteratorCancellationAndRetention(t *testing.T) {
 	framer := &framesFramer{frames: []input.Frame{{Index: 0, Bytes: 1}}}
 	it, err := input.NewWindowIterator(framer, 1024)
