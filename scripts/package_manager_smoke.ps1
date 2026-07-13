@@ -79,8 +79,9 @@ if ($existing -notmatch '(?im)no (installed )?package found matching input crite
 $installed = Invoke-WinGet 'list after install' $packageArguments
 if ($installed -notmatch "(?m)\b$([regex]::Escape($version))\b") { throw "installed WinGet package version mismatch: expected $version" }
 
-# Portable WinGet aliases live here; never use an arbitrary older ajq on PATH.
-$ajq = if ($env:AJQ_PACKAGE_EXECUTABLE) { $env:AJQ_PACKAGE_EXECUTABLE } else { Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\ajq.exe' }
+# WiX installs directly under the per-user Programs folder; never use an
+# arbitrary older ajq on PATH or the portable WinGet alias directory.
+$ajq = if ($env:AJQ_PACKAGE_EXECUTABLE) { $env:AJQ_PACKAGE_EXECUTABLE } else { Join-Path $env:LOCALAPPDATA 'Programs\ajq\ajq.exe' }
 if (-not (Test-Path -LiteralPath $ajq -PathType Leaf)) { throw "installed WinGet executable not found: $ajq" }
 $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("ajq-package-smoke-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $temp | Out-Null
@@ -102,5 +103,6 @@ try {
     Write-Output "WinGet mock stdout base64: $mockEvidence"
 } finally {
     Remove-Item -Recurse -Force -ErrorAction Ignore -LiteralPath $temp
+    [void](Invoke-WinGet 'uninstall after smoke' @('uninstall', '--id', 'RicardoCabral.ajq', '--exact', '--silent'))
 }
 Write-Output "WinGet package smoke passed for $Tag"

@@ -38,6 +38,11 @@ jobs:
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'tag must be vX.Y.Z, got %s\n' "$TAG" >&2; exit 1; }
           [[ "$CHANNEL" == homebrew || "$CHANNEL" == winget ]] || { printf 'unsupported channel: %s\n' "$CHANNEL" >&2; exit 1; }
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null || { printf 'release does not exist: %s\n' "$TAG" >&2; exit 1; }
+          if [[ "$CHANNEL" == winget ]]; then
+            expected="ajq_${TAG#v}_Windows_x86_64.msi"
+            mapfile -t msi_assets < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(. == "'"$expected"'")')
+            [[ "${#msi_assets[@]}" -eq 1 ]] || { printf 'winget smoke requires exactly one canonical MSI asset: %s\n' "$expected" >&2; exit 1; }
+          fi
           printf 'tag=%s\nversion=%s\n' "$TAG" "${TAG#v}" >> "$GITHUB_OUTPUT"
 
   homebrew:
