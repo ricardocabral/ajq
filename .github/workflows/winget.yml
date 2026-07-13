@@ -11,16 +11,12 @@ name: WinGet package
         description: Existing GitHub release tag to submit, for example v1.2.3
         required: true
         type: string
-      version:
-        description: Optional package version override, without leading v
-        required: false
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: winget-package-${{ github.event.release.tag_name || github.ref_name }}
+  group: winget-package-${{ github.event.release.tag_name || github.event.inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -28,13 +24,32 @@ jobs:
     name: Submit WinGet manifest update
     runs-on: windows-latest
     steps:
+      - name: Check out preflight scripts
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Validate release identity and asset
+        id: release
+        shell: pwsh
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_TAG: ${{ github.event.inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = if ($env:EVENT_TAG) { $env:EVENT_TAG } else { $env:DISPATCH_TAG }
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw "WinGet submission requires a vX.Y.Z tag, got $tag"
+          }
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json tagName,assets > release.json
+          ./scripts/winget_release_preflight.ps1 -Tag $tag -ReleaseJsonPath release.json -OutputPath $env:GITHUB_OUTPUT
+
       - name: Submit to winget-pkgs
         uses: vedantmgoyal9/winget-releaser@7bd472be23763def6e16bd06cc8b1cdfab0e2fd5 # main
         with:
           identifier: Ricardocabral.ajq
           token: ${{ secrets.WINGET_TOKEN }}
-          release-repository: ajq
-          release-tag: >-
-            ${{ github.event.release.tag_name || github.event.inputs.tag }}
-          version: ${{ github.event.inputs.version }}
-          installers-regex: 'ajq_.*Windows_x86_64\.zip$'
+          release-repository: ricardocabral/ajq
+          release-tag: ${{ steps.release.outputs.tag }}
+          version: ${{ steps.release.outputs.version }}
+          installers-regex: ${{ steps.release.outputs.regex }}
