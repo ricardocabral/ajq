@@ -236,6 +236,7 @@ jobs:
           & ./scripts/windows_msi_contract.ps1 -Tag $env:RELEASE_TAG -OutputPath $env:GITHUB_OUTPUT
 
       - name: Download and verify x64 release ZIP from draft
+        id: release_zip
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -272,8 +273,8 @@ jobs:
           PRODUCT_CODE: ${{ steps.contract.outputs.product_code }}
           PACKAGE_CODE: ${{ steps.contract.outputs.package_code }}
           MSI_ASSET: ${{ steps.contract.outputs.msi_asset }}
-          BINARY_SOURCE: ${{ steps.contract.outputs.binary }}
-          LICENSE_SOURCE: ${{ steps.contract.outputs.license }}
+          BINARY_SOURCE: ${{ steps.release_zip.outputs.binary }}
+          LICENSE_SOURCE: ${{ steps.release_zip.outputs.license }}
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path dist | Out-Null
@@ -369,7 +370,19 @@ jobs:
             --pattern 'ajq_*.tar.gz' \
             --pattern 'ajq_*.zip' \
             --pattern 'ajq_*.msi'
-          test -n "$(find dist -maxdepth 1 -name 'ajq_*.msi' -print -quit)"
+          expected_assets=(
+            "ajq_${RELEASE_VERSION}_Darwin_arm64.tar.gz"
+            "ajq_${RELEASE_VERSION}_Darwin_x86_64.tar.gz"
+            "ajq_${RELEASE_VERSION}_Linux_arm64.tar.gz"
+            "ajq_${RELEASE_VERSION}_Linux_x86_64.tar.gz"
+            "ajq_${RELEASE_VERSION}_Windows_x86_64.zip"
+            "ajq_${RELEASE_VERSION}_Windows_x86_64.msi"
+          )
+          mapfile -t downloaded_assets < <(find dist -maxdepth 1 -type f \( -name 'ajq_*.tar.gz' -o -name 'ajq_*.zip' -o -name 'ajq_*.msi' \) -printf '%f\n' | LC_ALL=C sort)
+          if ! diff -u <(printf '%s\n' "${expected_assets[@]}" | LC_ALL=C sort) <(printf '%s\n' "${downloaded_assets[@]}"); then
+            printf 'draft release assets must exactly match the expected archive/MSI allowlist\n' >&2
+            exit 1
+          fi
 
       - name: Regenerate final checksums including MSI
         shell: bash
@@ -405,9 +418,12 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: |
-            dist/*.tar.gz
-            dist/*.zip
-            dist/*.msi
+            dist/ajq_${{ needs.validate-release.outputs.version }}_Darwin_arm64.tar.gz
+            dist/ajq_${{ needs.validate-release.outputs.version }}_Darwin_x86_64.tar.gz
+            dist/ajq_${{ needs.validate-release.outputs.version }}_Linux_arm64.tar.gz
+            dist/ajq_${{ needs.validate-release.outputs.version }}_Linux_x86_64.tar.gz
+            dist/ajq_${{ needs.validate-release.outputs.version }}_Windows_x86_64.zip
+            dist/ajq_${{ needs.validate-release.outputs.version }}_Windows_x86_64.msi
             dist/checksums.txt
 
       - name: Publish complete draft release

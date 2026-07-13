@@ -72,6 +72,9 @@ foreach ($needle in @(
     'dotnet tool install --global wix --version 4.0.5',
     'release ZIP must contain exactly one root ajq.exe',
     'release ZIP must contain root LICENSE',
+    'id: release_zip',
+    'BINARY_SOURCE: ${{ steps.release_zip.outputs.binary }}',
+    'LICENSE_SOURCE: ${{ steps.release_zip.outputs.license }}',
     'gh release download $env:RELEASE_TAG --pattern $env:ZIP_ASSET --dir stage',
     'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.',
     'uses: azure/trusted-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba # v2.0.0',
@@ -83,6 +86,8 @@ foreach ($needle in @(
     'same verified inputs produced different unsigned MSI bytes',
     'expected_assets=(',
     'draft release must contain exactly one %s',
+    'draft release assets must exactly match the expected archive/MSI allowlist',
+    'mapfile -t downloaded_assets',
     'ajq_${RELEASE_VERSION}_Darwin_arm64.tar.gz',
     'ajq_${RELEASE_VERSION}_Darwin_x86_64.tar.gz',
     'ajq_${RELEASE_VERSION}_Linux_arm64.tar.gz',
@@ -90,12 +95,15 @@ foreach ($needle in @(
     'ajq_${RELEASE_VERSION}_Windows_x86_64.zip',
     'ajq_${RELEASE_VERSION}_Windows_x86_64.msi',
     'gh release edit "$RELEASE_TAG" --draft=false',
-    'dist/*.msi'
+    'dist/ajq_${{ needs.validate-release.outputs.version }}_Windows_x86_64.msi'
 )) {
     if (-not $workflow.Contains($needle)) { throw "release workflow is missing required MSI contract: $needle" }
 }
 foreach ($credential in @('AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'TRUSTED_SIGNING_ENDPOINT', 'TRUSTED_SIGNING_ACCOUNT', 'TRUSTED_SIGNING_PROFILE')) {
     if (-not $workflow.Contains($credential)) { throw "Trusted Signing credential gate omits $credential" }
+}
+if ($workflow.Contains('dist/*.tar.gz') -or $workflow.Contains('dist/*.zip') -or $workflow.Contains('dist/*.msi')) {
+    throw 'provenance must attest only the explicit final asset allowlist'
 }
 if ($workflow.IndexOf('name: Build Windows x64 MSI') -ge $workflow.IndexOf('name: Finalize checksums, attest, and publish')) {
     throw 'MSI finalization must run after MSI upload'
