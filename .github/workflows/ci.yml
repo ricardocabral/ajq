@@ -118,6 +118,7 @@ jobs:
         run: |
           ./scripts/winget_release_preflight_test.ps1
           ./scripts/package_manager_smoke_test.ps1
+          ./scripts/windows_msi_contract_test.ps1
 
   test:
     name: Unit tests (${{ matrix.os }})

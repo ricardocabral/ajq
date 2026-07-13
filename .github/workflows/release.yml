@@ -1,4 +1,3 @@
----
 name: Release
 
 "on":
@@ -8,6 +7,7 @@ name: Release
   pull_request:
     paths:
       - .goreleaser.yaml
+      - build/windows/ajq.wxs
       - .github/workflows/ci.yml
       - .github/workflows/release.yml
       - .github/workflows/winget.yml
@@ -19,6 +19,8 @@ name: Release
       - scripts/release_publish_preflight.sh
       - scripts/release_publish_preflight_test.sh
       - scripts/release_workflow_test.sh
+      - scripts/windows_msi_contract.ps1
+      - scripts/windows_msi_contract_test.ps1
       - scripts/package_manager_smoke.sh
       - scripts/package_manager_smoke_test.sh
       - scripts/package_manager_smoke.ps1
@@ -120,6 +122,7 @@ jobs:
           scripts/release_publish_preflight_test.sh
           scripts/release_workflow_test.sh
           scripts/package_manager_smoke_test.sh
+          pwsh ./scripts/windows_msi_contract_test.ps1
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
             .github/workflows/ci.yml .github/workflows/release.yml \
             .github/workflows/winget.yml .github/workflows/package-manager-smoke.yml
@@ -149,8 +152,8 @@ jobs:
           version: "~> v2"
           args: release --snapshot --clean
 
-  publish:
-    name: Publish GitHub release
+  create-draft:
+    name: Create draft GitHub release
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs:
@@ -158,8 +161,6 @@ jobs:
       - quality
     permissions:
       contents: write
-      id-token: write
-      attestations: write
     steps:
       - name: Check out release tag
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -178,7 +179,7 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
         run: scripts/release_publish_preflight.sh
 
-      - name: Run GoReleaser
+      - name: Run GoReleaser to draft release
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           distribution: goreleaser
@@ -189,10 +190,180 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
           HOMEBREW_CASK_UPLOAD: "1"
 
-      - name: Attest release provenance
+  release-windows-msi:
+    name: Build Windows x64 MSI
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    needs:
+      - validate-release
+      - create-draft
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.validate-release.outputs.ref }}
+
+      - name: Resolve deterministic MSI contract
+        id: contract
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
+          & ./scripts/windows_msi_contract.ps1 -Tag $env:RELEASE_TAG -OutputPath $env:GITHUB_OUTPUT
+
+      - name: Download and verify x64 release ZIP from draft
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          ZIP_ASSET: ${{ steps.contract.outputs.zip_asset }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path stage | Out-Null
+          $isDraft = (gh release view $env:RELEASE_TAG --json isDraft --jq '.isDraft').Trim()
+          if ($isDraft -ne 'true') { throw 'MSI packaging requires GoReleaser to leave the release as a draft' }
+          gh release download $env:RELEASE_TAG --pattern $env:ZIP_ASSET --dir stage
+          $zip = Join-Path stage $env:ZIP_ASSET
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw "draft release did not contain $env:ZIP_ASSET" }
+          Expand-Archive -LiteralPath $zip -DestinationPath stage/extracted -Force
+          $root = (Resolve-Path stage/extracted).Path
+          $binary = Join-Path $root 'ajq.exe'
+          $license = Join-Path $root 'LICENSE'
+          $allBinaries = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'ajq.exe')
+          if ($allBinaries.Count -ne 1 -or -not (Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'release ZIP must contain exactly one root ajq.exe' }
+          if (-not (Test-Path -LiteralPath $license -PathType Leaf)) { throw 'release ZIP must contain root LICENSE' }
+          "binary=$binary" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "license=$license" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Install pinned WiX v4
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 4.0.5
+          wix --version
+
+      - name: Build MSI only from verified release files
+        shell: pwsh
+        env:
+          MSI_VERSION: ${{ steps.contract.outputs.version }}
+          PRODUCT_CODE: ${{ steps.contract.outputs.product_code }}
+          MSI_ASSET: ${{ steps.contract.outputs.msi_asset }}
+          BINARY_SOURCE: ${{ steps.contract.outputs.binary }}
+          LICENSE_SOURCE: ${{ steps.contract.outputs.license }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          wix build build/windows/ajq.wxs -arch x64 `
+            -d "Version=$env:MSI_VERSION" `
+            -d "ProductCode=$env:PRODUCT_CODE" `
+            -d "BinarySource=$env:BINARY_SOURCE" `
+            -d "LicenseSource=$env:LICENSE_SOURCE" `
+            -o "dist/$env:MSI_ASSET"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Item "dist/$env:MSI_ASSET"
+
+      - name: Check optional Azure Trusted Signing credentials
+        id: signing
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          TRUSTED_SIGNING_ENDPOINT: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          TRUSTED_SIGNING_ACCOUNT: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          TRUSTED_SIGNING_PROFILE: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+        run: |
+          $required = @(
+            $env:AZURE_TENANT_ID, $env:AZURE_CLIENT_ID, $env:AZURE_CLIENT_SECRET,
+            $env:TRUSTED_SIGNING_ENDPOINT, $env:TRUSTED_SIGNING_ACCOUNT, $env:TRUSTED_SIGNING_PROFILE
+          )
+          $enabled = if (@($required | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -eq 0) { 'true' } else { 'false' }
+          "enabled=$enabled" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          if ($enabled -eq 'false') {
+            Write-Warning 'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.'
+          }
+
+      - name: Sign MSI with Azure Trusted Signing
+        if: steps.signing.outputs.enabled == 'true'
+        uses: azure/trusted-signing-action@v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\dist
+          files-folder-filter: msi
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Upload MSI to draft release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          MSI_ASSET: ${{ steps.contract.outputs.msi_asset }}
+        run: |
+          gh release upload $env:RELEASE_TAG "dist/$env:MSI_ASSET" --clobber
+
+  finalize-release:
+    name: Finalize checksums, attest, and publish
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs:
+      - validate-release
+      - create-draft
+      - release-windows-msi
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download all promoted draft assets
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "$RELEASE_TAG" --dir dist \
+            --pattern 'ajq_*.tar.gz' \
+            --pattern 'ajq_*.zip' \
+            --pattern 'ajq_*.msi'
+          test -n "$(find dist -maxdepth 1 -name 'ajq_*.msi' -print -quit)"
+
+      - name: Regenerate final checksums including MSI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          find . -maxdepth 1 -type f -name 'ajq_*' -printf '%f\n' | LC_ALL=C sort | xargs sha256sum > checksums.txt
+          grep -Eq ' ajq_.*_Windows_x86_64\.msi$' checksums.txt
+
+      - name: Replace draft checksum asset
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: gh release upload "$RELEASE_TAG" dist/checksums.txt --clobber
+
+      - name: Attest final release provenance
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: |
             dist/*.tar.gz
             dist/*.zip
+            dist/*.msi
             dist/checksums.txt
+
+      - name: Publish complete draft release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: gh release edit "$RELEASE_TAG" --draft=false

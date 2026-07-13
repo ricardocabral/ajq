@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WiX v4 source for ajq's per-user x64 installer. CI supplies all source
+  paths and immutable release identity values; this project never builds or
+  substitutes a binary while packaging.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="ajq"
+      Manufacturer="Ricardo Cabral"
+      Version="$(var.Version)"
+      ProductCode="$(var.ProductCode)"
+      UpgradeCode="{BA73FC93-6FEE-410C-A647-596319F7BC1F}"
+      Scope="perUser"
+      Compressed="yes">
+
+    <SummaryInformation Description="ajq semantic jq installer" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of ajq is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="ARPHELPLINK" Value="https://github.com/ricardocabral/ajq" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/ricardocabral/ajq" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="ajq" />
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="ajq" Level="1">
+      <Component Id="AjqExecutable" Directory="INSTALLFOLDER" Guid="{3B905BC6-13B9-4821-83CC-6B4DAE9A6715}" Bitness="always64">
+        <File Id="ajq.exe" Source="$(var.BinarySource)" KeyPath="yes" />
+        <Environment
+            Id="AjqUserPath"
+            Name="PATH"
+            Action="set"
+            Part="first"
+            System="no"
+            Value="[INSTALLFOLDER]" />
+      </Component>
+      <Component Id="LicenseFile" Directory="INSTALLFOLDER" Guid="{A47E4B97-8DB7-4B0E-8288-1D1DE69A4E21}" Bitness="always64">
+        <File Id="LICENSE.txt" Source="$(var.LicenseSource)" KeyPath="yes" />
+      </Component>
+    </Feature>
+  </Package>
+</Wix>
