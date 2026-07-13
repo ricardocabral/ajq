@@ -75,18 +75,21 @@ if ($existing -notmatch '(?im)no (installed )?package found matching input crite
     [void](Invoke-WinGet 'uninstall' @('uninstall', '--id', 'RicardoCabral.ajq', '--exact', '--silent'))
 }
 [void](Invoke-WinGet 'source update' @('source', 'update'))
-[void](Invoke-WinGet 'install' @('install', '--id', 'RicardoCabral.ajq', '--exact', '--version', $version, '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements', '--silent'))
-$installed = Invoke-WinGet 'list after install' $packageArguments
-if ($installed -notmatch "(?m)\b$([regex]::Escape($version))\b") { throw "installed WinGet package version mismatch: expected $version" }
-
-# WiX installs directly under the per-user Programs folder; never use an
-# arbitrary older ajq on PATH or the portable WinGet alias directory.
-$ajq = if ($env:AJQ_PACKAGE_EXECUTABLE) { $env:AJQ_PACKAGE_EXECUTABLE } else { Join-Path $env:LOCALAPPDATA 'Programs\ajq\ajq.exe' }
-if (-not (Test-Path -LiteralPath $ajq -PathType Leaf)) { throw "installed WinGet executable not found: $ajq" }
-$temp = Join-Path ([System.IO.Path]::GetTempPath()) ("ajq-package-smoke-" + [guid]::NewGuid())
-New-Item -ItemType Directory -Path $temp | Out-Null
-New-Item -ItemType File -Path (Join-Path $temp 'ajq.toml') | Out-Null
+$installedBySmoke = $false
+$temp = $null
 try {
+    [void](Invoke-WinGet 'install' @('install', '--id', 'RicardoCabral.ajq', '--exact', '--version', $version, '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements', '--silent'))
+    $installedBySmoke = $true
+    $installed = Invoke-WinGet 'list after install' $packageArguments
+    if ($installed -notmatch "(?m)\b$([regex]::Escape($version))\b") { throw "installed WinGet package version mismatch: expected $version" }
+
+    # WiX installs directly under the per-user Programs folder; never use an
+    # arbitrary older ajq on PATH or the portable WinGet alias directory.
+    $ajq = if ($env:AJQ_PACKAGE_EXECUTABLE) { $env:AJQ_PACKAGE_EXECUTABLE } else { Join-Path $env:LOCALAPPDATA 'Programs\ajq\ajq.exe' }
+    if (-not (Test-Path -LiteralPath $ajq -PathType Leaf)) { throw "installed WinGet executable not found: $ajq" }
+    $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("ajq-package-smoke-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $temp | Out-Null
+    New-Item -ItemType File -Path (Join-Path $temp 'ajq.toml') | Out-Null
     $env:HOME = Join-Path $temp 'home'
     $env:XDG_CONFIG_HOME = Join-Path $temp 'config'
     $env:AJQ_CONFIG = Join-Path $temp 'ajq.toml'
@@ -102,7 +105,7 @@ try {
     $mockEvidence = Assert-ExactBytes $mockFile "1`n" 'mock query'
     Write-Output "WinGet mock stdout base64: $mockEvidence"
 } finally {
-    Remove-Item -Recurse -Force -ErrorAction Ignore -LiteralPath $temp
-    [void](Invoke-WinGet 'uninstall after smoke' @('uninstall', '--id', 'RicardoCabral.ajq', '--exact', '--silent'))
+    if ($temp) { Remove-Item -Recurse -Force -ErrorAction Ignore -LiteralPath $temp }
+    if ($installedBySmoke) { [void](Invoke-WinGet 'uninstall after smoke' @('uninstall', '--id', 'RicardoCabral.ajq', '--exact', '--silent')) }
 }
 Write-Output "WinGet package smoke passed for $Tag"

@@ -34,7 +34,7 @@ $bytes = if ($Args[0] -eq '--version') {
         $env:WINGET_LOG = Join-Path $temp 'winget.log'
         Remove-Item -LiteralPath $env:WINGET_LOG -Force -ErrorAction Ignore
         $env:WINGET_BIN = if ($mode -eq 'missing') { Join-Path $temp 'missing-winget.exe' } else { $winget }
-        $env:AJQ_PACKAGE_EXECUTABLE = $ajq
+        $env:AJQ_PACKAGE_EXECUTABLE = if ($mode -eq 'missing-executable') { Join-Path $temp 'missing-ajq.exe' } else { $ajq }
         $env:WINGET_VERSION = if ($mode -eq 'version') { '9.9.9' } else { '1.2.3' }
         $env:WINGET_FAIL_OPERATION = if ($mode -like 'fail-*') { $mode.Substring(5) } else { '' }
         $env:WINGET_ABSENT = if ($mode -eq 'absent') { '1' } else { '' }
@@ -66,13 +66,17 @@ $bytes = if ($Args[0] -eq '--version') {
     }
     $result = Invoke-Smoke 'absent'
     if ($result.Success -or $result.Output -notmatch 'installed WinGet package version mismatch') { throw "absent package was not distinguished from an uninstall failure: $($result.Output)" }
-    if (Select-String -LiteralPath $env:WINGET_LOG -SimpleMatch 'uninstall ' -Quiet) { throw 'absent package unexpectedly ran uninstall' }
+    if (-not (Select-String -LiteralPath $env:WINGET_LOG -SimpleMatch 'uninstall --id RicardoCabral.ajq --exact --silent' -Quiet)) { throw 'post-install absent-package assertion did not clean up the package' }
     foreach ($operation in @('uninstall', 'source', 'install', 'list')) {
         $result = Invoke-Smoke "fail-$operation"
         if ($result.Success -or $result.Output -notmatch "WinGet .*${operation}.*failed \(exit 9\)") { throw "$operation failure was not rejected: $($result.Output)" }
     }
     $result = Invoke-Smoke 'version'
     if ($result.Success -or $result.Output -notmatch 'installed WinGet package version mismatch') { throw "version mismatch was not rejected: $($result.Output)" }
+    if (-not (Select-String -LiteralPath $env:WINGET_LOG -SimpleMatch 'uninstall --id RicardoCabral.ajq --exact --silent' -Quiet)) { throw 'post-install version mismatch did not clean up the package' }
+    $result = Invoke-Smoke 'missing-executable'
+    if ($result.Success -or $result.Output -notmatch 'installed WinGet executable not found') { throw "missing executable was not rejected: $($result.Output)" }
+    if (-not (Select-String -LiteralPath $env:WINGET_LOG -SimpleMatch 'uninstall --id RicardoCabral.ajq --exact --silent' -Quiet)) { throw 'missing installed executable did not clean up the package' }
     $result = Invoke-Smoke 'version-output'
     if ($result.Success -or $result.Output -notmatch 'ajq version mismatch') { throw "executable version suffix was not rejected: $($result.Output)" }
     foreach ($mode in @('query', 'query-crlf', 'query-extra-byte')) {
