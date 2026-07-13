@@ -546,10 +546,6 @@ func (rt *semanticRuntime) frameForCollected(index int) int64 {
 	return 0
 }
 
-func (rt *semanticRuntime) resolveError(index int, err error) error {
-	return &semanticResolveError{frame: rt.frameForCollected(index), err: err}
-}
-
 func (rt *semanticRuntime) judgementFromCall(opName string, input any, args []any) (backend.Judgement, error) {
 	judgement, err := judgementFromCall(opName, input, args)
 	if err != nil {

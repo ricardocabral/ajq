@@ -161,7 +161,7 @@ func TestJSONFramerReleasesOversizedDecoderBuffer(t *testing.T) {
 	reader, writer := io.Pipe()
 	writeDone := make(chan error, 1)
 	go func() {
-		defer writer.Close()
+		defer func() { _ = writer.Close() }()
 		if _, err := io.WriteString(writer, `{"value":"`); err != nil {
 			writeDone <- err
 			return
