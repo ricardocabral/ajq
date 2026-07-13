@@ -57,11 +57,26 @@ if (-not $wingetPath) {
 }
 if (-not (Test-Path -LiteralPath $wingetPath -PathType Leaf)) { throw 'required tool not found: winget' }
 
-# Ignore uninstall failure when the package is absent, then refresh the source.
-& $wingetPath uninstall --id Ricardocabral.ajq --exact --silent 2>$null
-& $wingetPath source update
-& $wingetPath install --id Ricardocabral.ajq --exact --version $version --source winget --accept-package-agreements --accept-source-agreements --silent
-$installed = (& $wingetPath list --id Ricardocabral.ajq --exact | Out-String)
+function Invoke-WinGet([string]$Operation, [string[]]$Arguments) {
+    $output = (& $wingetPath @Arguments 2>&1 | Out-String)
+    # A real winget executable always sets LASTEXITCODE. Treat its absence as a
+    # successful PowerShell-script test double, rather than relying on Stop.
+    $exitCode = Get-Variable -Name LASTEXITCODE -Scope Global -ValueOnly -ErrorAction SilentlyContinue
+    if ($null -eq $exitCode) { $exitCode = 0 }
+    if ($exitCode -ne 0) {
+        throw "WinGet $Operation failed (exit $exitCode): $output"
+    }
+    return $output
+}
+
+$packageArguments = @('list', '--id', 'Ricardocabral.ajq', '--exact')
+$existing = Invoke-WinGet 'list before cleanup' $packageArguments
+if ($existing -notmatch '(?im)no (installed )?package found matching input criteria') {
+    [void](Invoke-WinGet 'uninstall' @('uninstall', '--id', 'Ricardocabral.ajq', '--exact', '--silent'))
+}
+[void](Invoke-WinGet 'source update' @('source', 'update'))
+[void](Invoke-WinGet 'install' @('install', '--id', 'Ricardocabral.ajq', '--exact', '--version', $version, '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements', '--silent'))
+$installed = Invoke-WinGet 'list after install' $packageArguments
 if ($installed -notmatch "(?m)\b$([regex]::Escape($version))\b") { throw "installed WinGet package version mismatch: expected $version" }
 
 # Portable WinGet aliases live here; never use an arbitrary older ajq on PATH.
