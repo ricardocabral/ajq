@@ -27,6 +27,10 @@ type Frame struct {
 	Index  int64
 	Value  any
 	Offset int64
+	// Bytes is the exact source span consumed for this frame. JSON frames span
+	// decoder offsets (including leading/inter-value whitespace); raw frames
+	// include their original line terminators; null input is zero bytes.
+	Bytes int64
 }
 
 // Framer streams input frames.
@@ -59,7 +63,7 @@ func (f *nullFramer) Next() (Frame, error) {
 		return Frame{}, io.EOF
 	}
 	f.done = true
-	return Frame{Index: 0, Value: nil, Offset: 0}, nil
+	return Frame{Index: 0, Value: nil, Offset: 0, Bytes: 0}, nil
 }
 
 type jsonFramer struct {
@@ -83,7 +87,7 @@ func (f *jsonFramer) Next() (Frame, error) {
 		return Frame{}, parseError("json", f.index, f.dec.InputOffset(), err)
 	}
 
-	frame := Frame{Index: f.index, Value: value, Offset: start}
+	frame := Frame{Index: f.index, Value: value, Offset: start, Bytes: f.dec.InputOffset() - start}
 	f.index++
 	return frame, nil
 }
@@ -111,7 +115,8 @@ func (f *rawFramer) Next() (Frame, error) {
 	f.offset += int64(len(line))
 	line = bytes.TrimSuffix(line, []byte("\n"))
 	line = bytes.TrimSuffix(line, []byte("\r"))
-	frame := Frame{Index: f.index, Value: string(line), Offset: start}
+	// Bytes includes the original terminator(s), which were removed from Value.
+	frame := Frame{Index: f.index, Value: string(line), Offset: start, Bytes: f.offset - start}
 	f.index++
 	return frame, nil
 }

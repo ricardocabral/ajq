@@ -18,6 +18,10 @@ import (
 	"github.com/ricardocabral/ajq/internal/plan"
 )
 
+// DefaultWindowBytes is the byte budget used for supported three-phase
+// semantic execution when Options.WindowBytes is left at its zero value.
+const DefaultWindowBytes int64 = 256 * 1024
+
 // Options controls one pure-jq execution.
 type Options struct {
 	Query               string
@@ -29,6 +33,23 @@ type Options struct {
 	SemanticCache       *semanticcache.Store
 	MaxCalls            int
 	MaxCallsDefaultPaid bool
+	// WindowBytes bounds complete-frame windows for supported three-phase
+	// semantic execution. Zero selects DefaultWindowBytes; negative values are
+	// rejected. Pure-jq and interleaved execution do not use this setting.
+	WindowBytes int64
+}
+
+// ErrInvalidWindowBytes reports a negative direct engine window budget.
+var ErrInvalidWindowBytes = errors.New("window byte budget must not be negative")
+
+func normalizedWindowBytes(windowBytes int64) (int64, error) {
+	if windowBytes < 0 {
+		return 0, fmt.Errorf("%w: %d", ErrInvalidWindowBytes, windowBytes)
+	}
+	if windowBytes == 0 {
+		return DefaultWindowBytes, nil
+	}
+	return windowBytes, nil
 }
 
 // RunStats summarizes per-run accounting. InputFrames counts frames read from
@@ -149,6 +170,10 @@ func executeInterleaved(ctx context.Context, stdin io.Reader, stdout io.Writer, 
 
 func executeThreePhase(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Options, callSites int) (Result, error) {
 	stats := RunStats{SemanticCallSites: callSites}
+	windowBytes, err := normalizedWindowBytes(opts.WindowBytes)
+	if err != nil {
+		return Result{RunStats: stats}, err
+	}
 	program, err := compileThreePhaseWithStats(opts.Query, opts.Backend, opts.SemanticModelID, opts.SemanticCache, &stats)
 	if program != nil {
 		program.runtime.maxCalls = opts.MaxCalls
@@ -158,46 +183,88 @@ func executeThreePhase(ctx context.Context, stdin io.Reader, stdout io.Writer, o
 		return Result{RunStats: stats}, err
 	}
 
-	framer := input.NewFramer(stdin, opts.InputMode)
+	windows, err := input.NewWindowIterator(input.NewFramer(stdin, opts.InputMode), windowBytes)
+	if err != nil {
+		return Result{RunStats: stats}, err
+	}
 	result := Result{RunStats: stats}
 	for {
-		if err := ctxErr(ctx); err != nil {
-			return result, err
+		program.beginWindow()
+		window, err := windows.NextWith(ctx, func(frame input.Frame) error {
+			return program.harvestAppend(frame.Value, frame.Index)
+		})
+		var harvestErr *input.WindowFrameError
+		if errors.As(err, &harvestErr) {
+			// The iterator stops at the failing frame. Its returned window is the
+			// already-harvested prefix, which must retain the historical output
+			// behavior before that frame's error is reported.
+			stats.InputFrames += int64(len(window.Frames) + 1)
+			prefixErr := resolveAndExecuteWindow(ctx, stdout, opts, program, &result, window.Frames)
+			window.Release()
+			program.releaseWindow()
+			result.RunStats = stats
+			if prefixErr != nil {
+				return result, prefixErr
+			}
+			return result, &RuntimeError{Frame: harvestErr.Frame.Index + 1, Err: harvestErr.Err}
 		}
-
-		frame, err := framer.Next()
 		if errors.Is(err, io.EOF) {
 			return result, nil
 		}
 		if err != nil {
+			program.releaseWindow()
+			if ctxErr(ctx) != nil {
+				return result, err
+			}
 			return result, fmt.Errorf("input error: %w", err)
 		}
-		stats.InputFrames++
-		result.RunStats = stats
 
-		if err := program.harvest(frame.Value); err != nil {
-			result.RunStats = stats
-			return result, &RuntimeError{Frame: frame.Index + 1, Err: err}
-		}
+		stats.InputFrames += int64(len(window.Frames))
 		result.RunStats = stats
-		if err := program.resolve(ctx); err != nil {
-			result.RunStats = stats
-			return result, &RuntimeError{Frame: frame.Index + 1, Err: err}
-		}
+		err = resolveAndExecuteWindow(ctx, stdout, opts, program, &result, window.Frames)
+		window.Release()
+		program.releaseWindow()
 		result.RunStats = stats
+		if err != nil {
+			return result, err
+		}
+	}
+}
+
+func resolveAndExecuteWindow(ctx context.Context, stdout io.Writer, opts Options, program *threePhaseProgram, result *Result, frames []input.Frame) error {
+	if err := program.resolve(ctx); err != nil {
+		return &RuntimeError{Frame: resolveErrorFrame(err, frames), Err: err}
+	}
+	for i := range frames {
+		frame := &frames[i]
 		runResult, err := program.execute(frame.Value, func(value any) error {
 			result.Emitted = true
 			result.Last = value
 			return output.WriteValue(stdout, value, opts.Output)
 		})
 		if err != nil {
-			return result, &RuntimeError{Frame: frame.Index + 1, Err: err}
+			return &RuntimeError{Frame: frame.Index + 1, Err: err}
 		}
 		if runResult.Emitted {
 			result.Emitted = true
 			result.Last = runResult.Last
 		}
+		// A window may contain a large frame; drop its value as soon as ordered
+		// execution is done rather than retaining it until the next window.
+		frame.Value = nil
 	}
+	return nil
+}
+
+func resolveErrorFrame(err error, frames []input.Frame) int64 {
+	var resolveErr *semanticResolveError
+	if errors.As(err, &resolveErr) {
+		return resolveErr.frame + 1
+	}
+	if len(frames) != 0 {
+		return frames[0].Index + 1
+	}
+	return 1
 }
 
 func executeProgram(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Options, program *jq.Program, stats *RunStats) (Result, error) {
