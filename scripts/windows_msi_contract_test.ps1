@@ -86,17 +86,16 @@ foreach ($needle in @(
 }
 
 foreach ($needle in @(
-    'Set-MsiSummaryProperty $summary 9 $PackageCode',
-    'Set-MsiSummaryProperty $summary 12 $reproducibleTime',
-    'Set-MsiSummaryProperty $summary 13 $reproducibleTime',
-    'Get-MsiSummaryProperty $summary 9',
-    '[System.Reflection.BindingFlags]::SetProperty',
+    'MsiSummaryInfoSetProperty',
+    'MsiSummaryInfoPersist',
+    'MsiSummaryInfoGetProperty',
+    'VT_LPSTR = 30',
+    'VT_FILETIME = 64',
+    '[Ajq.MsiSummaryInfo]::Normalize($resolvedPath, $PackageCode, $reproducibleTime)',
+    '[Ajq.MsiSummaryInfo]::PackageCode($resolvedPath)',
     "[datetime]'2000-01-01T00:00:00'"
 )) {
     if (-not $msiFinalizer.Contains($needle)) { throw "MSI finalizer is missing reproducibility control: $needle" }
-}
-if ($msiFinalizer.IndexOf('$database.Commit()') -gt $msiFinalizer.IndexOf('Set-MsiSummaryProperty $summary 9 $PackageCode')) {
-    throw 'MSI package-code normalization must happen after the WiX database commit'
 }
 
 foreach ($needle in @(
