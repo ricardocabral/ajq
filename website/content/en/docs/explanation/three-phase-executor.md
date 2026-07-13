@@ -40,8 +40,29 @@ the configured budget therefore does not cap the memory needed for an individual
 A larger window can eliminate more nearby duplicate judgements and reduce backend batches,
 but it waits to harvest and resolve all frames in that window before emitting its first
 result. Choose a smaller positive budget when first-record latency is more important than
-cross-frame deduplication. Pure-jq and interleaved-required queries retain their existing
-streaming execution and do not use semantic windows.
+cross-frame deduplication.
+
+## User-selected inline execution
+
+`--stream` gives supported semantic plans an explicit low-latency alternative to windows.
+It resolves an uncached judgement inline as each frame reaches the semantic operation, so a
+first result can emit before a later frame arrives. This preserves input order, the
+backend/model/spec/value cache identity, persistent cache reads and writes, schema
+validation, cancellation, output and exit behavior, and the run-global `--max-calls` cap.
+The cap still aborts before backend call N+1; frames successfully completed before that
+boundary may already have been written.
+
+The price is no window-wide harvest, backend batch, or cross-frame pre-resolve
+deduplication. Inline runs may require more backend round trips and, with caching disabled,
+may resolve matching judgements in separate frames more than once. Cache hits still avoid
+backend calls. Default windows remain the better choice for throughput and batching;
+choose `--stream` when latency is more valuable. `--stats` distinguishes
+`three-phase-windowed` from `user-stream`, and `--explain --stream` explicitly reports
+that harvest/dedup estimates are unavailable without reading stdin.
+
+Pure-jq ignores `--stream` and remains deterministic. Queries that already require
+interleaving retain their planner-selected inline behavior, so the flag does not override
+that selection. Neither inline path uses semantic windows.
 
 ## Why two deterministic passes
 

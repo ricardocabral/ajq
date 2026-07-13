@@ -9,8 +9,9 @@ description: >
 ajq has shipped its deterministic jq spine, semantic planning and supported semantic
 execution, local inference, bounded-parallel local daemon transport, Phase 3
 backend/cloud controls, first-run local asset provisioning, local model management, the
-persistent judgement cache, byte-budgeted semantic windows, and checksummed release
-archives with a no-sudo install script. Richer streaming capabilities remain planned.
+persistent judgement cache, byte-budgeted semantic windows, an explicit low-latency
+semantic stream mode, and checksummed release archives with a no-sudo install script.
+Further streaming optimizations remain planned.
 
 ## What ajq does today
 
@@ -29,11 +30,13 @@ archives with a no-sudo install script. Richer streaming capabilities remain pla
   supported as a `group_by(...)` key, and gated unbounded value use can run through
   interleaved fallback. Standalone `sem_extract` and `sem_redact` are registered but
   currently fail as unsupported in three-phase execution.
-- **Three-phase executor** — harvest / resolve / execute with deduplication and cache
-  identity based on op, spec, model, and canonical value. Supported semantic NDJSON and
-  raw streams use complete-frame byte-budgeted windows (256 KiB by default), preserving
-  source order without retaining the complete stream; pure-jq and interleaved paths stay
-  streaming.
+- **Three-phase executor and stream selection** — harvest / resolve / execute with
+  deduplication and cache identity based on op, spec, model, and canonical value. Supported
+  semantic NDJSON and raw streams default to complete-frame byte-budgeted windows (256 KiB
+  by default), preserving source order without retaining the complete stream. `--stream`
+  selects low-latency inline execution instead when first-frame latency outweighs window
+  batching and cross-frame pre-resolve deduplication; identity and `--max-calls` semantics
+  remain unchanged. Pure-jq and planner-required inline paths stay streaming.
 - **Local inference** — a lazy `llama-server` daemon with idle timeout and
   `ajq daemon status|stop`; local requests use bounded parallelism while preserving result
   ordering.
@@ -63,7 +66,7 @@ polish.
 | **1 — Split-execution core** | Planner, desugar, semantic predicates, bounded classification, guarded executor. | ✅ Shipped with explicit unbounded value-op limits |
 | **2 — Local inference** | `llama-server` backend, daemon lifecycle, GBNF/schema constraints, provisioning. | ✅ Shipped |
 | **3 — Backends & cloud** | Ollama, OpenAI/OpenRouter, Anthropic, config/env selection, cost controls. | ✅ Shipped |
-| **4 — Scale & chunking** | Byte-budgeted complete-frame windows for supported three-phase semantic streams, persistent cache, and bounded local parallelism are shipped. Richer streaming remains planned. | 🟡 Partial |
+| **4 — Scale & chunking** | Byte-budgeted complete-frame windows and explicit `--stream` low-latency inline execution for supported semantic streams, persistent cache, and bounded local parallelism are shipped. Further streaming optimizations remain planned. | 🟡 Partial |
 | **5 — Polish & distribution** | Models subcommand, release archives/install script, and Homebrew tap publishing are shipped; standalone build, GPU auto-detect, richer vocabulary, and additional package managers remain planned. | 🟡 Partial |
 
 ## Follow along

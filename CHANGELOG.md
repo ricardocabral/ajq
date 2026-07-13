@@ -20,6 +20,10 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added `--stream` for supported semantic NDJSON/raw pipelines that need low-latency,
+  inline frame output instead of default window batching. The mode preserves cache identity
+  and `--max-calls` semantics; `--explain` and `--stats` now identify its inline batching
+  and cross-frame deduplication trade-off.
 - Added byte-budgeted semantic NDJSON windows with `--window-bytes`,
   `AJQ_WINDOW_BYTES`, and TOML `window_bytes` configuration, plus window-mode
   statistics for configured budgets, formed windows, and oversized records.

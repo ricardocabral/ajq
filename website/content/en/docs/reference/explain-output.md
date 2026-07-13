@@ -76,7 +76,7 @@ semantic_plan:
 | `deterministic` | `no`. |
 | `model_calls` / `backend_calls` | `input-dependent`. |
 | `byte_reproducible` | `cache-dependent` — deterministic phases are byte-reproducible; semantic answers depend on backend/cache state. |
-| `stdin` | `harvested for estimates` when valid stdin is used for an estimate. |
+| `stdin` | `harvested for estimates` when valid stdin is used for an estimate. With `--stream` on a supported plan, `not harvested`: inline execution has no cross-frame harvest estimate and explain leaves stdin untouched. |
 | `planned_call_sites` | Total semantic call sites found in the static plan. |
 | `semantic_predicates` / `semantic_values` | Counts of predicate-kind and value-kind ops. |
 
@@ -105,7 +105,7 @@ Present when valid stdin was supplied and the mock harvest path can estimate the
 | `specs` | Ordered literal spec arguments. |
 | `source_range` | Byte offsets into the desugared query for the call site, or `unavailable`. |
 | `gated` | For value ops: whether the result flows into a pruning gate; `n/a` for predicates. |
-| `execution` | Planner-selected execution mode such as `3-phase` or `interleaved`. |
+| `execution` | Execution mode: `3-phase`, planner-required `interleaved`, or `user-stream-inline` when `--stream` selects inline execution for a supported plan. |
 | `subgraph` | `semantic`. |
 
 ## When estimates are unavailable
@@ -113,6 +113,12 @@ Present when valid stdin was supplied and the mock harvest path can estimate the
 If stdin is empty or invalid, or the query uses a semantic execution shape the current
 executor cannot safely estimate/execute, the static plan is still printed and
 `estimate_status` is marked unavailable with a reason.
+
+`--explain --stream` is intentionally unavailable without reading stdin. Its report names
+`semantic user-stream inline`, says `stdin: not harvested`, and includes
+`execution_selection: user-selected --stream interleaving`, inline per-uncached-judgement
+batching, and disabled cross-frame pre-resolve deduplication. This is a mode choice, not a
+change to backend/model/cache identity or the run-global call cap.
 
 The important distinction is execution mode. `sem_score` in `sort_by(...)` and `sem_norm`
 in `group_by(...)` can use the three-phase placeholder path. Gated unbounded value shapes,

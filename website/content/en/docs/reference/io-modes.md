@@ -18,13 +18,18 @@ ajq selects an input framing based on flags and the shape of stdin.
 
 In the default mode, a stream of multiple top-level JSON values (whitespace- or
 newline-separated, i.e. NDJSON/JSON Lines) is framed independently, with no whole-stream
-buffering. Pure-jq and interleaved semantic queries execute and emit one frame at a time.
-Supported three-phase semantic queries instead group complete frames into configured
-byte-budgeted windows, resolve each window once, then emit its frames in original order.
-The window retains only its frames plus bounded framing lookahead; a record larger than
-the budget forms one oversized window and is never split. This still allows inputs larger
-than available memory. See [Process NDJSON](../../how-to/process-ndjson/) for tuning and
-latency trade-offs.
+buffering. Pure-jq and planner-required interleaved semantic queries execute and emit one
+frame at a time. Supported three-phase semantic queries instead group complete frames into
+configured byte-budgeted windows, resolve each window once, then emit their frames in
+original order. The window retains only its frames plus bounded framing lookahead; a record
+larger than the budget forms one oversized window and is never split. This still allows
+inputs larger than available memory.
+
+For a supported semantic query, `--stream` selects that same per-frame inline behavior
+instead of default windows so a result need not wait for a later frame. It trades
+window-wide batching and cross-frame pre-resolve deduplication for low latency, without
+changing cache identity or the run-global `--max-calls` cap. See
+[Process NDJSON](../../how-to/process-ndjson/) for selection guidance and examples.
 
 ## Output formatting
 
