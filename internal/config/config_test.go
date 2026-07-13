@@ -41,14 +41,14 @@ func TestLoadAJQConfigOverrideReadsExplicitPath(t *testing.T) {
 			if path != "/tmp/custom-ajq.toml" {
 				t.Fatalf("ReadFile path = %q", path)
 			}
-			return []byte("backend = \"mock\"\nmodel = \"m-file\"\nbase_url = \"http://file\"\nmax_calls = 7\nwindow_bytes = 8192\nno_cache = true\n"), nil
+			return []byte("backend = \"mock\"\nmodel = \"m-file\"\nbase_url = \"http://file\"\nmax_calls = 7\nbackend_concurrency = 2\nwindow_bytes = 8192\nno_cache = true\n"), nil
 		},
 		Stderr: &stderr,
 	})
 	if err != nil {
 		t.Fatalf("LoadWithOptions returned error: %v", err)
 	}
-	if !values.BackendSet || values.Backend != "mock" || !values.ModelSet || values.Model != "m-file" || !values.BaseURLSet || values.BaseURL != "http://file" || !values.MaxCallsSet || values.MaxCalls != 7 || !values.WindowBytesSet || values.WindowBytes != 8192 || !values.NoCacheSet || !values.NoCache {
+	if !values.BackendSet || values.Backend != "mock" || !values.ModelSet || values.Model != "m-file" || !values.BaseURLSet || values.BaseURL != "http://file" || !values.MaxCallsSet || values.MaxCalls != 7 || !values.BackendConcurrencySet || values.BackendConcurrency != 2 || !values.WindowBytesSet || values.WindowBytes != 8192 || !values.NoCacheSet || !values.NoCache {
 		t.Fatalf("values not fully decoded: %+v", values)
 	}
 	if stderr.String() != "" {
@@ -101,25 +101,25 @@ func TestLoadReadAndParseErrorsSurface(t *testing.T) {
 }
 
 func TestResolvePrecedenceForEveryField(t *testing.T) {
-	defaults := Values{Backend: "default-backend", BackendSet: true, Model: "default-model", ModelSet: true, BaseURL: "http://default", BaseURLSet: true, MaxCalls: 1, MaxCallsSet: true, WindowBytes: 1024, WindowBytesSet: true, NoCache: true, NoCacheSet: true}
-	file := Values{Backend: "file-backend", BackendSet: true, Model: "file-model", ModelSet: true, BaseURL: "http://file", BaseURLSet: true, MaxCalls: 2, MaxCallsSet: true, WindowBytes: 2048, WindowBytesSet: true, NoCache: false, NoCacheSet: true}
-	env := Values{Backend: "env-backend", BackendSet: true, Model: "env-model", ModelSet: true, BaseURL: "http://env", BaseURLSet: true, MaxCalls: 3, MaxCallsSet: true, WindowBytes: 4096, WindowBytesSet: true}
-	flags := Values{Backend: "flag-backend", BackendSet: true, Model: "flag-model", ModelSet: true, BaseURL: "http://flag", BaseURLSet: true, MaxCalls: 0, MaxCallsSet: true, WindowBytes: 8192, WindowBytesSet: true, NoCache: false, NoCacheSet: true}
+	defaults := Values{Backend: "default-backend", BackendSet: true, Model: "default-model", ModelSet: true, BaseURL: "http://default", BaseURLSet: true, MaxCalls: 1, MaxCallsSet: true, BackendConcurrency: 1, BackendConcurrencySet: true, WindowBytes: 1024, WindowBytesSet: true, NoCache: true, NoCacheSet: true}
+	file := Values{Backend: "file-backend", BackendSet: true, Model: "file-model", ModelSet: true, BaseURL: "http://file", BaseURLSet: true, MaxCalls: 2, MaxCallsSet: true, BackendConcurrency: 2, BackendConcurrencySet: true, WindowBytes: 2048, WindowBytesSet: true, NoCache: false, NoCacheSet: true}
+	env := Values{Backend: "env-backend", BackendSet: true, Model: "env-model", ModelSet: true, BaseURL: "http://env", BaseURLSet: true, MaxCalls: 3, MaxCallsSet: true, BackendConcurrency: 3, BackendConcurrencySet: true, WindowBytes: 4096, WindowBytesSet: true}
+	flags := Values{Backend: "flag-backend", BackendSet: true, Model: "flag-model", ModelSet: true, BaseURL: "http://flag", BaseURLSet: true, MaxCalls: 0, MaxCallsSet: true, BackendConcurrency: 4, BackendConcurrencySet: true, WindowBytes: 8192, WindowBytesSet: true, NoCache: false, NoCacheSet: true}
 
 	got := Resolve(flags, env, file, defaults)
-	want := Settings{Backend: "flag-backend", Model: "flag-model", BaseURL: "http://flag", BaseURLExplicit: true, MaxCalls: 0, WindowBytes: 8192, NoCache: false}
+	want := Settings{Backend: "flag-backend", Model: "flag-model", BaseURL: "http://flag", BaseURLExplicit: true, MaxCalls: 0, BackendConcurrency: 4, WindowBytes: 8192, NoCache: false}
 	if got != want {
 		t.Fatalf("Resolve() = %+v, want %+v", got, want)
 	}
 
 	got = Resolve(Values{}, env, file, defaults)
-	want = Settings{Backend: "env-backend", Model: "env-model", BaseURL: "http://env", BaseURLExplicit: true, MaxCalls: 3, WindowBytes: 4096, NoCache: false}
+	want = Settings{Backend: "env-backend", Model: "env-model", BaseURL: "http://env", BaseURLExplicit: true, MaxCalls: 3, BackendConcurrency: 3, WindowBytes: 4096, NoCache: false}
 	if got != want {
 		t.Fatalf("Resolve(no flags) = %+v, want %+v", got, want)
 	}
 
 	got = Resolve(Values{}, Values{}, Values{}, defaults)
-	want = Settings{Backend: "default-backend", Model: "default-model", BaseURL: "http://default", BaseURLExplicit: false, MaxCalls: 1, WindowBytes: 1024, NoCache: true}
+	want = Settings{Backend: "default-backend", Model: "default-model", BaseURL: "http://default", BaseURLExplicit: false, MaxCalls: 1, BackendConcurrency: 1, WindowBytes: 1024, NoCache: true}
 	if got != want {
 		t.Fatalf("Resolve(no flags) = %+v, want %+v", got, want)
 	}
@@ -136,6 +136,8 @@ func TestEnvReadsOnlyAJQSettings(t *testing.T) {
 			return "http://env"
 		case "AJQ_MAX_CALLS":
 			return "7"
+		case "AJQ_BACKEND_CONCURRENCY":
+			return "2"
 		case "AJQ_WINDOW_BYTES":
 			return "8192"
 		case "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY":
@@ -146,7 +148,7 @@ func TestEnvReadsOnlyAJQSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Env returned error: %v", err)
 	}
-	if values.Backend != "mock" || values.Model != "env-model" || values.BaseURL != "http://env" || values.MaxCalls != 7 || !values.MaxCallsSet || values.WindowBytes != 8192 || !values.WindowBytesSet {
+	if values.Backend != "mock" || values.Model != "env-model" || values.BaseURL != "http://env" || values.MaxCalls != 7 || !values.MaxCallsSet || values.BackendConcurrency != 2 || !values.BackendConcurrencySet || values.WindowBytes != 8192 || !values.WindowBytesSet {
 		t.Fatalf("Env() = %+v", values)
 	}
 }
@@ -214,6 +216,30 @@ func TestCredentialKeyRejectionBeforeUnknownWarnings(t *testing.T) {
 			}
 			if stderr.String() != "" {
 				t.Fatalf("credential rejection should happen before unknown warnings, got %q", stderr.String())
+			}
+		})
+	}
+}
+
+func TestBackendConcurrencyValidation(t *testing.T) {
+	for _, value := range []string{"0", "-1", "not-int"} {
+		t.Run("environment "+value, func(t *testing.T) {
+			_, err := Env(func(key string) string {
+				if key == "AJQ_BACKEND_CONCURRENCY" {
+					return value
+				}
+				return ""
+			})
+			if err == nil || !strings.Contains(err.Error(), "AJQ_BACKEND_CONCURRENCY") {
+				t.Fatalf("Env(AJQ_BACKEND_CONCURRENCY=%q) error = %v", value, err)
+			}
+		})
+	}
+	for _, value := range []string{"0", "-1"} {
+		t.Run("TOML "+value, func(t *testing.T) {
+			_, err := parse([]byte("backend_concurrency = "+value+"\n"), nil)
+			if err == nil || !strings.Contains(err.Error(), "config backend_concurrency must be positive") {
+				t.Fatalf("parse(%q) error = %v", value, err)
 			}
 		})
 	}

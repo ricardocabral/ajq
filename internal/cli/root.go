@@ -87,6 +87,7 @@ func NewRootCommand(opts Options) *cobra.Command {
 	var modelID string
 	var baseURL string
 	var maxCalls int
+	var backendConcurrency int
 	var windowBytes int64
 	var stream bool
 	var cloud bool
@@ -123,7 +124,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 				return fmt.Errorf("query %q is empty", query)
 			}
 
-			flagValues, err := backendFlagValues(cmd, backendName, modelID, baseURL, maxCalls, windowBytes, cloud, noCache)
+			flagValues, err := backendFlagValues(cmd, backendName, modelID, baseURL, maxCalls, backendConcurrency, windowBytes, cloud, noCache)
 			if err != nil {
 				return &ExitError{Code: 2, Err: err}
 			}
@@ -245,6 +246,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 	cmd.Flags().StringVar(&modelID, "model", "", "semantic model id or alias for the selected backend")
 	cmd.Flags().StringVar(&baseURL, "base-url", "", "base URL for HTTP semantic backends")
 	cmd.Flags().IntVar(&maxCalls, "max-calls", 0, "maximum post-dedup backend judgements before aborting (0 = unlimited; paid backends default to 100, local/ollama/mock default to unlimited)")
+	cmd.Flags().IntVar(&backendConcurrency, "backend-concurrency", 0, "maximum in-flight semantic requests per batch (default 1; maximum 2 for OpenAI-compatible/Anthropic and 4 for Ollama)")
 	cmd.Flags().Int64Var(&windowBytes, "window-bytes", 0, "maximum source bytes per supported three-phase semantic window (default 262144)")
 	cmd.Flags().BoolVar(&stream, "stream", false, "run supported semantic queries inline for low-latency frame output instead of window batching")
 	cmd.Flags().BoolVar(&cloud, "cloud", false, "select the Anthropic cloud semantic backend (equivalent to --backend anthropic)")
@@ -260,7 +262,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 	return cmd
 }
 
-func backendFlagValues(cmd *cobra.Command, backendName, modelID, baseURL string, maxCalls int, windowBytes int64, cloud, noCache bool) (config.Values, error) {
+func backendFlagValues(cmd *cobra.Command, backendName, modelID, baseURL string, maxCalls, backendConcurrency int, windowBytes int64, cloud, noCache bool) (config.Values, error) {
 	var values config.Values
 	flags := cmd.Flags()
 	backendChanged := flags.Changed("backend")
@@ -282,6 +284,13 @@ func backendFlagValues(cmd *cobra.Command, backendName, modelID, baseURL string,
 		}
 		values.MaxCalls = maxCalls
 		values.MaxCallsSet = true
+	}
+	if flags.Changed("backend-concurrency") {
+		if backendConcurrency <= 0 {
+			return config.Values{}, fmt.Errorf("--backend-concurrency must be positive")
+		}
+		values.BackendConcurrency = backendConcurrency
+		values.BackendConcurrencySet = true
 	}
 	if flags.Changed("window-bytes") {
 		if windowBytes <= 0 {
@@ -350,6 +359,9 @@ func resolveBackendForQuery(cmd *cobra.Command, query string, flags config.Value
 	settings = config.Resolve(flags, envValues, fileValues, registration.defaults())
 	if settings.MaxCalls < 0 {
 		return backendResolution{}, fmt.Errorf("max_calls must be non-negative")
+	}
+	if err := registration.validateBackendConcurrency(settings.BackendConcurrency); err != nil {
+		return backendResolution{}, err
 	}
 	semanticBackend, _, err := registration.Construct(opts, settings)
 	if err != nil {

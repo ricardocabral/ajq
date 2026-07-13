@@ -35,6 +35,8 @@ type backendRegistration struct {
 	DefaultModel           string
 	Paid                   bool
 	DefaultMaxCalls        int
+	DefaultMaxConcurrency  int
+	MaxBackendConcurrency  int
 	DefaultMaxOutputTokens int
 	ModelIdentity          func(config.Settings) (string, error)
 	Construct              backendConstructor
@@ -52,11 +54,29 @@ func (r backendRegistration) defaults() config.Values {
 	}
 	values.MaxCalls = r.DefaultMaxCalls
 	values.MaxCallsSet = true
+	concurrency := r.DefaultMaxConcurrency
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+	values.BackendConcurrency = concurrency
+	values.BackendConcurrencySet = true
 	return values
 }
 
+func (r backendRegistration) validateBackendConcurrency(value int) error {
+	if r.MaxBackendConcurrency == 0 || value <= r.MaxBackendConcurrency {
+		return nil
+	}
+	return fmt.Errorf("%s backend concurrency %d exceeds maximum %d", r.Name, value, r.MaxBackendConcurrency)
+}
+
 var constructAnthropicBackend = func(settings config.Settings) (backend.Backend, error) {
-	return anthropicbk.New(settings.Model)
+	be, err := anthropicbk.New(settings.Model)
+	if err != nil {
+		return nil, err
+	}
+	be.MaxConcurrency = settings.BackendConcurrency
+	return be, nil
 }
 
 var backendRegistry = []backendRegistration{
@@ -94,10 +114,12 @@ var backendRegistry = []backendRegistration{
 		},
 	},
 	{
-		Name:           "ollama",
-		HelpDescriptor: "local Ollama",
-		NeedsModel:     true,
-		NeedsBaseURL:   true,
+		Name:                  "ollama",
+		HelpDescriptor:        "local Ollama",
+		DefaultMaxConcurrency: 1,
+		MaxBackendConcurrency: 4,
+		NeedsModel:            true,
+		NeedsBaseURL:          true,
 		ModelIdentity: func(settings config.Settings) (string, error) {
 			return modelIdentityWithBaseURL("ollama/"+strings.TrimSpace(settings.Model), settings.BaseURL), nil
 		},
@@ -116,6 +138,8 @@ var backendRegistry = []backendRegistration{
 		DefaultModel:           anthropicbk.DefaultModel,
 		Paid:                   true,
 		DefaultMaxCalls:        100,
+		DefaultMaxConcurrency:  1,
+		MaxBackendConcurrency:  2,
 		DefaultMaxOutputTokens: int(anthropicbk.DefaultMaxTokens),
 		ModelIdentity: func(settings config.Settings) (string, error) {
 			return anthropicbk.ModelIdentity(settings.Model)
@@ -142,6 +166,8 @@ func openAICompatibleRegistration(name, defaultBaseURL, apiKeyEnv string) backen
 		DefaultBaseURL:         defaultBaseURL,
 		Paid:                   true,
 		DefaultMaxCalls:        100,
+		DefaultMaxConcurrency:  1,
+		MaxBackendConcurrency:  2,
 		DefaultMaxOutputTokens: oai.DefaultMaxTokens,
 		ModelIdentity: func(settings config.Settings) (string, error) {
 			return modelIdentityWithBaseURL(name+"/"+strings.TrimSpace(settings.Model), settings.BaseURL), nil
@@ -240,10 +266,11 @@ func newOpenAICompatibleBackend(name, defaultBaseURL, apiKeyEnv string, settings
 		return nil, err
 	}
 	return &oai.Backend{
-		BaseURL:   baseURL,
-		APIKey:    apiKey,
-		APIKeyEnv: apiKeyEnv,
-		Model:     model,
+		BaseURL:        baseURL,
+		APIKey:         apiKey,
+		APIKeyEnv:      apiKeyEnv,
+		Model:          model,
+		MaxConcurrency: settings.BackendConcurrency,
 	}, nil
 }
 
@@ -280,7 +307,7 @@ func newOllamaBackend(settings config.Settings) (backend.Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ollamabk.Backend{BaseURL: baseURL, Model: model}, nil
+	return &ollamabk.Backend{BaseURL: baseURL, Model: model, MaxConcurrency: settings.BackendConcurrency}, nil
 }
 
 type localModelResolution struct {
