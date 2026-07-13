@@ -21,6 +21,7 @@ name: Release
       - scripts/release_workflow_test.sh
       - scripts/windows_msi_contract.ps1
       - scripts/windows_msi_contract_test.ps1
+      - scripts/windows_msi_finalize.ps1
       - scripts/package_manager_smoke.sh
       - scripts/package_manager_smoke_test.sh
       - scripts/package_manager_smoke.ps1
@@ -269,20 +270,32 @@ jobs:
         env:
           MSI_VERSION: ${{ steps.contract.outputs.version }}
           PRODUCT_CODE: ${{ steps.contract.outputs.product_code }}
+          PACKAGE_CODE: ${{ steps.contract.outputs.package_code }}
           MSI_ASSET: ${{ steps.contract.outputs.msi_asset }}
           BINARY_SOURCE: ${{ steps.contract.outputs.binary }}
           LICENSE_SOURCE: ${{ steps.contract.outputs.license }}
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          wix build build/windows/ajq.wxs -arch x64 `
-            -d "Version=$env:MSI_VERSION" `
-            -d "ProductCode=$env:PRODUCT_CODE" `
-            -d "BinarySource=$env:BINARY_SOURCE" `
-            -d "LicenseSource=$env:LICENSE_SOURCE" `
-            -o "dist/$env:MSI_ASSET"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-Item "dist/$env:MSI_ASSET"
+          $out = "dist/$env:MSI_ASSET"
+          function Build-ReproducibleMsi {
+            wix build build/windows/ajq.wxs -arch x64 `
+              -d "Version=$env:MSI_VERSION" `
+              -d "ProductCode=$env:PRODUCT_CODE" `
+              -d "BinarySource=$env:BINARY_SOURCE" `
+              -d "LicenseSource=$env:LICENSE_SOURCE" `
+              -o $out
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & ./scripts/windows_msi_finalize.ps1 -MsiPath $out -PackageCode $env:PACKAGE_CODE
+          }
+          Build-ReproducibleMsi
+          Copy-Item -LiteralPath $out -Destination "$out.first" -Force
+          Build-ReproducibleMsi
+          if ((Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash -cne (Get-FileHash -LiteralPath "$out.first" -Algorithm SHA256).Hash) {
+            throw 'same verified inputs produced different unsigned MSI bytes'
+          }
+          Remove-Item -LiteralPath "$out.first" -Force
+          Get-Item $out
 
       - name: Check optional Azure Trusted Signing credentials
         id: signing
@@ -348,6 +361,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -359,11 +373,26 @@ jobs:
 
       - name: Regenerate final checksums including MSI
         shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
         run: |
           set -euo pipefail
           cd dist
-          find . -maxdepth 1 -type f -name 'ajq_*' -printf '%f\n' | LC_ALL=C sort | xargs sha256sum > checksums.txt
-          grep -Eq ' ajq_.*_Windows_x86_64\.msi$' checksums.txt
+          expected_assets=(
+            "ajq_${RELEASE_VERSION}_Darwin_arm64.tar.gz"
+            "ajq_${RELEASE_VERSION}_Darwin_x86_64.tar.gz"
+            "ajq_${RELEASE_VERSION}_Linux_arm64.tar.gz"
+            "ajq_${RELEASE_VERSION}_Linux_x86_64.tar.gz"
+            "ajq_${RELEASE_VERSION}_Windows_x86_64.zip"
+            "ajq_${RELEASE_VERSION}_Windows_x86_64.msi"
+          )
+          for asset in "${expected_assets[@]}"; do
+            [ "$(find . -maxdepth 1 -type f -name "$asset" -printf x | wc -c | tr -d ' ')" = 1 ] || {
+              printf 'draft release must contain exactly one %s\n' "$asset" >&2
+              exit 1
+            }
+          done
+          printf '%s\n' "${expected_assets[@]}" | LC_ALL=C sort | xargs sha256sum > checksums.txt
 
       - name: Replace draft checksum asset
         shell: bash

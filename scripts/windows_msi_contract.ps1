@@ -30,12 +30,14 @@ function Get-UuidV5([string]$Namespace, [string]$Name) {
 
 $version = $Tag.Substring(1)
 $productCode = Get-UuidV5 'BA73FC93-6FEE-410C-A647-596319F7BC1F' "RicardoCabral.ajq/x64/$version"
+$packageCode = Get-UuidV5 'BA73FC93-6FEE-410C-A647-596319F7BC1F' "RicardoCabral.ajq/x64/$version/package"
 $zipAsset = "ajq_${version}_Windows_x86_64.zip"
 $msiAsset = "ajq_${version}_Windows_x86_64.msi"
 
 $values = @(
     "version=$version"
     "product_code=$productCode"
+    "package_code=$packageCode"
     "zip_asset=$zipAsset"
     "msi_asset=$msiAsset"
 )
