@@ -474,6 +474,7 @@ func printRunStats(w io.Writer, stats engine.RunStats, paid bool, modelID string
 	}
 	lines := []string{
 		fmt.Sprintf("  execution_mode: %s", stats.ExecutionMode),
+		fmt.Sprintf("  batching_dedup: %s", statsBatchingDedup(stats.ExecutionMode)),
 		fmt.Sprintf("  window_bytes: %d", stats.WindowBytes),
 		fmt.Sprintf("  window_count: %d", stats.WindowCount),
 		fmt.Sprintf("  oversized_window_count: %d", stats.OversizedWindowCount),
@@ -498,6 +499,21 @@ func printRunStats(w io.Writer, stats engine.RunStats, paid bool, modelID string
 		}
 	}
 	return nil
+}
+
+func statsBatchingDedup(mode engine.ExecutionMode) string {
+	switch mode {
+	case engine.ExecutionModeThreePhaseWindowed:
+		return "windowed harvest with cross-frame pre-resolve dedup"
+	case engine.ExecutionModeUserStream:
+		return "inline per frame; cross-frame pre-resolve dedup disabled"
+	case engine.ExecutionModePlannerInterleaved:
+		return "inline planner-required; cross-frame pre-resolve dedup unavailable"
+	case engine.ExecutionModePureJQ:
+		return "not applicable: pure jq"
+	default:
+		return "unavailable"
+	}
 }
 
 func validateExplainCompile(query string, deterministic bool) error {

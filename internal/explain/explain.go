@@ -174,6 +174,13 @@ func writeEstimate(w io.Writer, semanticPlan *planpkg.Plan, estimate *Estimate) 
 		}
 	}
 	lines := []string{fmt.Sprintf("  static_call_sites: %d", staticCallSites)}
+	if estimate != nil && estimate.Status == EstimateStatusUnavailableUserStream {
+		lines = append(lines,
+			"  execution_selection: user-selected --stream interleaving",
+			"  semantic_batching: inline per uncached judgement",
+			"  cross_frame_pre_resolve_dedup: disabled",
+		)
+	}
 	if estimate != nil && estimate.Status == EstimateStatusAvailable {
 		lines = append(lines,
 			fmt.Sprintf("  input_frames: %d", estimate.InputFrames),

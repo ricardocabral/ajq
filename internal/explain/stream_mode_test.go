@@ -22,6 +22,9 @@ const wantStreamExplain = "ajq explain v1\n" +
 	"  estimate_status: unavailable: user stream\n" +
 	"  estimate_reason: \"user-selected inline execution has no cross-frame batching or pre-resolve dedup estimate\"\n" +
 	"  static_call_sites: 1\n" +
+	"  execution_selection: user-selected --stream interleaving\n" +
+	"  semantic_batching: inline per uncached judgement\n" +
+	"  cross_frame_pre_resolve_dedup: disabled\n" +
 	"  input_frames: unavailable\n" +
 	"  harvested_judgements: unavailable\n" +
 	"  post_dedup_judgements: unavailable\n" +

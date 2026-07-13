@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -163,6 +164,54 @@ func TestMaxCallsCumulativeAcrossWindows(t *testing.T) {
 	}
 	if len(be.Inputs()) != 1 || result.RunStats.PostDedupBackendCalls != 1 {
 		t.Fatalf("backend inputs=%d stats=%#v, want one successful judgement before cumulative abort", len(be.Inputs()), result.RunStats)
+	}
+}
+
+func TestMaxCallsUserStreamAbortsBeforeCallNPlusOne(t *testing.T) {
+	be := &backend.MockBackend{}
+	var stdout bytes.Buffer
+	result, err := Execute(context.Background(), strings.NewReader(`{"id":1,"msg":"keep"}`+"\n"+`{"id":2,"msg":"keep-two"}`+"\n"), &stdout, Options{
+		Query:         `select(sem_match(.msg; "keep")) | .id`,
+		InputMode:     input.ModeAuto,
+		Output:        output.Options{Compact: true},
+		Backend:       be,
+		SemanticCache: semanticcache.NewStore(),
+		MaxCalls:      1,
+		Stream:        true,
+	})
+	var capErr *MaxCallsExceededError
+	if !errors.As(err, &capErr) || capErr.Cap != 1 || capErr.Needed != 2 {
+		t.Fatalf("error = %T %[1]v, want user-stream cap=1 needed=2", err)
+	}
+	if got, want := stdout.String(), "1\n"; got != want {
+		t.Fatalf("stdout before N+1 cap = %q, want first frame %q", got, want)
+	}
+	if len(be.Inputs()) != 1 || result.RunStats.PostDedupBackendCalls != 1 || result.RunStats.ExecutionMode != ExecutionModeUserStream {
+		t.Fatalf("backend inputs=%d stats=%#v, want one user-stream call before N+1 abort", len(be.Inputs()), result.RunStats)
+	}
+}
+
+func TestMaxCallsStreamReusesWindowedCacheIdentityWithoutCapSpend(t *testing.T) {
+	store := semanticcache.NewStore()
+	stdin := `{"id":1,"msg":"keep"}` + "\n"
+	query := `select(sem_match(.msg; "keep")) | .id`
+	if _, err := Execute(context.Background(), strings.NewReader(stdin), io.Discard, Options{
+		Query: query, InputMode: input.ModeAuto, Backend: &backend.MockBackend{}, SemanticCache: store,
+	}); err != nil {
+		t.Fatalf("windowed cache warm Execute returned error: %v", err)
+	}
+
+	be := &backend.MockBackend{}
+	var stdout bytes.Buffer
+	result, err := Execute(context.Background(), strings.NewReader(stdin), &stdout, Options{
+		Query: query, InputMode: input.ModeAuto, Output: output.Options{Compact: true}, Backend: be,
+		SemanticCache: store, MaxCalls: 1, Stream: true,
+	})
+	if err != nil {
+		t.Fatalf("stream cache reuse Execute returned error: %v", err)
+	}
+	if stdout.String() != "1\n" || len(be.Inputs()) != 0 || result.RunStats.PostDedupBackendCalls != 0 || result.RunStats.CacheHits != 1 || result.RunStats.ExecutionMode != ExecutionModeUserStream {
+		t.Fatalf("stream cross-mode cache reuse output/calls/stats=%q/%d/%#v, want identity hit without cap spend", stdout.String(), len(be.Inputs()), result.RunStats)
 	}
 }
 

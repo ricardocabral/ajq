@@ -59,6 +59,25 @@ func TestRunStatsThreePhaseCountsHarvestDedupAndCacheHits(t *testing.T) {
 	}
 }
 
+func TestRunStatsUserStreamCountsBackendCallsWithoutHarvest(t *testing.T) {
+	var stdout bytes.Buffer
+	result, err := Execute(context.Background(), strings.NewReader(`{"id":1,"msg":"keep"}`+"\n"+`{"id":2,"msg":"other"}`+"\n"), &stdout, Options{
+		Query:         `select(sem_match(.msg; "keep")) | .id`,
+		InputMode:     input.ModeAuto,
+		Output:        output.Options{Compact: true},
+		Backend:       &backend.MockBackend{},
+		SemanticCache: semanticcache.NewStore(),
+		Stream:        true,
+	})
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	stats := result.RunStats
+	if stats.ExecutionMode != ExecutionModeUserStream || stats.WindowBytes != 0 || stats.WindowCount != 0 || stats.OversizedWindowCount != 0 || stats.InputFrames != 2 || stats.SemanticCallSites != 1 || stats.HarvestedJudgements != 0 || stats.PostDedupBackendCalls != 2 || stats.CacheHits != 0 {
+		t.Fatalf("RunStats = %#v, want user-stream inline calls without harvest/window counters", stats)
+	}
+}
+
 func TestRunStatsInterleavedCountsBackendCallsAndCacheHitsWithoutHarvest(t *testing.T) {
 	store := semanticcache.NewStore()
 	stdin := `[{"id":1,"msg":"urgent"},{"id":2,"msg":"low"}]`
