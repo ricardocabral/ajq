@@ -22,6 +22,7 @@ name: Release
       - scripts/windows_msi_contract.ps1
       - scripts/windows_msi_contract_test.ps1
       - scripts/windows_msi_finalize.ps1
+      - scripts/windows_msi_install_smoke.ps1
       - scripts/windows_pe_machine.ps1
       - scripts/package_manager_smoke.sh
       - scripts/package_manager_smoke_test.sh
@@ -351,6 +352,43 @@ jobs:
         run: |
           gh release upload $env:RELEASE_TAG "dist/$env:MSI_ASSET" --clobber
 
+  verify-draft-windows-msi:
+    name: Verify draft MSI installation before publication
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    needs:
+      - validate-release
+      - release-windows-msi
+    permissions:
+      contents: read
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ needs.validate-release.outputs.ref }}
+
+      - name: Resolve expected draft MSI identity
+        id: contract
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: ./scripts/windows_msi_contract.ps1 -Tag $env:RELEASE_TAG -OutputPath $env:GITHUB_OUTPUT
+
+      - name: Download, hash, and install-smoke the exact draft MSI
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          MSI_ASSET: ${{ steps.contract.outputs.msi_asset }}
+        run: |
+          New-Item -ItemType Directory -Force -Path stage | Out-Null
+          gh release download $env:RELEASE_TAG --pattern $env:MSI_ASSET --dir stage
+          $msi = Join-Path stage $env:MSI_ASSET
+          if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw "draft release did not contain $env:MSI_ASSET" }
+          $hash = (Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash
+          Write-Output "Draft MSI SHA-256: $hash"
+          ./scripts/windows_msi_install_smoke.ps1 -Tag $env:RELEASE_TAG -MsiPath $msi -ExpectedSha256 $hash
+
   finalize-release:
     name: Finalize checksums, attest, and publish
     if: github.event_name == 'push'
@@ -359,6 +397,7 @@ jobs:
       - validate-release
       - create-draft
       - release-windows-msi
+      - verify-draft-windows-msi
     permissions:
       contents: write
       id-token: write

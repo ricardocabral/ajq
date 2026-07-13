@@ -8,6 +8,10 @@ $workflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflow
 $goreleaser = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.goreleaser.yaml')
 $msiFinalizer = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/windows_msi_finalize.ps1')
 $peMachine = Join-Path $repoRoot 'scripts/windows_pe_machine.ps1'
+$installerSmoke = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/windows_msi_install_smoke.ps1')
+$ciWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/ci.yml')
+$packageSmoke = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/package_manager_smoke.ps1')
+$packageWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/package-manager-smoke.yml')
 
 function Get-Contract([string]$Tag) {
     $result = @{}
@@ -123,7 +127,9 @@ foreach ($needle in @(
     'ajq_${RELEASE_VERSION}_Windows_x86_64.zip',
     'ajq_${RELEASE_VERSION}_Windows_x86_64.msi',
     'gh release edit "$RELEASE_TAG" --draft=false',
-    'dist/ajq_${{ needs.validate-release.outputs.version }}_Windows_x86_64.msi'
+    'dist/ajq_${{ needs.validate-release.outputs.version }}_Windows_x86_64.msi',
+    'name: Verify draft MSI installation before publication',
+    './scripts/windows_msi_install_smoke.ps1 -Tag $env:RELEASE_TAG -MsiPath $msi -ExpectedSha256 $hash'
 )) {
     if (-not $workflow.Contains($needle)) { throw "release workflow is missing required MSI contract: $needle" }
 }
@@ -133,9 +139,10 @@ foreach ($credential in @('AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SE
 if ($workflow.Contains('dist/*.tar.gz') -or $workflow.Contains('dist/*.zip') -or $workflow.Contains('dist/*.msi')) {
     throw 'provenance must attest only the explicit final asset allowlist'
 }
-if ($workflow.IndexOf('name: Build Windows x64 MSI') -ge $workflow.IndexOf('name: Finalize checksums, attest, and publish')) {
-    throw 'MSI finalization must run after MSI upload'
+if ($workflow.IndexOf('name: Build Windows x64 MSI') -ge $workflow.IndexOf('name: Verify draft MSI installation before publication') -or $workflow.IndexOf('name: Verify draft MSI installation before publication') -ge $workflow.IndexOf('name: Finalize checksums, attest, and publish')) {
+    throw 'draft MSI verifier must run after build/upload and before finalization'
 }
+if ($workflow -notmatch 'finalize-release:[\s\S]*?verify-draft-windows-msi') { throw 'finalization must require successful draft MSI verification' }
 if ($workflow.IndexOf('name: Finalize checksums, attest, and publish') -ge $workflow.IndexOf('name: Publish Homebrew cask after release finalization')) {
     throw 'Homebrew publication must wait for successful MSI finalization'
 }
@@ -144,5 +151,13 @@ if ($goreleaser -notmatch '(?m)^\s*replace_existing_artifacts:\s*true\s*$') { th
 if ($workflow -notmatch "release-dry-run:\s*\r?\n\s*name: GoReleaser snapshot dry-run\s*\r?\n\s*if: github.event_name == 'pull_request'") {
     throw 'PR path must remain snapshot-only'
 }
+foreach ($needle in @('Get-FileHash', 'ProductVersion', 'ProductCode', 'msiexec.exe', "Programs\ajq", 'Join-Path $installDirectory ''ajq.exe''', 'installed mock query', 'MSI uninstall left installation directory', 'MSI uninstall left its per-user PATH entry behind')) {
+    if (-not $installerSmoke.Contains($needle)) { throw "MSI install smoke is missing $needle" }
+}
+foreach ($needle in @('name: Build and silently smoke-test a local MSI', 'dotnet tool install --global wix --version 4.0.5', './scripts/windows_msi_install_smoke.ps1 -Tag v0.0.0')) {
+    if (-not $ciWorkflow.Contains($needle)) { throw "Windows CI local MSI verifier is missing $needle" }
+}
+if ($packageSmoke.Contains('Microsoft\WinGet\Links\ajq.exe') -or -not $packageSmoke.Contains("Programs\ajq\ajq.exe")) { throw 'package manager smoke must use the WiX install location, not portable aliases' }
+if ($packageWorkflow -notmatch 'winget smoke requires exactly one canonical MSI asset') { throw 'package-manager workflow must reject releases without the canonical MSI' }
 
 Write-Host 'Windows MSI contract tests passed'
