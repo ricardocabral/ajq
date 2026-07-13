@@ -11,7 +11,7 @@ execution, local inference, bounded-parallel local daemon transport, Phase 3
 backend/cloud controls, first-run local asset provisioning, local model management, the
 persistent judgement cache, byte-budgeted semantic windows, an explicit low-latency
 semantic stream mode, and checksummed release archives with a no-sudo install script.
-Further streaming optimizations remain planned.
+Further streaming optimizations remain planned. The iterative-harvest experiment is an internal-only no-go prototype, not a shipped mode; default windowed execution is unchanged.
 
 ## What ajq does today
 
@@ -69,7 +69,7 @@ polish.
 | **1 — Split-execution core** | Planner, desugar, semantic predicates, bounded classification, guarded executor. | ✅ Shipped with explicit unbounded value-op limits |
 | **2 — Local inference** | `llama-server` backend, daemon lifecycle, GBNF/schema constraints, provisioning. | ✅ Shipped |
 | **3 — Backends & cloud** | Ollama, OpenAI/OpenRouter, Anthropic, config/env selection, cost controls. | ✅ Shipped |
-| **4 — Scale & chunking** | Byte-budgeted complete-frame windows and explicit `--stream` low-latency inline execution for supported semantic streams, persistent cache, and bounded local parallelism are shipped. Further streaming optimizations remain planned. | 🟡 Partial |
+| **4 — Scale & chunking** | Byte-budgeted complete-frame windows and explicit `--stream` low-latency inline execution for supported semantic streams, persistent cache, and bounded local parallelism are shipped. The iterative-harvest experiment is [an internal-only no-go](../iterative-harvest-evaluation/): it has no user flag and does not change the default executor. Further streaming optimizations remain planned. | 🟡 Partial |
 | **5 — Polish & distribution** | Models subcommand, release archives/install script, and Homebrew tap publishing are shipped; standalone build, GPU auto-detect, richer vocabulary, and additional package managers remain planned. | 🟡 Partial |
 
 ## Follow along

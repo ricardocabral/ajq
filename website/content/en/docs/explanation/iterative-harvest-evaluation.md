@@ -56,6 +56,35 @@ The saving metric is always `windowed PostDedupBackendCalls - iterative
 PostDedupBackendCalls`; harvested counts are not compared because staged and permissive
 harvest deliberately mean different things.
 
+### Protocol and acceptance thresholds
+
+The recorded run used the repository at `0b79f89` on an Apple M3 Pro
+(`darwin/arm64`, Go `go1.26.5`). It ran the network-free command above, then the
+allocation benchmark below; both commands are included so the reported evidence can be
+recreated without a model or credentials:
+
+```sh
+make bench-iterative-evidence
+go test ./internal/engine -run '^$' -bench BenchmarkIterativeHarvestPaired -benchmem -benchtime=200ms
+```
+
+The paired runner performs one discarded warm-up and 21 alternating samples for each
+of windowed, staged, and interleaved modes. It rejects a sample unless byte output,
+result/error outcome, selected mode, and the declared post-dedup call/batch oracle all
+match. Productionization required every parity/safety check plus all applicable limits:
+
+| Gate | Limit | Recorded result | Outcome |
+|---|---:|---:|---|
+| high-prune judgement reduction | >=25% | 43.75% (7 of 16 calls avoided) | pass |
+| no-prune median latency overhead | <=15% | 72.94% | fail |
+| no-prune peak retained-memory overhead | <=25% | 76.60% | fail |
+| strict current-window error/cache/exit parity | exact | pruned descendant error is dispatched only by windowed harvest | fail |
+
+The final parity row is a semantic limitation, not a noisy benchmark measurement: with
+a false earlier gate, permissive windowed harvest still resolves a later unreachable
+judgement and can expose its backend error; staged and interleaved execution correctly
+avoid that call. Therefore no performance result can make this prototype a go.
+
 ### Memory and allocation method
 
 For each timed fake sample the runner calls `runtime.GC`, records the baseline memory
@@ -68,7 +97,7 @@ comparison rather than a claim about a model server's memory.
 
 ## Recorded fake result
 
-On 2026-07-13, Apple M3 Pro (darwin/arm64, Go test runner), the fixed protocol reported:
+On 2026-07-13, the fixed protocol reported:
 
 - `high-prune`: 7 avoided judgements, **43.75%** reduction, passing the required >=25%
   judgement reduction threshold.
