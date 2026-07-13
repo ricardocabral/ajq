@@ -264,6 +264,9 @@ func recordWindowStats(stats *RunStats, window input.Window, harvestFailed, fail
 }
 
 func resolveAndExecuteWindow(ctx context.Context, stdout io.Writer, opts Options, program *threePhaseProgram, result *Result, frames []input.Frame) error {
+	if err := ctxErr(ctx); err != nil {
+		return err
+	}
 	err := program.resolve(ctx)
 	limit := len(frames)
 	if err != nil {
@@ -277,6 +280,9 @@ func resolveAndExecuteWindow(ctx context.Context, stdout io.Writer, opts Options
 		}
 	}
 	for i := 0; i < limit; i++ {
+		if err := ctxErr(ctx); err != nil {
+			return err
+		}
 		frame := &frames[i]
 		runResult, err := program.execute(frame.Value, func(value any) error {
 			result.Emitted = true

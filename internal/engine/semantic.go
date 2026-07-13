@@ -528,16 +528,13 @@ func (rt *semanticRuntime) resolve(ctx context.Context) error {
 	return nil
 }
 
-// resultResolveError commits only validated results needed by frames before the
-// failing frame. Results from the failed frame are intentionally not cached.
+// resultResolveError commits every result validated before the failing item.
+// Execution still stops before the failing frame, but keeping same-frame
+// validated values preserves the resolver's prior cache contract.
 func (rt *semanticRuntime) resultResolveError(failing int, err error, frames []int64, keys []semanticcache.Key, results []backend.Result) error {
 	failingFrame := frames[failing]
 	for i := 0; i < failing; i++ {
-		if frames[i] < failingFrame {
-			// The preceding results were validated in resolve before it reached
-			// the failing item, and only earlier source frames are executable.
-			rt.cache.Set(keys[i], results[i])
-		}
+		rt.cache.Set(keys[i], results[i])
 	}
 	return &semanticResolveError{frame: failingFrame, executeBefore: failingFrame, err: err}
 }

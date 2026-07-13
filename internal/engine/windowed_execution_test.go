@@ -124,6 +124,26 @@ func (shortResultsBackend) Judge(_ context.Context, _ []backend.Judgement) ([]ba
 	return []backend.Result{}, nil
 }
 
+func TestThreePhaseWindowCachesValidatedSameFrameResultBeforeLaterError(t *testing.T) {
+	store := semanticcache.NewStore()
+	_, err := Execute(context.Background(), strings.NewReader(`{"msg":"x"}`), ioDiscard{}, Options{
+		Query: `(.msg =~ "x") and (.msg =~ "y")`, InputMode: input.ModeAuto, Backend: resultErrorBackend{}, SemanticCache: store, WindowBytes: 1024,
+	})
+	if err == nil {
+		t.Fatal("expected second-result error")
+	}
+	be := &backend.MockBackend{}
+	_, err = Execute(context.Background(), strings.NewReader(`{"msg":"x"}`), ioDiscard{}, Options{
+		Query: `(.msg =~ "x") and (.msg =~ "y")`, InputMode: input.ModeAuto, Backend: be, SemanticCache: store, WindowBytes: 1024,
+	})
+	if err != nil {
+		t.Fatalf("cache probe Execute error: %v", err)
+	}
+	if got := len(be.Inputs()); got != 1 {
+		t.Fatalf("cache probe backend inputs = %d, want only failed second semantic call", got)
+	}
+}
+
 func TestThreePhaseWindowDoesNotExecuteBatchFailure(t *testing.T) {
 	var stdout bytes.Buffer
 	_, err := Execute(context.Background(), strings.NewReader("{\"msg\":\"first\"}\n{\"msg\":\"second\"}\n"), &stdout, Options{
@@ -293,6 +313,33 @@ func (b *observingBackend) Judge(_ context.Context, batch []backend.Judgement) (
 		results[i] = backend.Result{Value: true}
 	}
 	return results, nil
+}
+
+type cancelOnFirstWrite struct {
+	cancel context.CancelFunc
+	writes int
+	buf    bytes.Buffer
+}
+
+func (w *cancelOnFirstWrite) Write(p []byte) (int, error) {
+	w.writes++
+	n, err := w.buf.Write(p)
+	if w.writes == 1 {
+		w.cancel()
+	}
+	return n, err
+}
+
+func TestThreePhaseWindowWriterCancellationStopsLaterFrames(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	writer := &cancelOnFirstWrite{cancel: cancel}
+	_, err := Execute(ctx, strings.NewReader("keep\nkeep\nlater\n"), writer, Options{Query: `. =~ "keep"`, InputMode: input.ModeRaw, Output: output.Options{Compact: true}, Backend: &backend.MockBackend{}, SemanticCache: semanticcache.NewStore(), WindowBytes: 1024})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Execute error = %v, want context cancellation", err)
+	}
+	if writer.writes != 1 || writer.buf.String() != "true\n" {
+		t.Fatalf("writes/output = %d/%q, want only first frame", writer.writes, writer.buf.String())
+	}
 }
 
 func TestThreePhaseWindowLongStreamKeepsBackendBatchesBounded(t *testing.T) {
