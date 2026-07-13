@@ -127,7 +127,7 @@ func writeSemantic(w io.Writer, plan Plan) error {
 			fmt.Sprintf("    specs: %s", formatSpecs(node.Specs)),
 			fmt.Sprintf("    source_range: %s", formatSourceRange(node.Source)),
 			fmt.Sprintf("    gated: %s", gatedPlaceholder(node)),
-			fmt.Sprintf("    execution: %s", executionMode(*semanticPlan, node)),
+			fmt.Sprintf("    execution: %s", executionMode(*semanticPlan, node, plan.Stream)),
 			"    subgraph: semantic",
 		}
 		for _, line := range nodeLines {
@@ -150,7 +150,7 @@ func executionLine(semanticPlan *planpkg.Plan, stream bool) string {
 }
 
 func semanticStdinLine(estimate *Estimate) string {
-	if estimate == nil || estimate.Status != EstimateStatusAvailable {
+	if estimate == nil || estimate.Status == EstimateStatusUnavailableNoInput || estimate.Status == EstimateStatusUnavailablePureJQ || estimate.Status == EstimateStatusUnavailableUserStream {
 		return "stdin: not harvested"
 	}
 	return "stdin: harvested for estimates"
@@ -236,7 +236,10 @@ func gatedPlaceholder(node planpkg.SemNode) string {
 	return "no"
 }
 
-func executionMode(p planpkg.Plan, node planpkg.SemNode) string {
+func executionMode(p planpkg.Plan, node planpkg.SemNode, stream bool) string {
+	if stream {
+		return "user-stream-inline"
+	}
 	if node.ExecutionMode != "" {
 		return string(node.ExecutionMode)
 	}
