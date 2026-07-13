@@ -38,6 +38,14 @@ grep -Fq 'draft release must contain exactly one %s' "$workflow" || {
   printf 'Release workflow must require exact archive assets before publication\n' >&2
   exit 1
 }
+grep -Fq 'draft release assets must exactly match the expected archive/MSI allowlist' "$workflow" || {
+  printf 'Release workflow must reject unexpected archive assets before publication\n' >&2
+  exit 1
+}
+grep -Fq 'steps.release_zip.outputs.binary' "$workflow" || {
+  printf 'Release workflow must build MSI from the verified release ZIP binary\n' >&2
+  exit 1
+}
 grep -Fq 'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.' "$workflow" || {
   printf 'Release workflow must retain the credential-safe unsigned MSI warning\n' >&2
   exit 1
