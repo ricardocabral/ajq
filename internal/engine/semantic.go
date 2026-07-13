@@ -76,6 +76,7 @@ type semanticRuntime struct {
 	planned             map[plan.CallID]plan.SemNode
 	plannedOrder        []plan.SemNode
 	fired               []semanticWitness
+	witnessObserver     func(semanticWitness) // test-only callback retained across execution passes
 	stats               *RunStats
 	maxCalls            int
 	maxCallsDefaultPaid bool
@@ -440,14 +441,18 @@ func (rt *semanticRuntime) recordWitness(id plan.CallID, phase semanticPhase, fa
 		op = node.Op
 		source = node.Source
 	}
-	rt.fired = append(rt.fired, semanticWitness{
+	witness := semanticWitness{
 		ID:      id,
 		Planned: planned,
 		Op:      op,
 		Query:   rt.query,
 		Source:  source,
 		Phase:   phase,
-	})
+	}
+	rt.fired = append(rt.fired, witness)
+	if rt.witnessObserver != nil {
+		rt.witnessObserver(witness)
+	}
 }
 
 func (rt *semanticRuntime) checkInvariant(phase semanticPhase) error {

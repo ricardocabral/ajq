@@ -13,6 +13,7 @@ import (
 	"github.com/ricardocabral/ajq/internal/backend"
 	semanticcache "github.com/ricardocabral/ajq/internal/cache"
 	"github.com/ricardocabral/ajq/internal/input"
+	"github.com/ricardocabral/ajq/internal/jq"
 	"github.com/ricardocabral/ajq/internal/output"
 	"github.com/ricardocabral/ajq/internal/plan"
 )
@@ -207,22 +208,32 @@ func keyedResult(j backend.Judgement) backend.Result {
 }
 
 func (b *keyedBackend) values() []string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
 	var values []string
-	for _, batch := range b.batches {
-		for _, judgement := range batch {
-			values = append(values, fmt.Sprintf("%s:%v", judgement.Op, judgement.Value))
-		}
+	for _, batch := range b.batchValues() {
+		values = append(values, batch...)
 	}
 	return values
 }
 
+func (b *keyedBackend) batchValues() [][]string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	batches := make([][]string, len(b.batches))
+	for i, batch := range b.batches {
+		batches[i] = make([]string, len(batch))
+		for j, judgement := range batch {
+			batches[i][j] = fmt.Sprintf("%s:%v", judgement.Op, judgement.Value)
+		}
+	}
+	return batches
+}
+
 type iterativePathOutcome struct {
-	stdout string
-	result Result
-	err    error
-	calls  []string
+	stdout  string
+	result  Result
+	err     error
+	calls   []string
+	batches [][]string
 }
 
 func runIterativeThreePaths(t *testing.T, ctx context.Context, stdin, query string, base Options, makeBackend func() *keyedBackend) (windowed, iterative, interleaved iterativePathOutcome) {
@@ -241,7 +252,7 @@ func runIterativeThreePaths(t *testing.T, ctx context.Context, stdin, query stri
 		}
 		var stdout bytes.Buffer
 		result, err := Execute(ctx, strings.NewReader(stdin), &stdout, opts)
-		return iterativePathOutcome{stdout: stdout.String(), result: result, err: err, calls: be.values()}
+		return iterativePathOutcome{stdout: stdout.String(), result: result, err: err, calls: be.values(), batches: be.batchValues()}
 	}
 	return run("windowed"), run("iterative"), run("interleaved")
 }
@@ -274,13 +285,13 @@ func TestIterativeHarvestThreePathParityTable(t *testing.T) {
 	classify := `.[] | select(sem_classify(.kind; "low"; "medium"; "high") == "high") | select("high" == sem_classify(.tier; "a"; "b"; "high")) | .id`
 	cases := []struct {
 		name, query, stdin, want string
-		stages                   int
+		iterativeBatches         [][]string
 	}{
-		{"two gates zero survivors", query2, `[{"id":1,"first":"no","second":"keep"}]`, "", 2},
-		{"two gates all survivors", query2, `[{"id":1,"first":"yes","second":"keep"},{"id":2,"first":"yes","second":"keep"}]`, "1\n2\n", 2},
-		{"two gates some survivors and duplicate", query2, `[{"id":1,"first":"yes","second":"keep"},{"id":2,"first":"no","second":"pruned"},{"id":3,"first":"yes","second":"drop"},{"id":4,"first":"yes","second":"keep"}]`, "1\n4\n", 2},
-		{"three gates", query3, `[{"id":1,"first":"yes","second":"keep","third":"final"},{"id":2,"first":"yes","second":"keep","third":"drop"},{"id":3,"first":"no","second":"pruned","third":"pruned"}]`, "1\n", 3},
-		{"bounded enum equality orientations", classify, `[{"id":1,"kind":"high","tier":"high"},{"id":2,"kind":"low","tier":"high"}]`, "1\n", 2},
+		{"two gates zero survivors", query2, `[{"id":1,"first":"no","second":"keep"}]`, "", [][]string{{"sem_match:no"}}},
+		{"two gates all survivors", query2, `[{"id":1,"first":"yes","second":"keep"},{"id":2,"first":"yes","second":"keep"}]`, "1\n2\n", [][]string{{"sem_match:yes"}, {"sem_match:keep"}}},
+		{"two gates some survivors and duplicate", query2, `[{"id":1,"first":"yes","second":"keep"},{"id":2,"first":"no","second":"pruned"},{"id":3,"first":"yes","second":"drop"},{"id":4,"first":"yes","second":"keep"}]`, "1\n4\n", [][]string{{"sem_match:yes", "sem_match:no"}, {"sem_match:keep", "sem_match:drop"}}},
+		{"three gates", query3, `[{"id":1,"first":"yes","second":"keep","third":"final"},{"id":2,"first":"yes","second":"keep","third":"drop"},{"id":3,"first":"no","second":"pruned","third":"pruned"}]`, "1\n", [][]string{{"sem_match:yes", "sem_match:no"}, {"sem_match:keep"}, {"sem_match:final", "sem_match:drop"}}},
+		{"bounded enum equality orientations", classify, `[{"id":1,"kind":"high","tier":"high"},{"id":2,"kind":"low","tier":"high"}]`, "1\n", [][]string{{"sem_classify:high", "sem_classify:low"}, {"sem_classify:high"}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -290,8 +301,8 @@ func TestIterativeHarvestThreePathParityTable(t *testing.T) {
 				t.Fatalf("outputs/errors windowed=%q/%v iterative=%q/%v interleaved=%q/%v", windowed.stdout, windowed.err, iterative.stdout, iterative.err, interleaved.stdout, interleaved.err)
 			}
 			assertIterativeParity(t, interleaved, iterative)
-			if iterative.result.RunStats.ExecutionMode != ExecutionModeIterativeHarvest || len(iterative.calls) == 0 || len(iterative.calls) > tc.stages*2 {
-				t.Fatalf("iterative mode/calls = %q/%v, want bounded staged calls", iterative.result.RunStats.ExecutionMode, iterative.calls)
+			if iterative.result.RunStats.ExecutionMode != ExecutionModeIterativeHarvest || !reflect.DeepEqual(iterative.batches, tc.iterativeBatches) || int(iterative.result.RunStats.PostDedupBackendCalls) != len(iterative.calls) {
+				t.Fatalf("iterative mode/batches/post-dedup = %q/%v/%d, want %v/%d", iterative.result.RunStats.ExecutionMode, iterative.batches, iterative.result.RunStats.PostDedupBackendCalls, tc.iterativeBatches, len(iterative.calls))
 			}
 			if strings.Contains(strings.Join(iterative.calls, ","), "sem_match:pruned") {
 				t.Fatalf("pruned value reached a later iterative stage: %v", iterative.calls)
@@ -333,7 +344,7 @@ func TestIterativeHarvestCharacterizesPrunedDownstreamWindowedErrorDivergence(t 
 }
 
 func TestIterativeHarvestWarmCacheAcrossWindowsAndCaps(t *testing.T) {
-	query := `select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`
+	query := `. | select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`
 	stdin := "{\"id\":1,\"first\":\"yes\",\"second\":\"keep\"}\n{\"id\":2,\"first\":\"yes\",\"second\":\"keep\"}\n"
 	store := semanticcache.NewStore()
 	be := &keyedBackend{}
@@ -357,6 +368,15 @@ func TestIterativeHarvestWarmCacheAcrossWindowsAndCaps(t *testing.T) {
 	if !errors.As(err, &capErr) || len(cold.values()) != 0 {
 		t.Fatalf("exceeded cap err=%v calls=%v, want pre-dispatch cap rejection", err, cold.values())
 	}
+
+	// This distinct-key run proves the run-global cap spends the first forced
+	// window and rejects the next one conservatively before its active stage.
+	distinct := &keyedBackend{}
+	var distinctOut bytes.Buffer
+	_, err = Execute(context.Background(), strings.NewReader("{\"id\":1,\"first\":\"yes\",\"second\":\"keep\"}\n{\"id\":2,\"first\":\"no\",\"second\":\"never\"}\n"), &distinctOut, Options{Query: query, InputMode: input.ModeAuto, Output: output.Options{Compact: true}, Backend: distinct, IterativeHarvest: true, WindowBytes: 1, MaxCalls: 2})
+	if !errors.As(err, &capErr) || capErr.Cap != 2 || capErr.Needed != 4 || distinctOut.String() != "1\n" || !reflect.DeepEqual(distinct.batchValues(), [][]string{{"sem_match:yes"}, {"sem_match:keep"}}) {
+		t.Fatalf("two-window cap err/output/batches = %v/%q/%v", err, distinctOut.String(), distinct.batchValues())
+	}
 }
 
 type blockingIterativeBackend struct {
@@ -377,12 +397,13 @@ func (b *blockingIterativeBackend) Judge(ctx context.Context, batch []backend.Ju
 
 func TestIterativeHarvestCancellationDuringActiveStageStopsLaterDispatch(t *testing.T) {
 	be := &blockingIterativeBackend{started: make(chan struct{})}
+	store := semanticcache.NewStore()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		_, err := Execute(ctx, strings.NewReader(`[{"first":"yes","second":"keep"}]`), ioDiscard{}, Options{
-			Query: `.[] | select(sem_match(.first; "yes")) | select(sem_match(.second; "keep"))`, InputMode: input.ModeAuto, Backend: be, IterativeHarvest: true,
+		_, err := Execute(ctx, strings.NewReader(`[{"id":1,"first":"yes","second":"keep"}]`), ioDiscard{}, Options{
+			Query: `.[] | select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`, InputMode: input.ModeAuto, Backend: be, SemanticCache: store, IterativeHarvest: true,
 		})
 		done <- err
 	}()
@@ -391,6 +412,13 @@ func TestIterativeHarvestCancellationDuringActiveStageStopsLaterDispatch(t *test
 	if err := <-done; !errors.Is(err, context.Canceled) || be.calls != 1 {
 		t.Fatalf("cancellation error/calls = %v/%d, want one active call and no later stage", err, be.calls)
 	}
+	retry := &keyedBackend{}
+	_, err := Execute(context.Background(), strings.NewReader(`[{"id":1,"first":"yes","second":"keep"}]`), ioDiscard{}, Options{
+		Query: `.[] | select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`, InputMode: input.ModeAuto, Backend: retry, SemanticCache: store, IterativeHarvest: true,
+	})
+	if err != nil || !reflect.DeepEqual(retry.batchValues(), [][]string{{"sem_match:yes"}, {"sem_match:keep"}}) {
+		t.Fatalf("cancellation leaked overlay retry err/batches = %v/%v", err, retry.batchValues())
+	}
 }
 
 func TestIterativeHarvestUnsupportedShapesNeverPartiallySelect(t *testing.T) {
@@ -398,7 +426,10 @@ func TestIterativeHarvestUnsupportedShapesNeverPartiallySelect(t *testing.T) {
 		name, query, stdin string
 	}{
 		{"control flow", `.[] | if sem_match(.first; "yes") then .id else .id end`, `[{"id":1,"first":"yes"}]`},
+		{"short circuit", `.[] | select(sem_match(.first; "yes") and true) | .id`, `[{"id":1,"first":"yes"}]`},
 		{"alternate generator", `.[] | (select(sem_match(.first; "yes")), .id)`, `[{"id":1,"first":"yes"}]`},
+		{"nested query", `.[] | select([sem_match(.first; "yes")] | .[0]) | .id`, `[{"id":1,"first":"yes"}]`},
+		{"nonliteral spec", `.[] | select(sem_match(.first; .expected)) | .id`, `[{"id":1,"first":"yes","expected":"yes"}]`},
 		{"binding", `.[] as $row | select(sem_match($row.first; "yes")) | $row.id`, `[{"id":1,"first":"yes"}]`},
 		{"construction", `.[] | select(sem_match(.first; "yes")) | {id}`, `[{"id":1,"first":"yes"}]`},
 		{"value operation", `.[] | sem_extract(.first; "field")`, `[{"first":"yes"}]`},
@@ -459,6 +490,8 @@ func TestIterativeHarvestFiredCallsArePlannedAndStatsCountStages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compileIterative: %v", err)
 	}
+	var fired []semanticWitness
+	program.runtime.witnessObserver = func(witness semanticWitness) { fired = append(fired, witness) }
 	frames := []input.Frame{{Index: 0, Value: []any{map[string]any{"id": 1, "first": "yes", "second": "keep"}, map[string]any{"id": 2, "first": "no", "second": "pruned"}}}}
 	var stdout bytes.Buffer
 	result := Result{}
@@ -468,12 +501,336 @@ func TestIterativeHarvestFiredCallsArePlannedAndStatsCountStages(t *testing.T) {
 	if stdout.String() != "1\n" || stats.HarvestedJudgements != 3 || stats.PostDedupBackendCalls != 3 || len(be.batches) != 2 || len(be.batches[0]) != 2 || len(be.batches[1]) != 1 {
 		t.Fatalf("output/stats/batches = %q/%#v/%#v", stdout.String(), stats, be.batches)
 	}
-	for _, witness := range program.runtime.fired {
+	if len(fired) <= len(program.runtime.fired) {
+		t.Fatalf("observer retained only final pass: all=%d final=%d", len(fired), len(program.runtime.fired))
+	}
+	for _, witness := range fired {
 		if !witness.Planned {
 			t.Fatalf("fired call not in plan: %#v", witness)
 		}
 	}
 	if strings.Contains(strings.Join(be.values(), ","), "pruned") {
 		t.Fatalf("pruned downstream judgement was dispatched: %v", be.values())
+	}
+}
+
+func fullComparableError(err error) string {
+	if err == nil {
+		return ""
+	}
+	var runtimeErr *RuntimeError
+	if errors.As(err, &runtimeErr) {
+		return fmt.Sprintf("runtime:%d:%s", runtimeErr.Frame, errors.Unwrap(runtimeErr))
+	}
+	return err.Error()
+}
+
+// TestIterativeHarvestPreservesReachableReservationErrorOrder pins the ordering
+// contract that is stricter than the deliberate unreachable-key R011 divergence.
+// A later frame's stage-one error must not eclipse an earlier frame's reachable
+// stage-two error merely because the iterative implementation batches stage one.
+func TestIterativeHarvestPreservesReachableReservationErrorOrder(t *testing.T) {
+	query := `select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`
+	stdin := "{\"id\":1,\"first\":\"yes\",\"second\":\"stage-two-error\"}\n{\"id\":2,\"first\":\"stage-one-error\",\"second\":\"keep\"}\n"
+	answer := func(j backend.Judgement) backend.Result {
+		switch j.Value {
+		case "stage-two-error":
+			return backend.Result{Error: "frame-one-stage-two"}
+		case "stage-one-error":
+			return backend.Result{Error: "frame-two-stage-one"}
+		default:
+			return keyedResult(j)
+		}
+	}
+	run := func(mode string, store *semanticcache.Store, be *keyedBackend) (iterativePathOutcome, []backend.Judgement) {
+		var stdout bytes.Buffer
+		opts := Options{Query: query, InputMode: input.ModeAuto, Output: output.Options{Compact: true}, Backend: be, SemanticCache: store, WindowBytes: 1024}
+		if mode == "iterative" {
+			opts.IterativeHarvest = true
+		}
+		if mode == "interleaved" {
+			opts.Stream = true
+		}
+		result, err := Execute(context.Background(), strings.NewReader(stdin), &stdout, opts)
+		var calls []backend.Judgement
+		for _, batch := range be.batches {
+			calls = append(calls, batch...)
+		}
+		return iterativePathOutcome{stdout: stdout.String(), result: result, err: err, calls: be.values()}, calls
+	}
+	for _, mode := range []string{"windowed", "iterative", "interleaved"} {
+		t.Run(mode, func(t *testing.T) {
+			store, be := semanticcache.NewStore(), &keyedBackend{answer: answer}
+			got, calls := run(mode, store, be)
+			if got.stdout != "" || !strings.Contains(fullComparableError(got.err), "frame-one-stage-two") {
+				t.Fatalf("outcome = stdout=%q err=%v, want frame-one stage-two error", got.stdout, got.err)
+			}
+			trace := strings.Join(got.calls, ",")
+			if !strings.Contains(trace, "sem_match:stage-two-error") {
+				t.Fatalf("calls = %v, want frame-one reachable stage-two error", got.calls)
+			}
+			if mode != "interleaved" && !strings.Contains(trace, "sem_match:stage-one-error") {
+				t.Fatalf("calls = %v, want later competing stage-one error in batched path", got.calls)
+			}
+			var firstKey semanticcache.Key
+			for _, judgement := range calls {
+				if judgement.Value == "yes" {
+					var err error
+					firstKey, err = semanticcache.KeyForJudgement(judgement)
+					if err != nil {
+						t.Fatal(err)
+					}
+					break
+				}
+			}
+			if _, ok := store.Get(firstKey); !ok {
+				t.Fatal("validated frame-one stage-one result was not committed")
+			}
+			retryBackend := &keyedBackend{answer: answer}
+			_, retryCalls := run(mode, store, retryBackend)
+			for _, judgement := range retryCalls {
+				if judgement.Value == "yes" {
+					t.Fatalf("retry re-dispatched committed prefix key: %#v", retryCalls)
+				}
+			}
+		})
+	}
+}
+
+func TestIterativeHarvestReservationPrefixErrorCacheContract(t *testing.T) {
+	query := `. | select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`
+	run := func(store *semanticcache.Store, be backend.Backend) error {
+		_, err := Execute(context.Background(), strings.NewReader("{\"id\":1,\"first\":\"no\",\"second\":\"cached\"}\n{\"id\":2,\"first\":\"stage-error\",\"second\":\"suffix\"}\n"), ioDiscard{}, Options{Query: query, InputMode: input.ModeAuto, Backend: be, SemanticCache: store, IterativeHarvest: true, WindowBytes: 1024})
+		return err
+	}
+	t.Run("rejected descendant before active error commits and reuses", func(t *testing.T) {
+		store := semanticcache.NewStore()
+		be := &keyedBackend{answer: func(j backend.Judgement) backend.Result {
+			if j.Value == "stage-error" {
+				return backend.Result{Error: "active-stage-error"}
+			}
+			return keyedResult(j)
+		}}
+		err := run(store, be)
+		if !strings.Contains(fullComparableError(err), "active-stage-error") || !reflect.DeepEqual(be.batchValues(), [][]string{{"sem_match:no", "sem_match:stage-error"}, {"sem_match:cached"}}) {
+			t.Fatalf("error/batches = %v/%v", err, be.batchValues())
+		}
+		var cachedKey semanticcache.Key
+		for _, batch := range be.batches {
+			for _, judgement := range batch {
+				if judgement.Value == "cached" {
+					var keyErr error
+					cachedKey, keyErr = semanticcache.KeyForJudgement(judgement)
+					if keyErr != nil {
+						t.Fatal(keyErr)
+					}
+				}
+			}
+		}
+		if _, ok := store.Get(cachedKey); !ok {
+			t.Fatal("validated rejected descendant was not committed")
+		}
+		retry := &keyedBackend{}
+		_, err = Execute(context.Background(), strings.NewReader(`{"second":"cached"}`), ioDiscard{}, Options{Query: `. | select(sem_match(.second; "keep"))`, InputMode: input.ModeAuto, Backend: retry, SemanticCache: store, IterativeHarvest: true})
+		if err != nil || len(retry.values()) != 0 {
+			t.Fatalf("cache identity retry err/calls = %v/%v, want hit/no call", err, retry.values())
+		}
+	})
+	t.Run("earlier synthetic prefix failure wins", func(t *testing.T) {
+		store := semanticcache.NewStore()
+		be := &keyedBackend{answer: func(j backend.Judgement) backend.Result {
+			switch j.Value {
+			case "cached":
+				return backend.Result{Error: "synthetic-prefix-error"}
+			case "stage-error":
+				return backend.Result{Error: "later-active-error"}
+			default:
+				return keyedResult(j)
+			}
+		}}
+		err := run(store, be)
+		var runtimeErr *RuntimeError
+		if !errors.As(err, &runtimeErr) || runtimeErr.Frame != 1 || !strings.Contains(fullComparableError(err), "synthetic-prefix-error") || !reflect.DeepEqual(be.batchValues(), [][]string{{"sem_match:no", "sem_match:stage-error"}, {"sem_match:cached"}}) {
+			t.Fatalf("synthetic prefix error/batches = %v/%v", err, be.batchValues())
+		}
+	})
+}
+
+func TestIterativeHarvestActiveStageFailuresDiscardOverlay(t *testing.T) {
+	query := `. | select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`
+	inputText := `{"id":1,"first":"yes","second":"keep"}`
+	cases := []struct {
+		name string
+		be   backend.Backend
+	}{
+		{"transport", &keyedBackend{transport: func([]backend.Judgement) error { return errors.New("active transport") }}},
+		{"wrong result count", &recordingBackend{results: func([]backend.Judgement) []backend.Result { return nil }}},
+		{"invalid schema", &recordingBackend{results: func([]backend.Judgement) []backend.Result { return []backend.Result{{Value: "not-bool"}} }}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := semanticcache.NewStore()
+			_, err := Execute(context.Background(), strings.NewReader(inputText), ioDiscard{}, Options{Query: query, InputMode: input.ModeAuto, Backend: tc.be, SemanticCache: store, IterativeHarvest: true})
+			if err == nil {
+				t.Fatal("active-stage failure succeeded")
+			}
+			retry := &keyedBackend{}
+			_, err = Execute(context.Background(), strings.NewReader(inputText), ioDiscard{}, Options{Query: query, InputMode: input.ModeAuto, Backend: retry, SemanticCache: store, IterativeHarvest: true})
+			if err != nil || !reflect.DeepEqual(retry.batchValues(), [][]string{{"sem_match:yes"}, {"sem_match:keep"}}) {
+				t.Fatalf("unflushed overlay retry err/batches = %v/%v", err, retry.batchValues())
+			}
+		})
+	}
+}
+
+func TestIterativeHarvestDeferredAndFinalOutcomesKeepResolvedCache(t *testing.T) {
+	query := `. | select(sem_match(.first; "yes")) | .id`
+	cacheKey := func(t *testing.T, be *keyedBackend) semanticcache.Key {
+		t.Helper()
+		if len(be.batches) != 1 || len(be.batches[0]) != 1 {
+			t.Fatalf("batches = %#v", be.batches)
+		}
+		key, err := semanticcache.KeyForJudgement(be.batches[0][0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		return key
+	}
+	t.Run("deferred diagnostic yields to prefix backend failure", func(t *testing.T) {
+		be := &keyedBackend{answer: func(j backend.Judgement) backend.Result { return backend.Result{Error: "prefix-backend"} }}
+		_, err := Execute(context.Background(), strings.NewReader("{\"id\":1,\"first\":\"yes\"}\n1\n"), ioDiscard{}, Options{Query: query, InputMode: input.ModeAuto, Backend: be, IterativeHarvest: true, WindowBytes: 1024})
+		var runtimeErr *RuntimeError
+		if !errors.As(err, &runtimeErr) || runtimeErr.Frame != 1 || !strings.Contains(err.Error(), "prefix-backend") {
+			t.Fatalf("error = %v, want prefix backend failure", err)
+		}
+	})
+	t.Run("deferred diagnostic yields to prefix cap", func(t *testing.T) {
+		be := &keyedBackend{}
+		_, err := Execute(context.Background(), strings.NewReader("{\"id\":1,\"first\":\"yes\"}\n1\n"), ioDiscard{}, Options{Query: `. | select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`, InputMode: input.ModeAuto, Backend: be, IterativeHarvest: true, WindowBytes: 1024, MaxCalls: 1})
+		var capErr *MaxCallsExceededError
+		var runtimeErr *RuntimeError
+		if !errors.As(err, &capErr) || !errors.As(err, &runtimeErr) || runtimeErr.Frame != 1 || len(be.values()) != 0 {
+			t.Fatalf("prefix cap error/calls = %v/%v", err, be.values())
+		}
+	})
+	t.Run("final jq failure retains cache", func(t *testing.T) {
+		stagedQuery := `. | select(sem_match(.first; "yes")) | .id`
+		semanticPlan, diagnostics := plan.Build(stagedQuery)
+		if len(diagnostics) != 0 {
+			t.Fatalf("plan diagnostics = %#v", diagnostics)
+		}
+		stages, ok := plan.IterativeStages(stagedQuery, semanticPlan)
+		if !ok {
+			t.Fatal("supported query was not staged")
+		}
+		store, be, stats := semanticcache.NewStore(), &keyedBackend{}, RunStats{}
+		program, err := compileIterative(stagedQuery, be, "", store, &stats, stages)
+		if err != nil {
+			t.Fatal(err)
+		}
+		program.executeProgram, err = jq.Compile(`error("final jq failure")`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		frame := input.Frame{Index: 0, Value: map[string]any{"id": 1, "first": "yes"}}
+		program.reservation.beginWindow()
+		if err := program.reservation.harvestAppend(frame.Value, frame.Index); err != nil {
+			t.Fatal(err)
+		}
+		err = program.processWindow(context.Background(), ioDiscard{}, Options{}, &Result{}, []input.Frame{frame})
+		if err == nil || !strings.Contains(err.Error(), "final jq failure") {
+			t.Fatalf("final jq failure = %v", err)
+		}
+		if _, ok := store.Get(cacheKey(t, be)); !ok {
+			t.Fatal("final jq failure discarded resolved cache")
+		}
+	})
+	t.Run("failing writer retains cache", func(t *testing.T) {
+		store, be := semanticcache.NewStore(), &keyedBackend{}
+		_, err := Execute(context.Background(), strings.NewReader(`{"id":1,"first":"yes"}`), failingStreamWriter{}, Options{Query: query, InputMode: input.ModeAuto, Backend: be, SemanticCache: store, IterativeHarvest: true})
+		if err == nil || !strings.Contains(err.Error(), "stream writer failed") {
+			t.Fatalf("writer failure = %v", err)
+		}
+		if _, ok := store.Get(cacheKey(t, be)); !ok {
+			t.Fatal("writer failure discarded resolved cache")
+		}
+	})
+}
+
+func TestIterativeHarvestCharacterizesPrunedDownstreamCacheAndTransportDivergence(t *testing.T) {
+	query := `.[] | select(sem_match(.first; "yes")) | select(sem_match(.second; "keep")) | .id`
+	stdin := `[{"id":1,"first":"no","second":"poison"}]`
+	type divergenceCase struct {
+		name       string
+		newBackend func() *keyedBackend
+		wantError  string
+	}
+	cases := []divergenceCase{
+		{"per-result schema", func() *keyedBackend {
+			return &keyedBackend{answer: func(j backend.Judgement) backend.Result {
+				if j.Value == "poison" {
+					return backend.Result{Value: "not-a-bool"}
+				}
+				return keyedResult(j)
+			}}
+		}, "want bool result"},
+		{"transport", func() *keyedBackend {
+			return &keyedBackend{transport: func(batch []backend.Judgement) error {
+				for _, j := range batch {
+					if j.Value == "poison" {
+						return errors.New("poison transport")
+					}
+				}
+				return nil
+			}}
+		}, "poison transport"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			run := func(mode string, store *semanticcache.Store, be *keyedBackend) (Result, error) {
+				opts := Options{Query: query, InputMode: input.ModeAuto, Backend: be, SemanticCache: store, IterativeHarvest: mode == "iterative", Stream: mode == "interleaved"}
+				return Execute(context.Background(), strings.NewReader(stdin), ioDiscard{}, opts)
+			}
+			windowStore, windowBackend := semanticcache.NewStore(), tc.newBackend()
+			_, windowErr := run("windowed", windowStore, windowBackend)
+			if !strings.Contains(fullComparableError(windowErr), tc.wantError) || !strings.Contains(strings.Join(windowBackend.values(), ","), "poison") {
+				t.Fatalf("windowed err/calls = %v/%v", windowErr, windowBackend.values())
+			}
+			var poisonKey semanticcache.Key
+			for _, batch := range windowBackend.batches {
+				for _, j := range batch {
+					if j.Value == "poison" {
+						var err error
+						poisonKey, err = semanticcache.KeyForJudgement(j)
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+			if _, ok := windowStore.Get(poisonKey); ok {
+				t.Fatal("windowed failure committed poison key")
+			}
+			windowRetry := &keyedBackend{}
+			_, retryErr := run("windowed", windowStore, windowRetry)
+			if retryErr != nil || !strings.Contains(strings.Join(windowRetry.values(), ","), "poison") {
+				t.Fatalf("windowed retry err/calls = %v/%v, want poison redispatch", retryErr, windowRetry.values())
+			}
+			for _, mode := range []string{"iterative", "interleaved"} {
+				store, be := semanticcache.NewStore(), tc.newBackend()
+				_, err := run(mode, store, be)
+				if err != nil || strings.Contains(strings.Join(be.values(), ","), "poison") {
+					t.Fatalf("%s pruned err/calls = %v/%v", mode, err, be.values())
+				}
+				if _, ok := store.Get(poisonKey); ok {
+					t.Fatalf("%s invented a cache entry for pruned poison", mode)
+				}
+				retry := &keyedBackend{}
+				_, err = run(mode, store, retry)
+				if err != nil || len(retry.values()) != 0 {
+					t.Fatalf("%s warm retry err/calls = %v/%v, want cached false gate and no poison", mode, err, retry.values())
+				}
+			}
+		})
 	}
 }
