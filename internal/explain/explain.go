@@ -21,6 +21,7 @@ const (
 	EstimateStatusUnavailableInvalid     = "unavailable: invalid input"
 	EstimateStatusUnavailableHarvest     = "unavailable: unsupported harvest"
 	EstimateStatusUnavailableInterleaved = "unavailable: interleaved fallback"
+	EstimateStatusUnavailableUserStream  = "unavailable: user stream"
 )
 
 // Estimate contains semantic --explain call-estimate fields. Units are explicit:
@@ -46,6 +47,10 @@ type Plan struct {
 	Query        string
 	SemanticPlan *planpkg.Plan
 	Estimate     *Estimate
+	// Stream reports user-selected inline execution for a supported semantic
+	// plan. Planner-required interleaving takes precedence and leaves Stream
+	// false at the rendering boundary.
+	Stream bool
 }
 
 // Write renders a byte-stable explanation for an ajq query.
@@ -83,7 +88,7 @@ func writeSemantic(w io.Writer, plan Plan) error {
 	lines := []string{
 		fmt.Sprintf("ajq explain v%d", version),
 		fmt.Sprintf("query: %q", plan.Query),
-		executionLine(semanticPlan),
+		executionLine(semanticPlan, plan.Stream),
 		"deterministic: no",
 		"model_calls: input-dependent",
 		"backend_calls: input-dependent",
@@ -134,15 +139,18 @@ func writeSemantic(w io.Writer, plan Plan) error {
 	return nil
 }
 
-func executionLine(semanticPlan *planpkg.Plan) string {
+func executionLine(semanticPlan *planpkg.Plan, stream bool) string {
 	if semanticPlan != nil && semanticPlan.RequiresInterleaved {
 		return "execution: semantic interleaved fallback"
+	}
+	if stream {
+		return "execution: semantic user-stream inline"
 	}
 	return "execution: semantic split plan"
 }
 
 func semanticStdinLine(estimate *Estimate) string {
-	if estimate == nil || estimate.Status == EstimateStatusUnavailableNoInput || estimate.Status == EstimateStatusUnavailablePureJQ {
+	if estimate == nil || estimate.Status != EstimateStatusAvailable {
 		return "stdin: not harvested"
 	}
 	return "stdin: harvested for estimates"

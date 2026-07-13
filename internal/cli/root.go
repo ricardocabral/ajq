@@ -88,6 +88,7 @@ func NewRootCommand(opts Options) *cobra.Command {
 	var baseURL string
 	var maxCalls int
 	var windowBytes int64
+	var stream bool
 	var cloud bool
 	var noCache bool
 
@@ -147,7 +148,8 @@ exercise semantic query syntax without a model, network access, or API key.`,
 				if err := validateExplainCompile(rewrittenQuery, semanticPlan.Deterministic); err != nil {
 					return &ExitError{Code: 3, Err: fmt.Errorf("query %q compile error: %w", query, err)}
 				}
-				explainPlan := explain.Plan{Query: rewrittenQuery, SemanticPlan: &semanticPlan}
+				streamExplain := stream && !semanticPlan.RequiresInterleaved
+				explainPlan := explain.Plan{Query: rewrittenQuery, SemanticPlan: &semanticPlan, Stream: streamExplain}
 				if !semanticPlan.Deterministic {
 					mode := input.ModeAuto
 					if nullInput {
@@ -156,14 +158,14 @@ exercise semantic query syntax without a model, network access, or API key.`,
 						mode = input.ModeRaw
 					}
 					estimateInput := cmd.InOrStdin()
-					if mode != input.ModeNull {
+					if mode != input.ModeNull && !streamExplain {
 						data, err := io.ReadAll(cmd.InOrStdin())
 						if err != nil {
 							return &ExitError{Code: 3, Err: fmt.Errorf("query %q explain input error: %w", query, err)}
 						}
 						estimateInput = strings.NewReader(string(data))
 					}
-					estimate := engine.EstimateExplain(cmd.Context(), rewrittenQuery, estimateInput, mode)
+					estimate := engine.EstimateExplainWithOptions(cmd.Context(), rewrittenQuery, estimateInput, engine.ExplainOptions{InputMode: mode, Stream: streamExplain})
 					explainPlan.Estimate, err = explainEstimateFromEngine(cmd, flagValues, rewrittenQuery, estimate)
 					if err != nil {
 						return &ExitError{Code: 2, Err: err}
@@ -198,6 +200,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 				MaxCalls:            resolution.MaxCalls,
 				MaxCallsDefaultPaid: resolution.MaxCallsDefaultPaid,
 				WindowBytes:         resolution.WindowBytes,
+				Stream:              stream,
 			})
 			if err != nil {
 				code := 1
@@ -243,6 +246,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 	cmd.Flags().StringVar(&baseURL, "base-url", "", "base URL for HTTP semantic backends")
 	cmd.Flags().IntVar(&maxCalls, "max-calls", 0, "maximum post-dedup backend judgements before aborting (0 = unlimited; paid backends default to 100, local/ollama/mock default to unlimited)")
 	cmd.Flags().Int64Var(&windowBytes, "window-bytes", 0, "maximum source bytes per supported three-phase semantic window (default 262144)")
+	cmd.Flags().BoolVar(&stream, "stream", false, "run supported semantic queries inline for low-latency frame output instead of window batching")
 	cmd.Flags().BoolVar(&cloud, "cloud", false, "select the Anthropic cloud semantic backend (equivalent to --backend anthropic)")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "disable persistent on-disk judgement cache for this run")
 

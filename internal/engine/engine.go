@@ -37,6 +37,10 @@ type Options struct {
 	// semantic execution. Zero selects DefaultWindowBytes; negative values are
 	// rejected. Pure-jq and interleaved execution do not use this setting.
 	WindowBytes int64
+	// Stream selects inline semantic execution for semantic plans that otherwise
+	// support three-phase windowing. It does not affect pure-jq execution or any
+	// semantic backend, model, cache, or cost settings.
+	Stream bool
 }
 
 // ErrInvalidWindowBytes reports a negative direct engine window budget.
@@ -60,8 +64,15 @@ const (
 	ExecutionModePureJQ ExecutionMode = "pure-jq"
 	// ExecutionModeThreePhaseWindowed reports supported semantic execution in input windows.
 	ExecutionModeThreePhaseWindowed ExecutionMode = "three-phase-windowed"
-	// ExecutionModeInterleaved reports semantic execution that cannot use three phases.
-	ExecutionModeInterleaved ExecutionMode = "interleaved"
+	// ExecutionModePlannerInterleaved reports semantic execution that the planner
+	// requires to run inline because it cannot use three phases.
+	ExecutionModePlannerInterleaved ExecutionMode = "planner-interleaved"
+	// ExecutionModeUserStream reports supported semantic execution selected by
+	// Options.Stream to run inline instead of in three-phase windows.
+	ExecutionModeUserStream ExecutionMode = "user-stream"
+	// ExecutionModeInterleaved is retained as a source-compatible alias for
+	// planner-required interleaved execution.
+	ExecutionModeInterleaved = ExecutionModePlannerInterleaved
 )
 
 // RunStats summarizes per-run accounting. InputFrames counts frames read from
@@ -158,7 +169,10 @@ func Execute(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Option
 	}
 	if len(diagnostics) == 0 && !semanticPlan.Deterministic {
 		if semanticPlan.RequiresInterleaved {
-			return executeInterleaved(ctx, stdin, stdout, opts, len(semanticPlan.Semantic))
+			return executeInterleaved(ctx, stdin, stdout, opts, len(semanticPlan.Semantic), ExecutionModePlannerInterleaved)
+		}
+		if opts.Stream {
+			return executeInterleaved(ctx, stdin, stdout, opts, len(semanticPlan.Semantic), ExecutionModeUserStream)
 		}
 		return executeThreePhase(ctx, stdin, stdout, opts, len(semanticPlan.Semantic))
 	}
@@ -176,8 +190,8 @@ func rewriteQuery(query string) (string, error) {
 	return desugar.Rewrite(query)
 }
 
-func executeInterleaved(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Options, callSites int) (Result, error) {
-	stats := RunStats{ExecutionMode: ExecutionModeInterleaved, SemanticCallSites: callSites}
+func executeInterleaved(ctx context.Context, stdin io.Reader, stdout io.Writer, opts Options, callSites int, mode ExecutionMode) (Result, error) {
+	stats := RunStats{ExecutionMode: mode, SemanticCallSites: callSites}
 	program, err := compileInterleavedWithStats(ctx, opts.Query, opts.Backend, opts.SemanticModelID, opts.SemanticCache, &stats, opts.MaxCalls, opts.MaxCallsDefaultPaid)
 	if err != nil {
 		return Result{RunStats: stats}, err
