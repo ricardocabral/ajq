@@ -470,6 +470,9 @@ func explainPaidBackend(cmd *cobra.Command, flags config.Values) (backendRegistr
 		return backendRegistration{}, "", 0, false, unknownBackendError(settings.Backend)
 	}
 	settings = config.Resolve(flags, envValues, fileValues, registration.defaults())
+	if err := registration.validateBackendConcurrency(settings.BackendConcurrency); err != nil {
+		return backendRegistration{}, "", 0, false, err
+	}
 	modelID := settings.Model
 	if registration.ModelIdentity != nil {
 		modelID, err = registration.ModelIdentity(settings)
