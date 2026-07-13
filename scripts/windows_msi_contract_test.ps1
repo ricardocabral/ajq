@@ -93,6 +93,9 @@ foreach ($needle in @(
 )) {
     if (-not $msiFinalizer.Contains($needle)) { throw "MSI finalizer is missing reproducibility control: $needle" }
 }
+if ($msiFinalizer.IndexOf('$database.Commit()') -gt $msiFinalizer.IndexOf('$summary.Property(9) = $PackageCode')) {
+    throw 'MSI package-code normalization must happen after the WiX database commit'
+}
 
 foreach ($needle in @(
     'name: Create draft GitHub release',

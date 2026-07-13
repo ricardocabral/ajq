@@ -20,14 +20,17 @@ $database = $null
 $summary = $null
 try {
     $database = $installer.OpenDatabase((Resolve-Path -LiteralPath $MsiPath).Path, 1)
+    # Commit WiX's database work first: Windows Installer regenerates the
+    # package-code summary property during that commit. Persist our stable
+    # package code only after it, otherwise the commit overwrites it.
+    $database.Commit()
     $summary = $database.SummaryInformation(20)
     $reproducibleTime = [datetime]::SpecifyKind([datetime]'2000-01-01T00:00:00', [DateTimeKind]::Utc)
     $summary.Property(9) = $PackageCode
     $summary.Property(12) = $reproducibleTime
     $summary.Property(13) = $reproducibleTime
     $summary.Persist()
-    $database.Commit()
-    if ($summary.Property(9) -cne $PackageCode) { throw 'failed to persist deterministic MSI package code' }
+    if ($summary.Property(9) -cne $PackageCode) { throw "failed to persist deterministic MSI package code (got $($summary.Property(9)))" }
 } finally {
     if ($summary) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($summary) }
     if ($database) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database) }
