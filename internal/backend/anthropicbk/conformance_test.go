@@ -13,10 +13,10 @@ func TestAnthropicBackendConformance(t *testing.T) {
 }
 
 func TestAnthropicBackendConcurrentConformance(t *testing.T) {
-	runConformance(t, 2)
+	runConformance(t, 2, conformance.WithConcurrentDispatcher())
 }
 
-func runConformance(t *testing.T, maxConcurrency int) {
+func runConformance(t *testing.T, maxConcurrency int, opts ...conformance.Option) {
 	t.Helper()
 	t.Setenv(APIKeyEnv, "test-key")
 	server := conformance.NewScriptedServer(t, conformance.ProtocolAnthropic)
@@ -27,5 +27,5 @@ func runConformance(t *testing.T, maxConcurrency int) {
 		}
 		be.MaxConcurrency = maxConcurrency
 		return be
-	}, conformance.WithScriptedServer(server))
+	}, append(opts, conformance.WithScriptedServer(server))...)
 }

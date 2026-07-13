@@ -388,6 +388,81 @@ func TestAnthropicBackendConcurrentOrderBoundAndItemError(t *testing.T) {
 	}
 }
 
+func TestAnthropicBackendConcurrentRetriesRemainPerJudgement(t *testing.T) {
+	var mu sync.Mutex
+	inFlight, peak, firstAttempts := 0, 0, 0
+	attempts := map[string]int{}
+	firstAttemptsReady := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		body, _ := io.ReadAll(r.Body)
+		prompt := string(body)
+		kind := ""
+		switch {
+		case strings.Contains(prompt, "Value: retry-429"):
+			kind = "retry-429"
+		case strings.Contains(prompt, "Value: retry-5xx"):
+			kind = "retry-5xx"
+		default:
+			t.Errorf("unexpected prompt")
+			return
+		}
+		mu.Lock()
+		inFlight++
+		if inFlight > peak {
+			peak = inFlight
+		}
+		attempts[kind]++
+		attempt := attempts[kind]
+		mu.Unlock()
+		defer func() {
+			mu.Lock()
+			inFlight--
+			mu.Unlock()
+		}()
+		if attempt == 1 {
+			mu.Lock()
+			firstAttempts++
+			if firstAttempts == 2 {
+				close(firstAttemptsReady)
+			}
+			mu.Unlock()
+			<-firstAttemptsReady
+			w.Header().Set("Retry-After-Ms", "0")
+			if kind == "retry-429" {
+				http.Error(w, `{"type":"error","error":{"type":"rate_limit_error"}}`, http.StatusTooManyRequests)
+				return
+			}
+			http.Error(w, `{"type":"error","error":{"type":"api_error"}}`, http.StatusInternalServerError)
+			return
+		}
+		_, _ = io.WriteString(w, anthropicResponse(DefaultModel, "", textContent("true")))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv(APIKeyEnv, "test-key")
+	be, err := New("haiku", option.WithBaseURL(srv.URL), option.WithHTTPClient(srv.Client()), option.WithMaxRetries(2))
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+	be.MaxConcurrency = 2
+	results, err := be.Judge(context.Background(), []backend.Judgement{
+		{Op: "sem_match", Return: semantics.ReturnBool, Specs: []string{"x"}, Value: "retry-429"},
+		{Op: "sem_match", Return: semantics.ReturnBool, Specs: []string{"x"}, Value: "retry-5xx"},
+	})
+	if err != nil {
+		t.Fatalf("Judge returned error: %v", err)
+	}
+	if len(results) != 2 || results[0].Value != true || results[1].Value != true {
+		t.Fatalf("results = %#v, want ordered successful retries", results)
+	}
+	mu.Lock()
+	gotPeak, got429, got5xx := peak, attempts["retry-429"], attempts["retry-5xx"]
+	mu.Unlock()
+	if gotPeak != 2 || got429 != 2 || got5xx != 2 {
+		t.Fatalf("peak/attempts = %d/%d/%d, want 2/2/2", gotPeak, got429, got5xx)
+	}
+}
+
 func TestAnthropicBackendConcurrentTransportFailureCancelsSibling(t *testing.T) {
 	waitStarted := make(chan struct{})
 	waitCancelled := make(chan struct{})

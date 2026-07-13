@@ -14,10 +14,10 @@ func TestOpenAIBackendConformance(t *testing.T) {
 }
 
 func TestOpenAIBackendConcurrentConformance(t *testing.T) {
-	runConformance(t, 2)
+	runConformance(t, 2, conformance.WithConcurrentDispatcher())
 }
 
-func runConformance(t *testing.T, maxConcurrency int) {
+func runConformance(t *testing.T, maxConcurrency int, opts ...conformance.Option) {
 	t.Helper()
 	server := conformance.NewScriptedServer(t, conformance.ProtocolOpenAI)
 	conformance.Run(t, func(serverURL string) backend.Backend {
@@ -29,5 +29,5 @@ func runConformance(t *testing.T, maxConcurrency int) {
 			MaxConcurrency: maxConcurrency,
 			RetrySleep:     func(context.Context, time.Duration) error { return nil },
 		}
-	}, conformance.WithScriptedServer(server))
+	}, append(opts, conformance.WithScriptedServer(server))...)
 }

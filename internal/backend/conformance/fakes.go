@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,6 +35,10 @@ type ScriptedServer struct {
 	scripts    map[string][]scriptResponse
 	caseIdx    map[string]int
 	activeCase string
+
+	concurrentBlockStarted   chan struct{}
+	concurrentBlockCancelled chan struct{}
+	concurrentBlockOnce      sync.Once
 }
 
 type scriptResponse struct {
@@ -71,6 +76,31 @@ func (s *ScriptedServer) StartCase(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.activeCase = name
+	if name == "concurrent_transport_failure_cancels_admitted_sibling" {
+		s.concurrentBlockStarted = make(chan struct{})
+		s.concurrentBlockCancelled = make(chan struct{})
+		s.concurrentBlockOnce = sync.Once{}
+		return
+	}
+	s.concurrentBlockStarted = nil
+	s.concurrentBlockCancelled = nil
+}
+
+// WaitForConcurrentSiblingCancellation verifies the special concurrent
+// conformance case observed cancellation of its admitted blocked sibling.
+func (s *ScriptedServer) WaitForConcurrentSiblingCancellation(ctx context.Context) error {
+	s.mu.Lock()
+	cancelled := s.concurrentBlockCancelled
+	s.mu.Unlock()
+	if cancelled == nil {
+		return fmt.Errorf("concurrent cancellation case was not initialized")
+	}
+	select {
+	case <-cancelled:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("admitted concurrent sibling was not cancelled: %w", ctx.Err())
+	}
 }
 
 func (s *ScriptedServer) serveHTTP(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +120,10 @@ func (s *ScriptedServer) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(caseName) == "" {
 		caseName = detectCase(body)
 	}
+	if caseName == "concurrent_transport_failure_cancels_admitted_sibling" {
+		s.serveConcurrentTransportCancellation(w, r, body)
+		return
+	}
 	if resp, ok := s.requestAwareResponse(caseName, body); ok {
 		s.writeResponse(w, resp)
 		return
@@ -100,6 +134,37 @@ func (s *ScriptedServer) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeResponse(w, resp)
+}
+
+func (s *ScriptedServer) serveConcurrentTransportCancellation(w http.ResponseWriter, r *http.Request, body []byte) {
+	if strings.Contains(string(body), "Value: block") {
+		s.mu.Lock()
+		started := s.concurrentBlockStarted
+		cancelled := s.concurrentBlockCancelled
+		once := &s.concurrentBlockOnce
+		s.mu.Unlock()
+		if started == nil || cancelled == nil {
+			http.Error(w, "concurrent case was not initialized", http.StatusInternalServerError)
+			return
+		}
+		once.Do(func() { close(started) })
+		<-r.Context().Done()
+		close(cancelled)
+		return
+	}
+	if strings.Contains(string(body), "Value: fail") {
+		s.mu.Lock()
+		started := s.concurrentBlockStarted
+		s.mu.Unlock()
+		if started == nil {
+			http.Error(w, "concurrent case was not initialized", http.StatusInternalServerError)
+			return
+		}
+		<-started
+		http.Error(w, "scripted concurrent transport failure", http.StatusBadRequest)
+		return
+	}
+	http.Error(w, "unexpected concurrent conformance request", http.StatusInternalServerError)
 }
 
 func (s *ScriptedServer) validPath(path string) bool {
