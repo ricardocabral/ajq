@@ -438,49 +438,46 @@ func explainEstimateFromEngine(cmd *cobra.Command, flags config.Values, query st
 		PostDedupJudgements: estimate.PostDedupJudgements,
 		MockJudgeBatches:    estimate.MockJudgeBatches,
 	}
-	if estimate.Status != engine.ExplainEstimateAvailable {
-		return out, nil
-	}
-	registration, modelID, maxOutputTokens, ok, err := explainPaidBackend(cmd, flags)
-	if err != nil || !ok || !registration.Paid {
+	registration, settings, ok, err := resolveExplainBackend(cmd, flags)
+	if err != nil || !ok || estimate.Status != engine.ExplainEstimateAvailable || !registration.Paid {
 		return out, err
 	}
-	usd, known := pricing.Estimate(modelID, estimate.PostDedupJudgements, len(query), maxOutputTokens)
+	modelID := settings.Model
+	if registration.ModelIdentity != nil {
+		modelID, err = registration.ModelIdentity(settings)
+		if err != nil {
+			return out, err
+		}
+	}
+	usd, known := pricing.Estimate(modelID, estimate.PostDedupJudgements, len(query), registration.DefaultMaxOutputTokens)
 	out.EstimatedCostModelID = modelID
 	out.EstimatedCostUSD = usd
 	out.EstimatedCostKnown = known
 	return out, nil
 }
 
-func explainPaidBackend(cmd *cobra.Command, flags config.Values) (backendRegistration, string, int, bool, error) {
+func resolveExplainBackend(cmd *cobra.Command, flags config.Values) (backendRegistration, config.Settings, bool, error) {
 	fileValues, err := config.LoadWithOptions(config.LoadOptions{Stderr: cmd.ErrOrStderr()})
 	if err != nil {
-		return backendRegistration{}, "", 0, false, err
+		return backendRegistration{}, config.Settings{}, false, err
 	}
 	envValues, err := config.Env(os.Getenv)
 	if err != nil {
-		return backendRegistration{}, "", 0, false, err
+		return backendRegistration{}, config.Settings{}, false, err
 	}
 	settings := config.Resolve(flags, envValues, fileValues, config.Values{})
 	if settings.Backend == "" {
-		return backendRegistration{}, "", 0, false, nil
+		return backendRegistration{}, config.Settings{}, false, nil
 	}
 	registration, ok := lookupBackend(settings.Backend)
 	if !ok {
-		return backendRegistration{}, "", 0, false, unknownBackendError(settings.Backend)
+		return backendRegistration{}, config.Settings{}, false, unknownBackendError(settings.Backend)
 	}
 	settings = config.Resolve(flags, envValues, fileValues, registration.defaults())
 	if err := registration.validateBackendConcurrency(settings.BackendConcurrency); err != nil {
-		return backendRegistration{}, "", 0, false, err
+		return backendRegistration{}, config.Settings{}, false, err
 	}
-	modelID := settings.Model
-	if registration.ModelIdentity != nil {
-		modelID, err = registration.ModelIdentity(settings)
-		if err != nil {
-			return backendRegistration{}, "", 0, false, err
-		}
-	}
-	return registration, modelID, registration.DefaultMaxOutputTokens, true, nil
+	return registration, settings, true, nil
 }
 
 func printRunStats(w io.Writer, stats engine.RunStats, paid bool, modelID string, promptChars int, maxOutputTokens int) error {

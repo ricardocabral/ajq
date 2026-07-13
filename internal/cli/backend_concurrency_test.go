@@ -227,17 +227,23 @@ func TestBackendConcurrencyExplainValidation(t *testing.T) {
 		{name: "TOML", file: "backend = \"anthropic\"\nbackend_concurrency = 3\n", want: "anthropic backend concurrency 3 exceeds maximum 2"},
 		{name: "selected backend after switch", file: "backend = \"ollama\"\nmodel = \"llama3.2\"\nbackend_concurrency = 4\n", args: []string{"--backend", "openai", "--model", "test"}, want: "openai backend concurrency 4 exceeds maximum 2"},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			isolateConfigEnv(t)
-			if tc.file != "" {
-				t.Setenv("AJQ_CONFIG", writeTempConfig(t, tc.file))
+		for _, stdin := range []string{`{"msg":"keep"}`, ""} {
+			name := tc.name + "/available"
+			if stdin == "" {
+				name = tc.name + "/unavailable"
 			}
-			t.Setenv("AJQ_BACKEND_CONCURRENCY", tc.env)
-			args := append(tc.args, "--explain", `.msg =~ "keep"`)
-			_, stderr, err := executeForBackendTest(t, nil, `{"msg":"keep"}`, args...)
-			if err == nil || !strings.Contains(stderr, tc.want) {
-				t.Fatalf("error=%v stderr=%q, want %q", err, stderr, tc.want)
-			}
-		})
+			t.Run(name, func(t *testing.T) {
+				isolateConfigEnv(t)
+				if tc.file != "" {
+					t.Setenv("AJQ_CONFIG", writeTempConfig(t, tc.file))
+				}
+				t.Setenv("AJQ_BACKEND_CONCURRENCY", tc.env)
+				args := append(tc.args, "--explain", `.msg =~ "keep"`)
+				_, stderr, err := executeForBackendTest(t, nil, stdin, args...)
+				if err == nil || !strings.Contains(stderr, tc.want) {
+					t.Fatalf("error=%v stderr=%q, want %q", err, stderr, tc.want)
+				}
+			})
+		}
 	}
 }
