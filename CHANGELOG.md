@@ -20,6 +20,15 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Added
 
+- Added bounded provider batch concurrency through `--backend-concurrency`,
+  `AJQ_BACKEND_CONCURRENCY`, and TOML `backend_concurrency`. OpenAI-compatible and
+  Anthropic backends remain sequential by default and allow an explicit maximum of two
+  in-flight requests; Ollama defaults to one and allows four. Ordered results, cancellation,
+  retries, and `--max-calls` accounting are preserved.
+- Added `--stream` for supported semantic NDJSON/raw pipelines that need low-latency,
+  inline frame output instead of default window batching. The mode preserves cache identity
+  and `--max-calls` semantics; `--explain` and `--stats` now identify its inline batching
+  and cross-frame deduplication trade-off.
 - Added byte-budgeted semantic NDJSON windows with `--window-bytes`,
   `AJQ_WINDOW_BYTES`, and TOML `window_bytes` configuration, plus window-mode
   statistics for configured budgets, formed windows, and oversized records.
@@ -37,6 +46,7 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 - Added the first reviewed fresh-session `none` versus `local-guidance` routing baseline for
   Codex GPT-5. It is recorded as one paired observation, not a general discovery-rate claim.
 - Added a bounded classification recipe for webhook events emitted as NDJSON.
+- Documented reproducible evidence for the non-default iterative-harvest prototype: it remains unavailable to users after a no-go decision caused by strict error-contract divergence and no-prune fake-overhead thresholds.
 
 ### Fixed
 

@@ -30,6 +30,36 @@ func TestDetectRealAssetsIsSafe(t *testing.T) {
 // TestRealBench runs the real-inference benchmark. It is gated behind both the
 // AJQ_BENCH_REAL=1 opt-in and the presence of provisioned assets, so the normal
 // `go test ./...` run never spawns a daemon or loads a model.
+func TestIterativeLocalBench(t *testing.T) {
+	if os.Getenv(bench.EnvRealBench) != "1" {
+		t.Skipf("iterative local bench disabled: set %s=1 to enable", bench.EnvRealBench)
+	}
+	cfg, available, reason := bench.DetectRealAssets()
+	if !available {
+		t.Skipf("iterative local assets unavailable: %s", reason)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	defer cancel()
+	var workload bench.IterativeWorkload
+	for _, candidate := range bench.IterativeWorkloads() {
+		if candidate.Name == "high-prune" {
+			workload = candidate
+			break
+		}
+	}
+	if workload.Name == "" {
+		t.Fatal("high-prune workload missing")
+	}
+	report, err := bench.RunIterativeLocal(ctx, cfg, workload, 3)
+	if err != nil {
+		t.Fatalf("RunIterativeLocal: %v", err)
+	}
+	if len(report.Samples[bench.IterativeModeWindowed]) != 3 || len(report.Samples[bench.IterativeModeHarvest]) != 3 {
+		t.Fatalf("incomplete local comparison: %+v", report.Samples)
+	}
+	t.Logf("iterative local comparison (informational; fake gate remains authoritative): %+v", report)
+}
+
 func TestRealBench(t *testing.T) {
 	if os.Getenv(bench.EnvRealBench) != "1" {
 		t.Skipf("real bench disabled: set %s=1 to enable", bench.EnvRealBench)

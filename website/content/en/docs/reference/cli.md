@@ -26,6 +26,7 @@ when semantic operators require one.
 |---|---|---|
 | `--backend <name>` | | Select the semantic backend: `anthropic`, `local`, `mock`, `ollama`, `openai`, or `openrouter`. |
 | `--base-url <url>` | | Set the HTTP base URL for backends that use one (`local`, `ollama`, `openai`, `openrouter`). For `openai`/`openrouter`, custom URLs must use HTTPS unless the host is loopback (`127.0.0.1`, `localhost`, or `[::1]`). |
+| `--backend-concurrency <N>` | | Maximum in-flight semantic requests in one provider batch. Default `1`; maximum `2` for OpenAI-compatible/Anthropic and `4` for Ollama. Must be positive when set. |
 | `--cloud` | | Select the Anthropic cloud backend; equivalent to `--backend anthropic`. |
 | `--compact-output` | `-c` | Emit compact JSON output. |
 | `--exit-status` | `-e` | Set the exit status based on the last output value. |
@@ -37,7 +38,8 @@ when semantic operators require one.
 | `--raw-input` | `-R` | Read each input line as a string. |
 | `--raw-output` | `-r` | Emit strings without JSON quoting. |
 | `--stats` | | Print run statistics to stderr after a successful run. |
-| `--window-bytes <N>` | | Maximum source bytes per supported three-phase semantic window; positive integer, default `262144`. Has no execution effect for pure-jq or interleaved queries. |
+| `--stream` | | Run supported semantic queries inline for low-latency frame output instead of window batching. Does not change backend, model, cache identity, or `--max-calls`; pure-jq and planner-required inline queries retain their existing behavior. |
+| `--window-bytes <N>` | | Maximum source bytes per supported three-phase semantic window; positive integer, default `262144`. Has no execution effect for pure-jq or inline queries, including `--stream`. |
 | `--version` | `-v` | Print the version and exit. |
 | `--help` | `-h` | Print usage and exit. |
 
@@ -168,11 +170,18 @@ The `--exit-status` codes match jq's convention.
 - `--explain` on a pure-jq query validates the query and prints a byte-stable pure-jq
   report without reading stdin.
 - `--explain` on a semantic query prints the static plan and, when valid stdin is supplied,
-  mock-path estimates without contacting a real backend.
-- `--stats` writes only the summary to stderr; query output remains on stdout. Its window
-  fields are `execution_mode` (`pure-jq`, `three-phase-windowed`, or `interleaved`),
-  `window_bytes`, `window_count`, and `oversized_window_count`. The three numeric window
-  fields are zero outside `three-phase-windowed` mode.
+  mock-path estimates without contacting a real backend. With `--explain --stream` on a
+  supported semantic plan, it instead identifies user-selected inline execution, does not
+  consume stdin, and reports the harvest/batching/dedup estimate as unavailable.
+- `--stats` writes only the summary to stderr; query output remains on stdout. Its
+  `execution_mode` is `pure-jq`, `three-phase-windowed`, `planner-interleaved`, or
+  `user-stream`; `batching_dedup` states the matching windowed or inline trade-off. The
+  numeric `window_bytes`, `window_count`, and `oversized_window_count` fields are zero
+  outside `three-phase-windowed` mode.
+- `--stream` selects inline, input-order semantic execution only for supported semantic
+  plans that would otherwise be windowed. It gives first-frame latency but disables
+  cross-frame pre-resolve deduplication and window batching. Cache identity, cache hits,
+  schema validation, and the run-global `--max-calls` cap are unchanged.
 - `--window-bytes` applies only to supported three-phase semantic execution. It forms
   complete-frame windows, never buffers the entire input, and accepts a record larger than
   the budget as a one-frame oversized window.

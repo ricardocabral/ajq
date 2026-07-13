@@ -12,6 +12,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/ricardocabral/ajq/internal/backend"
+	"github.com/ricardocabral/ajq/internal/backend/batchdispatch"
 	"github.com/ricardocabral/ajq/internal/backend/promptkit"
 	"github.com/ricardocabral/ajq/internal/schema"
 )
@@ -32,9 +33,9 @@ var modelAliases = map[string]string{
 }
 
 // Backend sends semantic judgements to Anthropic's Messages API using the
-// official SDK. Judge resolves a batch sequentially, one Messages.New call per
-// judgement, preserving input order. Whole-batch provider/system failures are
-// returned from Judge; per-item schema/parse/refusal failures are returned in
+// official SDK. Judge resolves a batch with bounded concurrency when requested,
+// preserving input order. Whole-batch provider/system failures are returned
+// from Judge; per-item schema/parse/refusal failures are returned in
 // backend.Result.Error.
 type Backend struct {
 	// Model is the resolved Claude model id sent to Anthropic. Required.
@@ -46,6 +47,9 @@ type Backend struct {
 	// MaxTokens overrides the per-judgement generation budget. Defaults to
 	// DefaultMaxTokens and must remain <= 512 for the ajq contract.
 	MaxTokens int64
+	// MaxConcurrency caps simultaneous Messages API requests. Values less than
+	// two preserve the provider-owned sequential Judge path exactly.
+	MaxConcurrency int
 }
 
 // Ensure Backend satisfies the backend.Backend interface.
@@ -100,12 +104,29 @@ func New(model string, opts ...option.RequestOption) (*Backend, error) {
 // and the SDK performs provider retries on actual judgement calls.
 func (b *Backend) Warm(context.Context) error { return nil }
 
-// Judge sends each judgement to Anthropic sequentially and returns results in
-// batch order.
+// Judge sends each judgement to Anthropic and returns results in batch order.
+// MaxConcurrency values less than two retain judgeSequential exactly.
 func (b *Backend) Judge(ctx context.Context, batch []backend.Judgement) ([]backend.Result, error) {
 	if strings.TrimSpace(b.Model) == "" {
 		return nil, fmt.Errorf("anthropic backend model is empty")
 	}
+	if b.MaxConcurrency <= 1 {
+		return b.judgeSequential(ctx, batch)
+	}
+	results, err := batchdispatch.Run(ctx, batch, b.MaxConcurrency, func(ctx context.Context, _ int, judgement backend.Judgement) (backend.Result, error) {
+		return b.judgeOne(ctx, judgement)
+	})
+	if err == nil {
+		return results, nil
+	}
+	var failure *batchdispatch.Failure
+	if errors.As(err, &failure) {
+		return nil, fmt.Errorf("anthropic backend judgement %d (%s): %w", failure.Index, batch[failure.Index].Op, failure.Err)
+	}
+	return nil, err
+}
+
+func (b *Backend) judgeSequential(ctx context.Context, batch []backend.Judgement) ([]backend.Result, error) {
 	if len(batch) == 0 {
 		return nil, nil
 	}

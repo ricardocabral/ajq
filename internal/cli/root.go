@@ -87,7 +87,9 @@ func NewRootCommand(opts Options) *cobra.Command {
 	var modelID string
 	var baseURL string
 	var maxCalls int
+	var backendConcurrency int
 	var windowBytes int64
+	var stream bool
 	var cloud bool
 	var noCache bool
 
@@ -122,7 +124,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 				return fmt.Errorf("query %q is empty", query)
 			}
 
-			flagValues, err := backendFlagValues(cmd, backendName, modelID, baseURL, maxCalls, windowBytes, cloud, noCache)
+			flagValues, err := backendFlagValues(cmd, backendName, modelID, baseURL, maxCalls, backendConcurrency, windowBytes, cloud, noCache)
 			if err != nil {
 				return &ExitError{Code: 2, Err: err}
 			}
@@ -147,7 +149,8 @@ exercise semantic query syntax without a model, network access, or API key.`,
 				if err := validateExplainCompile(rewrittenQuery, semanticPlan.Deterministic); err != nil {
 					return &ExitError{Code: 3, Err: fmt.Errorf("query %q compile error: %w", query, err)}
 				}
-				explainPlan := explain.Plan{Query: rewrittenQuery, SemanticPlan: &semanticPlan}
+				streamExplain := stream && !semanticPlan.RequiresInterleaved
+				explainPlan := explain.Plan{Query: rewrittenQuery, SemanticPlan: &semanticPlan, Stream: streamExplain}
 				if !semanticPlan.Deterministic {
 					mode := input.ModeAuto
 					if nullInput {
@@ -156,14 +159,14 @@ exercise semantic query syntax without a model, network access, or API key.`,
 						mode = input.ModeRaw
 					}
 					estimateInput := cmd.InOrStdin()
-					if mode != input.ModeNull {
+					if mode != input.ModeNull && !streamExplain {
 						data, err := io.ReadAll(cmd.InOrStdin())
 						if err != nil {
 							return &ExitError{Code: 3, Err: fmt.Errorf("query %q explain input error: %w", query, err)}
 						}
 						estimateInput = strings.NewReader(string(data))
 					}
-					estimate := engine.EstimateExplain(cmd.Context(), rewrittenQuery, estimateInput, mode)
+					estimate := engine.EstimateExplainWithOptions(cmd.Context(), rewrittenQuery, estimateInput, engine.ExplainOptions{InputMode: mode, Stream: streamExplain})
 					explainPlan.Estimate, err = explainEstimateFromEngine(cmd, flagValues, rewrittenQuery, estimate)
 					if err != nil {
 						return &ExitError{Code: 2, Err: err}
@@ -198,6 +201,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 				MaxCalls:            resolution.MaxCalls,
 				MaxCallsDefaultPaid: resolution.MaxCallsDefaultPaid,
 				WindowBytes:         resolution.WindowBytes,
+				Stream:              stream,
 			})
 			if err != nil {
 				code := 1
@@ -242,7 +246,9 @@ exercise semantic query syntax without a model, network access, or API key.`,
 	cmd.Flags().StringVar(&modelID, "model", "", "semantic model id or alias for the selected backend")
 	cmd.Flags().StringVar(&baseURL, "base-url", "", "base URL for HTTP semantic backends")
 	cmd.Flags().IntVar(&maxCalls, "max-calls", 0, "maximum post-dedup backend judgements before aborting (0 = unlimited; paid backends default to 100, local/ollama/mock default to unlimited)")
+	cmd.Flags().IntVar(&backendConcurrency, "backend-concurrency", 0, "maximum in-flight semantic requests per batch (default 1; maximum 2 for OpenAI-compatible/Anthropic and 4 for Ollama)")
 	cmd.Flags().Int64Var(&windowBytes, "window-bytes", 0, "maximum source bytes per supported three-phase semantic window (default 262144)")
+	cmd.Flags().BoolVar(&stream, "stream", false, "run supported semantic queries inline for low-latency frame output instead of window batching")
 	cmd.Flags().BoolVar(&cloud, "cloud", false, "select the Anthropic cloud semantic backend (equivalent to --backend anthropic)")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "disable persistent on-disk judgement cache for this run")
 
@@ -256,7 +262,7 @@ exercise semantic query syntax without a model, network access, or API key.`,
 	return cmd
 }
 
-func backendFlagValues(cmd *cobra.Command, backendName, modelID, baseURL string, maxCalls int, windowBytes int64, cloud, noCache bool) (config.Values, error) {
+func backendFlagValues(cmd *cobra.Command, backendName, modelID, baseURL string, maxCalls, backendConcurrency int, windowBytes int64, cloud, noCache bool) (config.Values, error) {
 	var values config.Values
 	flags := cmd.Flags()
 	backendChanged := flags.Changed("backend")
@@ -278,6 +284,13 @@ func backendFlagValues(cmd *cobra.Command, backendName, modelID, baseURL string,
 		}
 		values.MaxCalls = maxCalls
 		values.MaxCallsSet = true
+	}
+	if flags.Changed("backend-concurrency") {
+		if backendConcurrency <= 0 {
+			return config.Values{}, fmt.Errorf("--backend-concurrency must be positive")
+		}
+		values.BackendConcurrency = backendConcurrency
+		values.BackendConcurrencySet = true
 	}
 	if flags.Changed("window-bytes") {
 		if windowBytes <= 0 {
@@ -346,6 +359,9 @@ func resolveBackendForQuery(cmd *cobra.Command, query string, flags config.Value
 	settings = config.Resolve(flags, envValues, fileValues, registration.defaults())
 	if settings.MaxCalls < 0 {
 		return backendResolution{}, fmt.Errorf("max_calls must be non-negative")
+	}
+	if err := registration.validateBackendConcurrency(settings.BackendConcurrency); err != nil {
+		return backendResolution{}, err
 	}
 	semanticBackend, _, err := registration.Construct(opts, settings)
 	if err != nil {
@@ -422,46 +438,46 @@ func explainEstimateFromEngine(cmd *cobra.Command, flags config.Values, query st
 		PostDedupJudgements: estimate.PostDedupJudgements,
 		MockJudgeBatches:    estimate.MockJudgeBatches,
 	}
-	if estimate.Status != engine.ExplainEstimateAvailable {
-		return out, nil
-	}
-	registration, modelID, maxOutputTokens, ok, err := explainPaidBackend(cmd, flags)
-	if err != nil || !ok || !registration.Paid {
+	registration, settings, ok, err := resolveExplainBackend(cmd, flags)
+	if err != nil || !ok || estimate.Status != engine.ExplainEstimateAvailable || !registration.Paid {
 		return out, err
 	}
-	usd, known := pricing.Estimate(modelID, estimate.PostDedupJudgements, len(query), maxOutputTokens)
+	modelID := settings.Model
+	if registration.ModelIdentity != nil {
+		modelID, err = registration.ModelIdentity(settings)
+		if err != nil {
+			return out, err
+		}
+	}
+	usd, known := pricing.Estimate(modelID, estimate.PostDedupJudgements, len(query), registration.DefaultMaxOutputTokens)
 	out.EstimatedCostModelID = modelID
 	out.EstimatedCostUSD = usd
 	out.EstimatedCostKnown = known
 	return out, nil
 }
 
-func explainPaidBackend(cmd *cobra.Command, flags config.Values) (backendRegistration, string, int, bool, error) {
+func resolveExplainBackend(cmd *cobra.Command, flags config.Values) (backendRegistration, config.Settings, bool, error) {
 	fileValues, err := config.LoadWithOptions(config.LoadOptions{Stderr: cmd.ErrOrStderr()})
 	if err != nil {
-		return backendRegistration{}, "", 0, false, err
+		return backendRegistration{}, config.Settings{}, false, err
 	}
 	envValues, err := config.Env(os.Getenv)
 	if err != nil {
-		return backendRegistration{}, "", 0, false, err
+		return backendRegistration{}, config.Settings{}, false, err
 	}
 	settings := config.Resolve(flags, envValues, fileValues, config.Values{})
 	if settings.Backend == "" {
-		return backendRegistration{}, "", 0, false, nil
+		return backendRegistration{}, config.Settings{}, false, nil
 	}
 	registration, ok := lookupBackend(settings.Backend)
 	if !ok {
-		return backendRegistration{}, "", 0, false, unknownBackendError(settings.Backend)
+		return backendRegistration{}, config.Settings{}, false, unknownBackendError(settings.Backend)
 	}
 	settings = config.Resolve(flags, envValues, fileValues, registration.defaults())
-	modelID := settings.Model
-	if registration.ModelIdentity != nil {
-		modelID, err = registration.ModelIdentity(settings)
-		if err != nil {
-			return backendRegistration{}, "", 0, false, err
-		}
+	if err := registration.validateBackendConcurrency(settings.BackendConcurrency); err != nil {
+		return backendRegistration{}, config.Settings{}, false, err
 	}
-	return registration, modelID, registration.DefaultMaxOutputTokens, true, nil
+	return registration, settings, true, nil
 }
 
 func printRunStats(w io.Writer, stats engine.RunStats, paid bool, modelID string, promptChars int, maxOutputTokens int) error {
@@ -470,6 +486,7 @@ func printRunStats(w io.Writer, stats engine.RunStats, paid bool, modelID string
 	}
 	lines := []string{
 		fmt.Sprintf("  execution_mode: %s", stats.ExecutionMode),
+		fmt.Sprintf("  batching_dedup: %s", statsBatchingDedup(stats.ExecutionMode)),
 		fmt.Sprintf("  window_bytes: %d", stats.WindowBytes),
 		fmt.Sprintf("  window_count: %d", stats.WindowCount),
 		fmt.Sprintf("  oversized_window_count: %d", stats.OversizedWindowCount),
@@ -494,6 +511,21 @@ func printRunStats(w io.Writer, stats engine.RunStats, paid bool, modelID string
 		}
 	}
 	return nil
+}
+
+func statsBatchingDedup(mode engine.ExecutionMode) string {
+	switch mode {
+	case engine.ExecutionModeThreePhaseWindowed:
+		return "windowed harvest with cross-frame pre-resolve dedup"
+	case engine.ExecutionModeUserStream:
+		return "inline per frame; cross-frame pre-resolve dedup disabled"
+	case engine.ExecutionModePlannerInterleaved:
+		return "inline planner-required; cross-frame pre-resolve dedup unavailable"
+	case engine.ExecutionModePureJQ:
+		return "not applicable: pure jq"
+	default:
+		return "unavailable"
+	}
 }
 
 func validateExplainCompile(query string, deterministic bool) error {

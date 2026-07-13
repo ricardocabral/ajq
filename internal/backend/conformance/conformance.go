@@ -24,9 +24,10 @@ type Factory func(serverURL string) backend.Backend
 type Option func(*config)
 
 type config struct {
-	server        *ScriptedServer
-	caseFilter    func(Case) bool
-	expectFailure bool
+	server               *ScriptedServer
+	caseFilter           func(Case) bool
+	expectFailure        bool
+	concurrentDispatcher bool
 }
 
 // WithScriptedServer supplies the wire-protocol fake used by HTTP backends.
@@ -44,6 +45,12 @@ func WithCaseFilter(filter func(Case) bool) Option {
 // at least one conformance case detects the deliberately broken backend.
 func ExpectFailure() Option {
 	return func(cfg *config) { cfg.expectFailure = true }
+}
+
+// WithConcurrentDispatcher enables conformance cases that require a backend
+// factory configured with more than one in-flight judgement slot.
+func WithConcurrentDispatcher() Option {
+	return func(cfg *config) { cfg.concurrentDispatcher = true }
 }
 
 // Case describes one backend contract invariant.
@@ -96,6 +103,21 @@ func Run(t *testing.T, factory Factory, opts ...Option) {
 	}
 	if cfg.expectFailure && failures == 0 {
 		t.Fatalf("negative control backend passed all conformance cases")
+	}
+	if cfg.concurrentDispatcher && !cfg.expectFailure {
+		t.Run("concurrent_transport_failure_cancels_admitted_sibling", func(t *testing.T) {
+			if cfg.server == nil {
+				t.Fatal("concurrent dispatcher conformance requires a scripted server")
+			}
+			cfg.server.Reset()
+			cfg.server.StartCase("concurrent_transport_failure_cancels_admitted_sibling")
+			be := factory(serverURL(cfg.server))
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			if err := testConcurrentTransportFailureCancelsAdmittedSibling(ctx, be, cfg.server); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
@@ -195,6 +217,24 @@ func testNumberInvalidJSONIsPerItemError(ctx context.Context, be backend.Backend
 		return fmt.Errorf("wrong whole-batch error for invalid numeric JSON: %w", err)
 	}
 	return requireOnlyError(results, 0)
+}
+
+func testConcurrentTransportFailureCancelsAdmittedSibling(ctx context.Context, be backend.Backend, server *ScriptedServer) error {
+	batch := []backend.Judgement{
+		judgement("sem_match", semantics.ReturnBool, nil, []string{"x"}, "fail"),
+		judgement("sem_match", semantics.ReturnBool, nil, []string{"x"}, "block"),
+	}
+	results, err := be.Judge(ctx, batch)
+	if err == nil {
+		return fmt.Errorf("Judge returned nil error and results %#v, want whole-batch error", results)
+	}
+	if len(results) != 0 {
+		return fmt.Errorf("Judge returned partial results %#v with whole-batch error", results)
+	}
+	if err := server.WaitForConcurrentSiblingCancellation(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func testTransportFailureIsWholeBatchError(ctx context.Context, be backend.Backend) error {

@@ -88,6 +88,31 @@ The paid/remote backends (`anthropic`, `openai`, and `openrouter`) default to
 `max_calls = 100` unless a flag, env var, or config value overrides it. Local, Ollama, and
 mock default to unlimited.
 
+## Bounded batch concurrency
+
+`--backend-concurrency`, `AJQ_BACKEND_CONCURRENCY`, and TOML
+`backend_concurrency` set the maximum number of simultaneous requests while one provider
+resolves a batch of distinct cache misses. The default is `1`, which keeps the established
+sequential path. Explicit values must be positive and are validated for the selected
+provider before backend construction or a request:
+
+| Provider | Default | Maximum | Why |
+|---|---:|---:|---|
+| OpenAI-compatible (`openai`, `openrouter`) | 1 | 2 | A conservative opt-in ceiling for paid requests and their retries. |
+| Anthropic | 1 | 2 | Bounds concurrent SDK-retried paid Messages API requests. |
+| Ollama | 1 | 4 | A bounded local-service limit matching the managed local daemon's default slot count. |
+
+A higher value can reduce latency for a multi-judgement batch, but it does not increase a
+batch's judgement count, relax `max_calls`, change deduplication or cache keys, or alter
+per-request retry policy. For paid providers, start at `1` and increase only after checking
+the provider's account rate limits; retries also consume request capacity. Managed-local
+and mock backend scheduling are unchanged by this setting.
+
+Results always retain their input-batch order even when requests complete out of order. A
+per-item schema/coercion error stays attached to that item. In contrast, a transport or
+system failure cancels queued and admitted sibling work, waits for cleanup, and returns no
+partial batch results.
+
 ## Related
 
 - [Configuration](../configuration/) — precedence and environment variables.

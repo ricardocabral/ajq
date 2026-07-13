@@ -892,6 +892,7 @@ func isolateConfigEnv(t *testing.T) {
 	t.Setenv("AJQ_MODEL", "")
 	t.Setenv("AJQ_BASE_URL", "")
 	t.Setenv("AJQ_MAX_CALLS", "")
+	t.Setenv("AJQ_BACKEND_CONCURRENCY", "")
 }
 
 func executeForBackendTest(t *testing.T, local backend.Backend, stdin string, args ...string) (stdout, stderr string, err error) {

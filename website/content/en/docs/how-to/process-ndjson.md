@@ -47,7 +47,8 @@ itself can require more memory than the configured budget.
 
 Use a larger budget to find duplicates across more nearby records and reduce backend
 batches; the trade-off is that output waits until its full window has been harvested and
-resolved. Use a smaller positive budget when lower first-record latency matters:
+resolved. Use a smaller positive budget when lower first-record latency matters but
+window-wide batching and deduplication are still useful:
 
 ```bash
 # Keep semantic windows near 64 KiB for this invocation.
@@ -55,9 +56,31 @@ producer | ajq --backend local --window-bytes 65536 \
   'select(.message =~ "payment failure")'
 ```
 
-Persistent cache entries remain reusable across windows. Pure-jq queries and semantic
-queries that require interleaved execution keep their existing per-frame streaming paths;
-this setting does not window them.
+### Choose `--stream` for first-frame latency
+
+Use `--stream` when a supported semantic pipeline must resolve and emit each frame without
+waiting for a window to fill:
+
+```bash
+producer | ajq --backend local --stream \
+  'select(.message =~ "payment failure")'
+```
+
+`--stream` selects inline semantic execution for queries that otherwise use three-phase
+windows. It preserves input order, cache reads/writes and identity, schema validation,
+cancellation, output/exit behavior, and the run-global `--max-calls` cap. An uncached
+judgement resolves inline; a persistent cache hit still makes no backend call.
+
+The latency trade-off is deliberate: inline execution has no window-wide backend batching
+or cross-frame pre-resolve deduplication. It can therefore make more backend round trips
+(and, with `--no-cache`, repeat a judgement in separate frames), while default windows can
+reduce those calls at the cost of waiting for the window. `--stats` names the selected mode
+and trade-off; `--explain --stream` reports that its harvest/dedup estimate is unavailable
+without consuming stdin.
+
+Pure-jq queries ignore `--stream` and remain deterministic. Queries the planner already
+requires to interleave keep that existing inline behavior; `--stream` does not change their
+selection. `--window-bytes` does not affect either inline path.
 
 ## Raw lines (awk mode)
 

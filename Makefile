@@ -192,6 +192,14 @@ bench-phase2: ## Run the Phase 2.5 fake-mode bench harness (deterministic, CI-sa
 bench-phase2-real: ## Run the Phase 2.5 real local-inference bench (needs provisioned llama-server + model)
 	AJQ_BENCH_REAL=1 AJQ_BENCH_GIT_REVISION=$(BENCH_GIT_REVISION) AJQ_BENCH_REPORT_DIR="$(abspath $(AJQ_BENCH_REPORT_DIR))" $(GO) test -count=$(BENCH_RUNS) -v -run TestRealBench -timeout 5m ./internal/bench/...
 
+.PHONY: bench-iterative-evidence
+bench-iterative-evidence: ## Run reproducible paired fake iterative-harvest evidence (no model/network)
+	$(GO) test -count=1 -run TestIterativeFakeEvidence -v ./internal/bench
+
+.PHONY: bench-iterative-real
+bench-iterative-real: ## Run optional end-to-end local iterative comparison (needs AJQ_BENCH_REAL=1 and local assets)
+	AJQ_BENCH_REAL=1 $(GO) test -count=$(BENCH_RUNS) -v -run TestIterativeLocalBench -timeout 10m ./internal/bench
+
 ##@ Quality
 
 .PHONY: fmt

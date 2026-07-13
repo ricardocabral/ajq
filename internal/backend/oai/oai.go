@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ricardocabral/ajq/internal/backend"
+	"github.com/ricardocabral/ajq/internal/backend/batchdispatch"
 	"github.com/ricardocabral/ajq/internal/backend/promptkit"
 	"github.com/ricardocabral/ajq/internal/schema"
 )
@@ -43,9 +45,10 @@ type SleepFunc func(context.Context, time.Duration) error
 // Backend is a backend.Backend implementation for OpenAI-compatible
 // /chat/completions APIs (OpenAI, OpenRouter, vLLM, llama.cpp /v1, LM Studio).
 //
-// Judge resolves a batch sequentially, one POST per judgement, preserving input
-// order. Whole-batch transport, status, and envelope errors are returned from
-// Judge. Per-item schema/parse/type/enum failures are returned in Result.Error.
+// Judge resolves a batch with bounded concurrency when MaxConcurrency is
+// greater than one and otherwise sequentially, preserving input order.
+// Whole-batch transport, status, and envelope errors are returned from Judge.
+// Per-item schema/parse/type/enum failures are returned in Result.Error.
 type Backend struct {
 	// BaseURL is the API base URL including version prefix, e.g.
 	// "https://api.openai.com/v1" or "https://openrouter.ai/api/v1". Required.
@@ -72,6 +75,9 @@ type Backend struct {
 	// RetrySleep is used between retryable attempts. Tests may inject a
 	// deterministic hook; nil uses a real timer that aborts on context cancel.
 	RetrySleep SleepFunc
+	// MaxConcurrency caps simultaneous judgement requests. Values less than two
+	// preserve the provider-owned sequential Judge path exactly.
+	MaxConcurrency int
 }
 
 // Ensure Backend satisfies the backend.Backend interface.
@@ -125,12 +131,29 @@ func (e *statusError) Error() string {
 // Warm is a no-op for remote OpenAI-compatible backends.
 func (b *Backend) Warm(context.Context) error { return nil }
 
-// Judge sends each judgement to /chat/completions sequentially and returns
-// results in batch order.
+// Judge sends each judgement to /chat/completions and returns results in batch
+// order. MaxConcurrency values less than two retain judgeSequential exactly.
 func (b *Backend) Judge(ctx context.Context, batch []backend.Judgement) ([]backend.Result, error) {
 	if err := b.validateConfig(); err != nil {
 		return nil, err
 	}
+	if b.MaxConcurrency <= 1 {
+		return b.judgeSequential(ctx, batch)
+	}
+	results, err := batchdispatch.Run(ctx, batch, b.MaxConcurrency, func(ctx context.Context, _ int, judgement backend.Judgement) (backend.Result, error) {
+		return b.judgeOne(ctx, judgement)
+	})
+	if err == nil {
+		return results, nil
+	}
+	var failure *batchdispatch.Failure
+	if errors.As(err, &failure) {
+		return nil, fmt.Errorf("openai-compatible backend judgement %d (%s): %w", failure.Index, batch[failure.Index].Op, failure.Err)
+	}
+	return nil, err
+}
+
+func (b *Backend) judgeSequential(ctx context.Context, batch []backend.Judgement) ([]backend.Result, error) {
 	if len(batch) == 0 {
 		return nil, nil
 	}

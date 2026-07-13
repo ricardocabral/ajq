@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ricardocabral/ajq/internal/backend"
+	"github.com/ricardocabral/ajq/internal/backend/batchdispatch"
 	"github.com/ricardocabral/ajq/internal/backend/promptkit"
 	"github.com/ricardocabral/ajq/internal/schema"
 	"github.com/ricardocabral/ajq/internal/semantics"
@@ -33,8 +34,8 @@ const (
 )
 
 // Backend sends semantic judgements to Ollama's native /api/chat endpoint.
-// Judge resolves batches sequentially, one POST per judgement, preserving input
-// order. Whole-batch transport/system failures are returned from Judge;
+// Judge resolves batches with bounded concurrency when requested, preserving
+// input order. Whole-batch transport/system failures are returned from Judge;
 // schema/parse/type/enum violations are returned as per-item Result.Error.
 type Backend struct {
 	// BaseURL is the Ollama server base URL, e.g. http://127.0.0.1:11434.
@@ -46,6 +47,9 @@ type Backend struct {
 	HTTPClient *http.Client
 	// ChatPath overrides the Ollama chat endpoint path. Defaults to /api/chat.
 	ChatPath string
+	// MaxConcurrency caps simultaneous chat requests. Values less than two
+	// preserve the provider-owned sequential Judge path exactly.
+	MaxConcurrency int
 }
 
 var _ backend.Backend = (*Backend)(nil)
@@ -145,12 +149,29 @@ func (b *Backend) Warm(ctx context.Context) error {
 	return nil
 }
 
-// Judge sends each judgement to Ollama sequentially and returns results in
-// batch order.
+// Judge sends each judgement to Ollama and returns results in batch order.
+// MaxConcurrency values less than two retain judgeSequential exactly.
 func (b *Backend) Judge(ctx context.Context, batch []backend.Judgement) ([]backend.Result, error) {
 	if err := b.validateConfig(); err != nil {
 		return nil, err
 	}
+	if b.MaxConcurrency <= 1 {
+		return b.judgeSequential(ctx, batch)
+	}
+	results, err := batchdispatch.Run(ctx, batch, b.MaxConcurrency, func(ctx context.Context, _ int, judgement backend.Judgement) (backend.Result, error) {
+		return b.judgeOne(ctx, judgement)
+	})
+	if err == nil {
+		return results, nil
+	}
+	var failure *batchdispatch.Failure
+	if errors.As(err, &failure) {
+		return nil, fmt.Errorf("ollama backend judgement %d (%s): %w", failure.Index, batch[failure.Index].Op, failure.Err)
+	}
+	return nil, err
+}
+
+func (b *Backend) judgeSequential(ctx context.Context, batch []backend.Judgement) ([]backend.Result, error) {
 	if len(batch) == 0 {
 		return nil, nil
 	}
