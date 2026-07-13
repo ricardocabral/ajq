@@ -62,8 +62,9 @@ namespace Ajq {
       IntPtr summary = Open(path, 3);
       try {
         Check(MsiSummaryInfoSetProperty(summary, 9, VT_LPSTR, 0, IntPtr.Zero, packageCode), "setting deterministic MSI package code");
-        SetFileTime(summary, 12, timestamp);
-        SetFileTime(summary, 13, timestamp);
+        // WiX 4 emits stable summary timestamps for identical inputs. Rewriting
+        // their FILETIME variants invalidates the compound MSI stream on current
+        // Windows Installer, so normalize only the generated package code.
         Check(MsiSummaryInfoPersist(summary), "persisting deterministic MSI summary information");
       } finally { MsiCloseHandle(summary); }
     }
