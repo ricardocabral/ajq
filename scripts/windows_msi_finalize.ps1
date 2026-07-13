@@ -74,6 +74,7 @@ namespace Ajq {
         uint result = MsiSummaryInfoGetProperty(summary, 9, out type, out intValue, out fileTime, null, ref chars);
         if (result != 234 && result != 0) Check(result, "reading MSI package code length");
         var value = new StringBuilder(chars + 1);
+        chars = value.Capacity;
         Check(MsiSummaryInfoGetProperty(summary, 9, out type, out intValue, out fileTime, value, ref chars), "reading MSI package code");
         return value.ToString();
       } finally { MsiCloseHandle(summary); }
