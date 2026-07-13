@@ -179,6 +179,21 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
         run: scripts/release_publish_preflight.sh
 
+      - name: Reject published release reruns
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if is_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
+            [ "$is_draft" = true ] || {
+              printf 'refusing to replace assets on published release %s\n' "$RELEASE_TAG" >&2
+              exit 1
+            }
+            printf 'replacing deterministic assets on existing draft %s\n' "$RELEASE_TAG"
+          fi
+
       - name: Run GoReleaser to draft release
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
@@ -187,8 +202,13 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          HOMEBREW_CASK_UPLOAD: "1"
+
+      - name: Save generated Homebrew cask until finalization
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ajq-homebrew-cask
+          path: dist/homebrew/Casks/ajq.rb
+          if-no-files-found: error
 
   release-windows-msi:
     name: Build Windows x64 MSI
@@ -287,7 +307,7 @@ jobs:
 
       - name: Sign MSI with Azure Trusted Signing
         if: steps.signing.outputs.enabled == 'true'
-        uses: azure/trusted-signing-action@v2.0.0
+        uses: azure/trusted-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba # v2.0.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -367,3 +387,35 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
         run: gh release edit "$RELEASE_TAG" --draft=false
+
+  publish-homebrew-cask:
+    name: Publish Homebrew cask after release finalization
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs:
+      - validate-release
+      - finalize-release
+    steps:
+      - name: Restore generated Homebrew cask
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ajq-homebrew-cask
+          path: cask
+
+      - name: Publish saved cask to the tap
+        shell: bash
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          scripts/release_publish_preflight.sh
+          git clone "https://x-access-token:${HOMEBREW_TAP_GITHUB_TOKEN}@github.com/ricardocabral/homebrew-tap.git" tap
+          install -m 0644 cask/ajq.rb tap/Casks/ajq.rb
+          git -C tap config user.name github-actions[bot]
+          git -C tap config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C tap diff --quiet -- Casks/ajq.rb || {
+            git -C tap add Casks/ajq.rb
+            git -C tap commit -m "Homebrew cask update for ajq ${RELEASE_TAG}"
+            git -C tap push
+          }

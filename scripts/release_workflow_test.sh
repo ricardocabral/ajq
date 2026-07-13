@@ -34,6 +34,18 @@ grep -Fq 'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.
   printf 'Release workflow must retain the credential-safe unsigned MSI warning\n' >&2
   exit 1
 }
+grep -Fq 'azure/trusted-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba # v2.0.0' "$workflow" || {
+  printf 'Release workflow must SHA-pin Azure Trusted Signing\n' >&2
+  exit 1
+}
+grep -Fq 'refusing to replace assets on published release' "$workflow" || {
+  printf 'Release workflow must reject published release reruns\n' >&2
+  exit 1
+}
+grep -Fq 'name: Publish Homebrew cask after release finalization' "$workflow" || {
+  printf 'Release workflow must defer Homebrew upload until MSI finalization\n' >&2
+  exit 1
+}
 grep -Fq 'args: release --clean' "$workflow" || {
   printf 'Release workflow must retain clean GoReleaser publication\n' >&2
   exit 1
@@ -44,6 +56,10 @@ grep -Eq '^[[:space:]]*mode:[[:space:]]*replace[[:space:]]*$' "$goreleaser_confi
 }
 grep -Eq '^[[:space:]]*draft:[[:space:]]*true[[:space:]]*$' "$goreleaser_config" || {
   printf 'GoReleaser must retain a draft until MSI finalization succeeds\n' >&2
+  exit 1
+}
+grep -Eq '^[[:space:]]*replace_existing_artifacts:[[:space:]]*true[[:space:]]*$' "$goreleaser_config" || {
+  printf 'GoReleaser must replace assets only for deterministic draft retries\n' >&2
   exit 1
 }
 grep -Fq 'The pinned releaser requires an existing winget-pkgs version as its update base.' "$winget_workflow" || {
