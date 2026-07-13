@@ -122,14 +122,14 @@ func TestBackendConcurrencyConstructorsAndPaidDispatchBound(t *testing.T) {
 		t.Fatalf("Anthropic MaxConcurrency = %d, want 2", got)
 	}
 
-	for _, concurrency := range []int{1, 2} {
+	for _, concurrency := range []int32{1, 2} {
 		t.Run(fmt.Sprintf("OpenAI limit %d", concurrency), func(t *testing.T) {
 			runOpenAIConcurrencyScenario(t, concurrency)
 		})
 	}
 }
 
-func runOpenAIConcurrencyScenario(t *testing.T, concurrency int) {
+func runOpenAIConcurrencyScenario(t *testing.T, concurrency int32) {
 	t.Helper()
 	isolateConfigEnv(t)
 	t.Setenv("OPENAI_API_KEY", "test-key")
@@ -187,7 +187,7 @@ func runOpenAIConcurrencyScenario(t *testing.T, concurrency int) {
 	case <-time.After(time.Second):
 		t.Fatal("execution did not finish after requests were released")
 	}
-	if got := peak.Load(); got != int32(concurrency) {
+	if got := peak.Load(); got != concurrency {
 		t.Fatalf("peak in-flight OpenAI requests = %d, want %d", got, concurrency)
 	}
 }
