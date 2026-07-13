@@ -95,7 +95,8 @@ release:
   github:
     owner: ricardocabral
     name: ajq
-  draft: false
+  # Finalize the draft only after the Windows MSI and replacement checksums exist.
+  draft: true
   prerelease: auto
   mode: replace
   header: |

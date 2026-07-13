@@ -11,7 +11,27 @@ if grep -Eq '^[[:space:]]+workflow_dispatch:' "$workflow"; then
   exit 1
 fi
 grep -Fq "if: github.event_name == 'push'" "$workflow" || {
-  printf 'Release publish job must run only for tag pushes\n' >&2
+  printf 'Release publish jobs must run only for tag pushes\n' >&2
+  exit 1
+}
+grep -Fq 'name: Create draft GitHub release' "$workflow" || {
+  printf 'Release workflow must create a draft before Windows MSI packaging\n' >&2
+  exit 1
+}
+grep -Fq 'name: Build Windows x64 MSI' "$workflow" || {
+  printf 'Release workflow must include the Windows MSI job\n' >&2
+  exit 1
+}
+grep -Fq 'name: Finalize checksums, attest, and publish' "$workflow" || {
+  printf 'Release workflow must finalize only after MSI packaging\n' >&2
+  exit 1
+}
+grep -Fq 'dotnet tool install --global wix --version 4.0.5' "$workflow" || {
+  printf 'Release workflow must pin WiX 4.0.5\n' >&2
+  exit 1
+}
+grep -Fq 'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.' "$workflow" || {
+  printf 'Release workflow must retain the credential-safe unsigned MSI warning\n' >&2
   exit 1
 }
 grep -Fq 'args: release --clean' "$workflow" || {
@@ -20,6 +40,10 @@ grep -Fq 'args: release --clean' "$workflow" || {
 }
 grep -Eq '^[[:space:]]*mode:[[:space:]]*replace[[:space:]]*$' "$goreleaser_config" || {
   printf 'GoReleaser must retain release mode: replace for the immutable tag release contract\n' >&2
+  exit 1
+}
+grep -Eq '^[[:space:]]*draft:[[:space:]]*true[[:space:]]*$' "$goreleaser_config" || {
+  printf 'GoReleaser must retain a draft until MSI finalization succeeds\n' >&2
   exit 1
 }
 grep -Fq 'The pinned releaser requires an existing winget-pkgs version as its update base.' "$winget_workflow" || {
