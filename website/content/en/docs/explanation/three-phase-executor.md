@@ -134,6 +134,7 @@ plan. A violation aborts before spending money and names the missed operation.
 
 ## Related
 
+- [Iterative-harvest prototype evaluation](../iterative-harvest-evaluation/) — measured no-go evidence for the non-default staged prototype.
 - [Split execution](../split-execution/) — the idea this engine implements.
 - [The determinism contract](../determinism/) — what reproducibility means here.
 - [`--explain` output](../../reference/explain-output/) — how harvest/dedup estimates are reported.
