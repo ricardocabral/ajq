@@ -51,10 +51,26 @@ func (e *SemanticInvariantError) Error() string {
 	return fmt.Sprintf("semantic invariant violation: unplanned semantic call during %s: op=%s query=%q source=%q", w.Phase, w.Op, w.Query, w.Source.Expression)
 }
 
+// semanticResolveError preserves the zero-based source frame for a
+// deterministic error raised while resolving a batch of collected judgements.
+// executeBefore is exclusive: frames before it have all values necessary for
+// ordered execution; a negative value means no frame from the window is safe
+// to execute.
+type semanticResolveError struct {
+	frame         int64
+	executeBefore int64
+	err           error
+}
+
+func (e *semanticResolveError) Error() string { return e.err.Error() }
+func (e *semanticResolveError) Unwrap() error { return e.err }
+
 type semanticRuntime struct {
 	backend             backend.Backend
 	modelID             string
 	collected           []backend.Judgement
+	collectedFrames     []int64
+	currentFrame        int64
 	cache               *semanticcache.Store
 	query               string
 	planned             map[plan.CallID]plan.SemNode
@@ -189,24 +205,70 @@ func newSemanticRuntime(be backend.Backend, modelID string, store *semanticcache
 	return &semanticRuntime{backend: be, modelID: modelID, cache: store, query: p.Query, planned: planned, plannedOrder: plannedOrder}
 }
 
+// beginWindow releases all previous window references before collecting the
+// next window. Call harvestAppend once per frame, then resolve once.
+func (p *threePhaseProgram) beginWindow() {
+	p.runtime.releaseCollected()
+}
+
+// releaseWindow drops collected values after resolve and ordered execution.
+func (p *threePhaseProgram) releaseWindow() {
+	p.runtime.releaseCollected()
+}
+
+// harvest preserves the historical one-frame collection contract used by unit
+// tests and callers that compile a three-phase program directly.
 func (p *threePhaseProgram) harvest(input any) error {
-	p.runtime.collected = nil
-	p.runtime.resetWitnesses()
+	p.beginWindow()
+	return p.harvestAppend(input, 0)
+}
+
+// harvestAppend appends one frame transactionally. A failed frame contributes
+// neither judgements nor witnesses to the already materialized window prefix.
+func (p *threePhaseProgram) harvestAppend(input any, frame int64) error {
+	rt := p.runtime
+	startCollected := len(rt.collected)
+	startFrames := len(rt.collectedFrames)
+	rt.currentFrame = frame
+	rt.resetWitnesses()
 	_, err := p.harvestProgram.Run(input, nil)
-	if invariantErr := p.runtime.checkInvariant(semanticPhaseHarvest); invariantErr != nil {
-		return invariantErr
+	if invariantErr := rt.checkInvariant(semanticPhaseHarvest); invariantErr != nil {
+		err = invariantErr
 	}
-	if p.runtime.stats != nil {
-		p.runtime.stats.HarvestedJudgements += len(p.runtime.collected)
+	if err != nil {
+		rt.discardCollectedFrom(startCollected, startFrames)
+		return err
 	}
-	return err
+	if rt.stats != nil {
+		rt.stats.HarvestedJudgements += len(rt.collected) - startCollected
+	}
+	return nil
 }
 
 func (p *threePhaseProgram) resolve(ctx context.Context) error {
 	return p.runtime.resolve(ctx)
 }
 
+func (rt *semanticRuntime) releaseCollected() {
+	for i := range rt.collected {
+		rt.collected[i].Value = nil
+		rt.collected[i].Specs = nil
+	}
+	rt.collected = nil
+	rt.collectedFrames = nil
+}
+
+func (rt *semanticRuntime) discardCollectedFrom(collected, frames int) {
+	for i := collected; i < len(rt.collected); i++ {
+		rt.collected[i].Value = nil
+		rt.collected[i].Specs = nil
+	}
+	rt.collected = rt.collected[:collected]
+	rt.collectedFrames = rt.collectedFrames[:frames]
+}
+
 func (p *threePhaseProgram) execute(input any, emit func(any) error) (jq.RunResult, error) {
+	p.runtime.resetWitnesses()
 	runResult, err := p.executeProgram.Run(input, emit)
 	if invariantErr := p.runtime.checkInvariant(semanticPhaseExecute); invariantErr != nil {
 		return runResult, invariantErr
@@ -265,7 +327,7 @@ func (rt *semanticRuntime) harvestPredicate(id plan.CallID, op string, source pl
 		if err != nil {
 			return gojq.NewIter[any](err)
 		}
-		rt.collected = append(rt.collected, judgement)
+		rt.appendJudgement(judgement)
 		return gojq.NewIter[any](true, false)
 	}
 }
@@ -277,7 +339,7 @@ func (rt *semanticRuntime) unsupportedHarvestValueFunction(id plan.CallID, op st
 		if err != nil {
 			return err
 		}
-		rt.collected = append(rt.collected, judgement)
+		rt.appendJudgement(judgement)
 		return fmt.Errorf("%s is not yet safe for three-phase harvest; use a supported bounded value op", op)
 	}
 }
@@ -289,7 +351,7 @@ func (rt *semanticRuntime) harvestValueFunction(id plan.CallID, op string, sourc
 		if err != nil {
 			return err
 		}
-		rt.collected = append(rt.collected, judgement)
+		rt.appendJudgement(judgement)
 		switch judgement.Return {
 		case semantics.ReturnNumber:
 			return 0.0
@@ -310,7 +372,7 @@ func (rt *semanticRuntime) harvestClassify(id plan.CallID, source plan.Source) f
 		if err != nil {
 			return gojq.NewIter[any](err)
 		}
-		rt.collected = append(rt.collected, judgement)
+		rt.appendJudgement(judgement)
 		values := make([]any, len(judgement.Specs))
 		for i, spec := range judgement.Specs {
 			values[i] = spec
@@ -361,6 +423,11 @@ func publicSemanticSource(op string) plan.Source {
 	return plan.Source{Expression: op, StartByte: -1, EndByte: -1, HasRange: false}
 }
 
+func (rt *semanticRuntime) appendJudgement(judgement backend.Judgement) {
+	rt.collected = append(rt.collected, judgement)
+	rt.collectedFrames = append(rt.collectedFrames, rt.currentFrame)
+}
+
 func (rt *semanticRuntime) resetWitnesses() {
 	rt.fired = nil
 }
@@ -400,10 +467,17 @@ func (rt *semanticRuntime) resolve(ctx context.Context) error {
 	seen := make(map[semanticcache.Key]struct{}, len(rt.collected))
 	var pending []backend.Judgement
 	var pendingKeys []semanticcache.Key
-	for _, judgement := range rt.collected {
+	var pendingFrames []int64
+	for i, judgement := range rt.collected {
 		key, err := semanticcache.KeyForJudgement(judgement)
 		if err != nil {
-			return err
+			// No batch has been dispatched. Only frames before the first uncached
+			// judgement can be known to be executable from cache.
+			prefix := rt.frameForCollected(i)
+			if len(pendingFrames) != 0 && pendingFrames[0] < prefix {
+				prefix = pendingFrames[0]
+			}
+			return &semanticResolveError{frame: rt.frameForCollected(i), executeBefore: prefix, err: err}
 		}
 		if _, ok := rt.cache.Get(key); ok {
 			if rt.stats != nil {
@@ -417,6 +491,7 @@ func (rt *semanticRuntime) resolve(ctx context.Context) error {
 		seen[key] = struct{}{}
 		pending = append(pending, judgement)
 		pendingKeys = append(pendingKeys, key)
+		pendingFrames = append(pendingFrames, rt.frameForCollected(i))
 	}
 	if len(pending) == 0 {
 		return nil
@@ -426,29 +501,49 @@ func (rt *semanticRuntime) resolve(ctx context.Context) error {
 		spent = rt.stats.PostDedupBackendCalls
 	}
 	if err := checkMaxCalls(rt.maxCalls, spent, len(pending), rt.maxCallsDefaultPaid); err != nil {
-		return err
+		return &semanticResolveError{frame: pendingFrames[0], executeBefore: -1, err: err}
 	}
 	if rt.stats != nil {
 		rt.stats.PostDedupBackendCalls += len(pending)
 	}
 	results, err := rt.backend.Judge(ctx, append([]backend.Judgement(nil), pending...))
 	if err != nil {
-		return err
+		return &semanticResolveError{frame: pendingFrames[0], executeBefore: -1, err: err}
 	}
 	if len(results) != len(pending) {
-		return fmt.Errorf("backend returned %d results for %d judgements", len(results), len(pending))
+		return &semanticResolveError{frame: pendingFrames[0], executeBefore: -1, err: fmt.Errorf("backend returned %d results for %d judgements", len(results), len(pending))}
 	}
 	for i, judgement := range pending {
 		result := results[i]
 		if result.Error != "" {
-			return fmt.Errorf("backend result %d for %s: %s", i, judgement.Op, result.Error)
+			return rt.resultResolveError(i, fmt.Errorf("backend result %d for %s: %s", i, judgement.Op, result.Error), pendingFrames, pendingKeys, results)
 		}
 		if err := validateResult(judgement, result); err != nil {
-			return fmt.Errorf("backend result %d for %s: %w", i, judgement.Op, err)
+			return rt.resultResolveError(i, fmt.Errorf("backend result %d for %s: %w", i, judgement.Op, err), pendingFrames, pendingKeys, results)
 		}
+	}
+	for i, result := range results {
 		rt.cache.Set(pendingKeys[i], result)
 	}
 	return nil
+}
+
+// resultResolveError commits every result validated before the failing item.
+// Execution still stops before the failing frame, but keeping same-frame
+// validated values preserves the resolver's prior cache contract.
+func (rt *semanticRuntime) resultResolveError(failing int, err error, frames []int64, keys []semanticcache.Key, results []backend.Result) error {
+	failingFrame := frames[failing]
+	for i := 0; i < failing; i++ {
+		rt.cache.Set(keys[i], results[i])
+	}
+	return &semanticResolveError{frame: failingFrame, executeBefore: failingFrame, err: err}
+}
+
+func (rt *semanticRuntime) frameForCollected(index int) int64 {
+	if index >= 0 && index < len(rt.collectedFrames) {
+		return rt.collectedFrames[index]
+	}
+	return 0
 }
 
 func (rt *semanticRuntime) judgementFromCall(opName string, input any, args []any) (backend.Judgement, error) {

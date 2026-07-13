@@ -13,8 +13,8 @@ file, and backend defaults.
 
 | Rank | Source | Notes |
 |---:|---|---|
-| 1 | Command-line flags | `--backend`, `--model`, `--base-url`, `--max-calls`, and `--no-cache`. |
-| 2 | Environment variables | `AJQ_BACKEND`, `AJQ_MODEL`, `AJQ_BASE_URL`, `AJQ_MAX_CALLS`. |
+| 1 | Command-line flags | `--backend`, `--model`, `--base-url`, `--max-calls`, `--window-bytes`, and `--no-cache`. |
+| 2 | Environment variables | `AJQ_BACKEND`, `AJQ_MODEL`, `AJQ_BASE_URL`, `AJQ_MAX_CALLS`, `AJQ_WINDOW_BYTES`. |
 | 3 | TOML config | Default path or `AJQ_CONFIG`. |
 | 4 | Backend defaults | For example, Anthropic's default model and paid-backend call cap. |
 
@@ -39,6 +39,7 @@ A missing default config file is ignored. A missing explicit `AJQ_CONFIG` file i
 | `model` | string | `"qwen2.5-3b"` | Model id or shipped alias for the selected backend. |
 | `base_url` | string | `"http://127.0.0.1:11434"` | HTTP base URL for backends that accept one. |
 | `max_calls` | integer | `100` | Maximum post-dedup backend judgements; `0` means unlimited. Must be non-negative. |
+| `window_bytes` | positive integer | `262144` | Maximum source bytes in a supported three-phase semantic window. A larger value can deduplicate more nearby records but delays output until the window resolves. It has no execution effect for pure-jq or interleaved queries. |
 | `no_cache` | boolean | `true` | Disable persistent judgement cache reads/writes when true. |
 
 Example:
@@ -47,6 +48,7 @@ Example:
 backend = "local"
 model = "qwen2.5-3b"
 max_calls = 50
+window_bytes = 262144
 no_cache = false
 ```
 
@@ -61,6 +63,7 @@ It preserves unrelated keys but not comments or original formatting.
 | `AJQ_MODEL` | string | Same meaning as `model`. |
 | `AJQ_BASE_URL` | string | Same meaning as `base_url`. |
 | `AJQ_MAX_CALLS` | non-negative integer | Same meaning as `max_calls`. |
+| `AJQ_WINDOW_BYTES` | positive integer | Same meaning as `window_bytes`; defaults to `262144` when unset. |
 | `AJQ_CONFIG` | path | Explicit config file path. |
 | `AJQ_CACHE_DIR` | path | Cache root for provisioning assets, daemon state, local models, and judgement cache files. |
 | `OLLAMA_HOST` | URL or host[:port] | Used by the Ollama backend when no ajq base URL is set. |
@@ -69,7 +72,11 @@ It preserves unrelated keys but not comments or original formatting.
 | `OPENROUTER_API_KEY` | secret | OpenRouter credential. |
 
 Provider API keys are not part of the generic `AJQ_*` config merge. Each provider backend
-reads only its own credential environment variable.
+reads only its own credential environment variable. `window_bytes` follows normal flag >
+environment > TOML > default precedence. An explicit invalid `--window-bytes` value is
+rejected; invalid environment or TOML values are rejected when a semantic backend is
+resolved. Pure-jq execution does not resolve a semantic backend, so its streaming behavior
+is unchanged by environment or TOML window settings.
 
 ## API-key policy
 

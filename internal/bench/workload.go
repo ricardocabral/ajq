@@ -46,9 +46,9 @@ const (
 	// exercised within a single resolve call. This is the shape used to tune
 	// Phase 4 window sizing.
 	ShapeArray Shape = iota
-	// ShapeNDJSON emits one JSON object per line. Each line is an independent
-	// frame (its own harvest/resolve/execute cycle), which models per-record
-	// streaming throughput and latency.
+	// ShapeNDJSON emits one JSON object per line. Complete adjacent frames share
+	// a bounded three-phase semantic window, which models streaming throughput
+	// while preserving byte-budgeted memory bounds.
 	ShapeNDJSON
 )
 
@@ -65,6 +65,9 @@ type Workload struct {
 	Mode input.Mode
 	// Shape records how Input was generated, for reporting only.
 	Shape Shape
+	// WindowBytes is the configured byte budget for three-phase semantic windows.
+	// Zero uses engine's default budget.
+	WindowBytes int64
 	// Distinct records how many distinct field values the generator used, so
 	// reports can explain the expected post-dedup judgement count.
 	Distinct int
@@ -184,7 +187,7 @@ func GenerateArray(name, query string, n int) (Workload, error) {
 }
 
 // GenerateNDJSON builds an NDJSON workload with n records, one JSON object per
-// line. Each line is an independent frame, modelling per-record streaming.
+// line. The zero WindowBytes value selects the engine default budget.
 func GenerateNDJSON(name, query string, n int) (Workload, error) {
 	records, distinct := generateRecords(n)
 	var buf bytes.Buffer
@@ -226,7 +229,7 @@ func StandardWorkloads(records int) ([]Workload, error) {
 	if records <= 0 {
 		records = 64
 	}
-	workloads := make([]Workload, 0, 5)
+	workloads := make([]Workload, 0, 7)
 	for _, spec := range []struct {
 		name  string
 		query string
@@ -242,9 +245,23 @@ func StandardWorkloads(records int) ([]Workload, error) {
 		}
 		workloads = append(workloads, w)
 	}
-	w, err := GenerateNDJSON("sem_match/ndjson", `select(sem_match(.msg; "urgent")) | .id`, records)
-	if err != nil {
-		return nil, err
+	for _, budget := range []int64{256, 4096} {
+		w, err := GenerateNDJSON(fmt.Sprintf("sem_match/ndjson/window-%d", budget), `select(sem_match(.msg; "urgent")) | .id`, records)
+		if err != nil {
+			return nil, err
+		}
+		w.WindowBytes = budget
+		workloads = append(workloads, w)
 	}
-	return append(workloads, w), nil
+	oversized := Workload{
+		Name:        "sem_match/ndjson/oversized",
+		Query:       `select(sem_match(.msg; "urgent")) | .id`,
+		Input:       []byte(`{"id":1,"msg":"urgent ` + string(bytes.Repeat([]byte("x"), 256)) + `"}` + "\n"),
+		Mode:        input.ModeAuto,
+		Shape:       ShapeNDJSON,
+		WindowBytes: 64,
+		Distinct:    1,
+		Records:     1,
+	}
+	return append(workloads, oversized), nil
 }

@@ -6,7 +6,8 @@ description: >
   Harvest, resolve, execute — and why deduplication comes for free.
 ---
 
-ajq runs supported semantic queries in three phases:
+ajq runs supported semantic queries in three phases. For NDJSON and raw streams, the
+unit of work is a bounded window of complete frames rather than the complete stream.
 
 ## The three phases
 
@@ -21,6 +22,26 @@ Phase 3  EXECUTE   pure gojq run; semantic ops in LOOKUP mode return resolved
 
 Phases 1 and 3 are pure gojq. Phase 2 is the isolated semantic boundary: it deduplicates,
 checks cache identity, and calls the backend only for misses.
+
+## Complete-frame windows
+
+Supported three-phase streams are grouped by source bytes into windows before phase 1.
+The default is 262144 bytes (256 KiB), configurable by `--window-bytes`,
+`AJQ_WINDOW_BYTES`, or TOML `window_bytes` with flag > environment > file > default
+precedence. Each window harvests all of its frames, resolves its deduplicated cache misses
+once, then executes and emits frames in source order. Persistent cache entries can be
+reused by later windows.
+
+The window boundary never splits a JSON value or raw line. The executor retains the
+current window, one complete-frame lookahead, and bounded framing buffers, rather than the
+whole input. A frame larger than the budget is processed as one valid oversized window;
+the configured budget therefore does not cap the memory needed for an individual record.
+
+A larger window can eliminate more nearby duplicate judgements and reduce backend batches,
+but it waits to harvest and resolve all frames in that window before emitting its first
+result. Choose a smaller positive budget when first-record latency is more important than
+cross-frame deduplication. Pure-jq and interleaved-required queries retain their existing
+streaming execution and do not use semantic windows.
 
 ## Why two deterministic passes
 

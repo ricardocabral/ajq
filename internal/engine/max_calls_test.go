@@ -17,16 +17,17 @@ import (
 	"github.com/ricardocabral/ajq/internal/output"
 )
 
-func TestMaxCallsThreePhaseAbortsBeforeExceedingCap(t *testing.T) {
+func TestMaxCallsThreePhaseSameWindowAbortsBeforeDispatch(t *testing.T) {
 	be := &backend.MockBackend{}
 	var stdout bytes.Buffer
-	result, err := Execute(context.Background(), strings.NewReader(`[{"msg":"keep"},{"msg":"drop"}]`), &stdout, Options{
-		Query:         `.[] | .msg =~ "keep"`,
+	result, err := Execute(context.Background(), strings.NewReader("{\"msg\":\"keep\"}\n{\"msg\":\"drop\"}\n"), &stdout, Options{
+		Query:         `.msg =~ "keep"`,
 		InputMode:     input.ModeAuto,
 		Output:        output.Options{Compact: true},
 		Backend:       be,
 		SemanticCache: semanticcache.NewStore(),
 		MaxCalls:      1,
+		WindowBytes:   1024,
 	})
 	if err == nil {
 		t.Fatal("expected max calls error")
@@ -145,7 +146,7 @@ func TestMaxCallsDoesNotCountCachedJudgements(t *testing.T) {
 	}
 }
 
-func TestMaxCallsCumulativeAcrossFrames(t *testing.T) {
+func TestMaxCallsCumulativeAcrossWindows(t *testing.T) {
 	be := &backend.MockBackend{}
 	var stdout bytes.Buffer
 	result, err := Execute(context.Background(), strings.NewReader("{\"msg\":\"a\"}\n{\"msg\":\"b\"}\n"), &stdout, Options{
@@ -155,6 +156,7 @@ func TestMaxCallsCumulativeAcrossFrames(t *testing.T) {
 		Backend:       be,
 		SemanticCache: semanticcache.NewStore(),
 		MaxCalls:      1,
+		WindowBytes:   1,
 	})
 	if err == nil {
 		t.Fatal("expected cumulative cap error")

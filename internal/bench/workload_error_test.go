@@ -109,7 +109,7 @@ func TestCheckedWorkloadGenerationSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StandardWorkloads: %v", err)
 	}
-	if len(workloads) != 5 {
-		t.Fatalf("StandardWorkloads len = %d, want 5", len(workloads))
+	if len(workloads) != 7 {
+		t.Fatalf("StandardWorkloads len = %d, want 7", len(workloads))
 	}
 }

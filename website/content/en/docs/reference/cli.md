@@ -37,6 +37,7 @@ when semantic operators require one.
 | `--raw-input` | `-R` | Read each input line as a string. |
 | `--raw-output` | `-r` | Emit strings without JSON quoting. |
 | `--stats` | | Print run statistics to stderr after a successful run. |
+| `--window-bytes <N>` | | Maximum source bytes per supported three-phase semantic window; positive integer, default `262144`. Has no execution effect for pure-jq or interleaved queries. |
 | `--version` | `-v` | Print the version and exit. |
 | `--help` | `-h` | Print usage and exit. |
 
@@ -168,7 +169,13 @@ The `--exit-status` codes match jq's convention.
   report without reading stdin.
 - `--explain` on a semantic query prints the static plan and, when valid stdin is supplied,
   mock-path estimates without contacting a real backend.
-- `--stats` writes only the summary to stderr; query output remains on stdout.
+- `--stats` writes only the summary to stderr; query output remains on stdout. Its window
+  fields are `execution_mode` (`pure-jq`, `three-phase-windowed`, or `interleaved`),
+  `window_bytes`, `window_count`, and `oversized_window_count`. The three numeric window
+  fields are zero outside `three-phase-windowed` mode.
+- `--window-bytes` applies only to supported three-phase semantic execution. It forms
+  complete-frame windows, never buffers the entire input, and accepts a record larger than
+  the budget as a one-frame oversized window.
 
 ## Related
 

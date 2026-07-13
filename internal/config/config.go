@@ -15,6 +15,9 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// DefaultWindowBytes is the byte budget used for supported three-phase semantic windows.
+const DefaultWindowBytes int64 = 262144
+
 // Settings are the resolved user-facing knobs shared by CLI and backend setup.
 type Settings struct {
 	Backend         string
@@ -22,22 +25,25 @@ type Settings struct {
 	BaseURL         string
 	BaseURLExplicit bool
 	MaxCalls        int
+	WindowBytes     int64
 	NoCache         bool
 }
 
 // Values is a presence-aware settings patch. Zero values are meaningful only
 // when the corresponding Has* field is true.
 type Values struct {
-	Backend     string
-	BackendSet  bool
-	Model       string
-	ModelSet    bool
-	BaseURL     string
-	BaseURLSet  bool
-	MaxCalls    int
-	MaxCallsSet bool
-	NoCache     bool
-	NoCacheSet  bool
+	Backend        string
+	BackendSet     bool
+	Model          string
+	ModelSet       bool
+	BaseURL        string
+	BaseURLSet     bool
+	MaxCalls       int
+	MaxCallsSet    bool
+	WindowBytes    int64
+	WindowBytesSet bool
+	NoCache        bool
+	NoCacheSet     bool
 }
 
 // Resolve applies the single supported precedence chain:
@@ -50,8 +56,16 @@ func Resolve(flags, env, file, defaults Values) Settings {
 		BaseURL:         merged.BaseURL,
 		BaseURLExplicit: flags.BaseURLSet || env.BaseURLSet || file.BaseURLSet,
 		MaxCalls:        merged.MaxCalls,
+		WindowBytes:     resolvedWindowBytes(merged),
 		NoCache:         merged.NoCache,
 	}
+}
+
+func resolvedWindowBytes(values Values) int64 {
+	if values.WindowBytesSet {
+		return values.WindowBytes
+	}
+	return DefaultWindowBytes
 }
 
 func mergeValues(sources ...Values) Values {
@@ -72,6 +86,10 @@ func mergeValues(sources ...Values) Values {
 		if source.MaxCallsSet {
 			out.MaxCalls = source.MaxCalls
 			out.MaxCallsSet = true
+		}
+		if source.WindowBytesSet {
+			out.WindowBytes = source.WindowBytes
+			out.WindowBytesSet = true
 		}
 		if source.NoCacheSet {
 			out.NoCache = source.NoCache
@@ -109,12 +127,31 @@ func Env(getenv func(string) string) (Values, error) {
 		values.MaxCalls = maxCalls
 		values.MaxCallsSet = true
 	}
+	if value, ok := lookupEnv(getenv, "AJQ_WINDOW_BYTES"); ok {
+		windowBytes, err := parsePositiveInt64("AJQ_WINDOW_BYTES", value)
+		if err != nil {
+			return Values{}, err
+		}
+		values.WindowBytes = windowBytes
+		values.WindowBytesSet = true
+	}
 	return values, nil
 }
 
 func lookupEnv(getenv func(string) string, key string) (string, bool) {
 	value := getenv(key)
 	return value, value != ""
+}
+
+func parsePositiveInt64(name string, value string) (int64, error) {
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	if parsed <= 0 {
+		return 0, fmt.Errorf("%s must be positive", name)
+	}
+	return parsed, nil
 }
 
 func parseNonNegativeInt(name string, value string) (int, error) {
@@ -194,11 +231,12 @@ func configPath(getenv func(string) string, homeDir func() (string, error)) (pat
 }
 
 type fileSettings struct {
-	Backend  *string `toml:"backend"`
-	Model    *string `toml:"model"`
-	BaseURL  *string `toml:"base_url"`
-	MaxCalls *int    `toml:"max_calls"`
-	NoCache  *bool   `toml:"no_cache"`
+	Backend     *string `toml:"backend"`
+	Model       *string `toml:"model"`
+	BaseURL     *string `toml:"base_url"`
+	MaxCalls    *int    `toml:"max_calls"`
+	WindowBytes *int64  `toml:"window_bytes"`
+	NoCache     *bool   `toml:"no_cache"`
 }
 
 func parse(data []byte, stderr io.Writer) (Values, error) {
@@ -240,6 +278,13 @@ func parse(data []byte, stderr io.Writer) (Values, error) {
 		}
 		values.MaxCalls = *file.MaxCalls
 		values.MaxCallsSet = true
+	}
+	if file.WindowBytes != nil {
+		if *file.WindowBytes <= 0 {
+			return Values{}, fmt.Errorf("config window_bytes must be positive")
+		}
+		values.WindowBytes = *file.WindowBytes
+		values.WindowBytesSet = true
 	}
 	if file.NoCache != nil {
 		values.NoCache = *file.NoCache

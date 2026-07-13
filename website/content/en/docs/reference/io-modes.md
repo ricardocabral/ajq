@@ -17,9 +17,14 @@ ajq selects an input framing based on flags and the shape of stdin.
 | Raw input | `-R`, `--raw-input` | Reads each stdin line as a string, excluding the line terminator. `.` is the line. |
 
 In the default mode, a stream of multiple top-level JSON values (whitespace- or
-newline-separated, i.e. NDJSON/JSON Lines) is processed **one frame at a time**: each
-value is run through the query and emitted independently, with no whole-stream buffering.
-This allows inputs larger than available memory.
+newline-separated, i.e. NDJSON/JSON Lines) is framed independently, with no whole-stream
+buffering. Pure-jq and interleaved semantic queries execute and emit one frame at a time.
+Supported three-phase semantic queries instead group complete frames into configured
+byte-budgeted windows, resolve each window once, then emit its frames in original order.
+The window retains only its frames plus bounded framing lookahead; a record larger than
+the budget forms one oversized window and is never split. This still allows inputs larger
+than available memory. See [Process NDJSON](../../how-to/process-ndjson/) for tuning and
+latency trade-offs.
 
 ## Output formatting
 

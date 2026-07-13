@@ -29,7 +29,7 @@ stdout ← [Assembler / schema-invariance guard]
 
 | Component | Responsibility |
 |---|---|
-| **Reader / Framer** | Stream framing: single JSON, NDJSON, and raw lines (awk-mode). Byte-budget windowing for very large inputs is planned (Phase 4). |
+| **Reader / Framer** | Stream framing: single JSON, NDJSON, and raw lines (awk-mode). Supported three-phase semantic input is grouped into complete-frame byte-budgeted windows; pure-jq and interleaved paths remain streaming. |
 | **Desugar** | Rewrites `=~` / `!~` into `sem_match` calls with a jq-aware lexer. |
 | **Planner** | Exhaustive AST walk that discovers every semantic call site → a `Plan` used for `--explain`, validation, and cost estimation. |
 | **Executor** | Runs the plan in three phases (harvest / resolve / execute), with interleaved fallback for gated unbounded value ops. |
@@ -37,6 +37,16 @@ stdout ← [Assembler / schema-invariance guard]
 | **Backend** | Pluggable inference. Shipped backends: `mock`, `local` (llama-server daemon), `ollama`, `openai`, `openrouter`, and `anthropic`/`--cloud`. |
 | **Grammar / schema builder** | Turns an op's return type / enum into a JSON Schema and, for the local engine, GBNF grammar constraints. |
 | **Assembler** | Reassembles the output stream and enforces schema invariance. |
+
+## Windowed semantic execution
+
+For supported three-phase semantic queries, the executor retains one complete-frame window
+at a time, harvests its semantic judgements, resolves deduplicated cache misses in one
+backend batch, then executes frames in source order. The default source-byte budget is
+256 KiB and can be overridden with `--window-bytes`, `AJQ_WINDOW_BYTES`, or
+`window_bytes` in TOML. A record that exceeds the budget is a valid one-frame oversized
+window, so the budget is not a rejection limit. The executor does not retain the complete
+stream: it keeps the current window, one lookahead frame, and bounded framing buffers.
 
 ## The `Backend` seam
 
