@@ -22,6 +22,7 @@ name: Release
       - scripts/windows_msi_contract.ps1
       - scripts/windows_msi_contract_test.ps1
       - scripts/windows_msi_finalize.ps1
+      - scripts/windows_pe_machine.ps1
       - scripts/package_manager_smoke.sh
       - scripts/package_manager_smoke_test.sh
       - scripts/package_manager_smoke.ps1
@@ -69,11 +70,16 @@ jobs:
           fi
 
           if [[ "$EVENT_NAME" == push ]]; then
-            [[ "$EVENT_REF" =~ ^refs/tags/(v[0-9]+\.[0-9]+\.[0-9]+)$ ]] || {
-              printf 'release publish requires a vX.Y.Z tag, got %s\n' "$EVENT_REF" >&2
+            [[ "$EVENT_REF" =~ ^refs/tags/(v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$ ]] || {
+              printf 'release publish requires a stable vX.Y.Z tag without leading zeroes, got %s\n' "$EVENT_REF" >&2
               exit 1
             }
             tag="${BASH_REMATCH[1]}"
+            IFS=. read -r major minor build <<< "${tag#v}"
+            (( 10#$major <= 255 && 10#$minor <= 255 && 10#$build <= 65535 )) || {
+              printf 'release tag %s cannot be represented by Windows Installer ProductVersion\n' "$tag" >&2
+              exit 1
+            }
             git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
             [[ "$(git rev-parse "refs/tags/$tag^{commit}")" == "$(git rev-parse "$EVENT_SHA^{commit}")" ]] || {
               printf 'tag %s does not resolve to the triggering commit\n' "$tag" >&2
@@ -257,6 +263,7 @@ jobs:
           $allBinaries = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'ajq.exe')
           if ($allBinaries.Count -ne 1 -or -not (Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'release ZIP must contain exactly one root ajq.exe' }
           if (-not (Test-Path -LiteralPath $license -PathType Leaf)) { throw 'release ZIP must contain root LICENSE' }
+          & ./scripts/windows_pe_machine.ps1 -BinaryPath $binary
           "binary=$binary" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "license=$license" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 

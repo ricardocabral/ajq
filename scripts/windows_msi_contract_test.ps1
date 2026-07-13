@@ -7,6 +7,7 @@ $wix = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'build/windows/ajq.wxs
 $workflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
 $goreleaser = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.goreleaser.yaml')
 $msiFinalizer = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/windows_msi_finalize.ps1')
+$peMachine = Join-Path $repoRoot 'scripts/windows_pe_machine.ps1'
 
 function Get-Contract([string]$Tag) {
     $result = @{}
@@ -15,6 +16,27 @@ function Get-Contract([string]$Tag) {
         $result[$name] = $value
     }
     return $result
+}
+
+$peFixture = Join-Path ([IO.Path]::GetTempPath()) ("ajq-pe-machine-" + [guid]::NewGuid())
+try {
+    $bytes = [byte[]]::new(0x100)
+    $bytes[0] = 0x4d; $bytes[1] = 0x5a
+    [Array]::Copy([BitConverter]::GetBytes(0x80), 0, $bytes, 0x3c, 4)
+    $bytes[0x80] = 0x50; $bytes[0x81] = 0x45
+    [Array]::Copy([BitConverter]::GetBytes([uint16]0x8664), 0, $bytes, 0x84, 2)
+    [IO.File]::WriteAllBytes($peFixture, $bytes)
+    & $peMachine -BinaryPath $peFixture
+    [Array]::Copy([BitConverter]::GetBytes([uint16]0x014c), 0, $bytes, 0x84, 2)
+    [IO.File]::WriteAllBytes($peFixture, $bytes)
+    try {
+        & $peMachine -BinaryPath $peFixture
+        throw 'x86 PE fixture unexpectedly passed AMD64 validation'
+    } catch {
+        if ($_.Exception.Message -notmatch 'expected AMD64 0x8664') { throw }
+    }
+} finally {
+    Remove-Item -LiteralPath $peFixture -Force -ErrorAction Ignore
 }
 
 $first = Get-Contract 'v0.0.7'
@@ -29,12 +51,16 @@ if ($next.product_code -ceq $first.product_code -or $next.package_code -ceq $fir
 if ($next.zip_asset -cne 'ajq_0.0.8_Windows_x86_64.zip' -or $next.msi_asset -cne 'ajq_0.0.8_Windows_x86_64.msi') {
     throw 'MSI asset contract is not case-sensitive canonical Windows x64 naming'
 }
-try {
-    & $contract -Tag 'v0.0.8-rc.1' | Out-Null
-    throw 'pre-release tag unexpectedly produced an MSI identity'
-} catch {
-    if ($_.Exception.Message -notmatch 'stable vX\.Y\.Z tag') { throw }
+foreach ($invalidTag in @('v0.0.8-rc.1', 'v01.0.0', 'v256.0.0', 'v1.256.0', 'v1.2.65536')) {
+    try {
+        & $contract -Tag $invalidTag | Out-Null
+        throw "MSI-inexpressible tag unexpectedly produced an identity: $invalidTag"
+    } catch {
+        if ($_.Exception.Message -notmatch '(stable vX\.Y\.Z|version components)') { throw }
+    }
 }
+$boundary = Get-Contract 'v255.255.65535'
+if ($boundary.version -ne '255.255.65535') { throw 'MSI version boundary did not remain valid' }
 
 foreach ($needle in @(
     'ProductCode="$(var.ProductCode)"',
@@ -72,6 +98,8 @@ foreach ($needle in @(
     'dotnet tool install --global wix --version 4.0.5',
     'release ZIP must contain exactly one root ajq.exe',
     'release ZIP must contain root LICENSE',
+    'windows_pe_machine.ps1 -BinaryPath $binary',
+    'cannot be represented by Windows Installer ProductVersion',
     'id: release_zip',
     'BINARY_SOURCE: ${{ steps.release_zip.outputs.binary }}',
     'LICENSE_SOURCE: ${{ steps.release_zip.outputs.license }}',

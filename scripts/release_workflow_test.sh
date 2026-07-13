@@ -46,6 +46,14 @@ grep -Fq 'steps.release_zip.outputs.binary' "$workflow" || {
   printf 'Release workflow must build MSI from the verified release ZIP binary\n' >&2
   exit 1
 }
+grep -Fq 'windows_pe_machine.ps1 -BinaryPath $binary' "$workflow" || {
+  printf 'Release workflow must validate the selected release executable is AMD64\n' >&2
+  exit 1
+}
+grep -Fq 'cannot be represented by Windows Installer ProductVersion' "$workflow" || {
+  printf 'Release workflow must reject MSI-inexpressible versions before draft creation\n' >&2
+  exit 1
+}
 grep -Fq 'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.' "$workflow" || {
   printf 'Release workflow must retain the credential-safe unsigned MSI warning\n' >&2
   exit 1

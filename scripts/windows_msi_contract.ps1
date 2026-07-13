@@ -7,8 +7,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if ($Tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
-    throw "Windows MSI requires a stable vX.Y.Z tag, got $Tag"
+if ($Tag -notmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+    throw "Windows MSI requires a stable vX.Y.Z tag without leading zeroes, got $Tag"
+}
+$major, $minor, $build = $Tag.Substring(1).Split('.') | ForEach-Object { [uint32]::Parse($_, [Globalization.CultureInfo]::InvariantCulture) }
+if ($major -gt 255 -or $minor -gt 255 -or $build -gt 65535) {
+    throw "Windows MSI version components must be major/minor <= 255 and build <= 65535, got $Tag"
 }
 
 function Get-UuidV5([string]$Namespace, [string]$Name) {
