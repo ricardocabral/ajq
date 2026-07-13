@@ -1,6 +1,12 @@
 ---
 name: WinGet package
 
+# The pinned releaser requires an existing winget-pkgs version as its update base.
+# Initial registration is intentionally manual: the release maintainer creates a
+# clean branch from current microsoft/winget-pkgs master in ricardocabral/winget-pkgs,
+# adds canonical Ricardocabral.ajq manifests for the immutable release, and waits for
+# Microsoft merge and source propagation. Only then may this release-triggered workflow
+# submit future package versions.
 "on":
   release:
     types:
