@@ -46,6 +46,7 @@ grep -Fq 'steps.release_zip.outputs.binary' "$workflow" || {
   printf 'Release workflow must build MSI from the verified release ZIP binary\n' >&2
   exit 1
 }
+# shellcheck disable=SC2016 # The literal workflow fragment intentionally includes $binary.
 grep -Fq 'windows_pe_machine.ps1 -BinaryPath $binary' "$workflow" || {
   printf 'Release workflow must validate the selected release executable is AMD64\n' >&2
   exit 1
