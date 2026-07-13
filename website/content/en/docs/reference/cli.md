@@ -26,6 +26,7 @@ when semantic operators require one.
 |---|---|---|
 | `--backend <name>` | | Select the semantic backend: `anthropic`, `local`, `mock`, `ollama`, `openai`, or `openrouter`. |
 | `--base-url <url>` | | Set the HTTP base URL for backends that use one (`local`, `ollama`, `openai`, `openrouter`). For `openai`/`openrouter`, custom URLs must use HTTPS unless the host is loopback (`127.0.0.1`, `localhost`, or `[::1]`). |
+| `--backend-concurrency <N>` | | Maximum in-flight semantic requests in one provider batch. Default `1`; maximum `2` for OpenAI-compatible/Anthropic and `4` for Ollama. Must be positive when set. |
 | `--cloud` | | Select the Anthropic cloud backend; equivalent to `--backend anthropic`. |
 | `--compact-output` | `-c` | Emit compact JSON output. |
 | `--exit-status` | `-e` | Set the exit status based on the last output value. |

@@ -48,7 +48,11 @@ ajq: error: query ".[] | select(.msg =~ \"urgent\") | .msg" runtime error in fra
 ```
 
 Paid backends (`anthropic`, `openai`, and `openrouter`) default to `--max-calls 100`.
-Use `--max-calls 0` only when you intentionally want no cap.
+Use `--max-calls 0` only when you intentionally want no cap. `--backend-concurrency`
+changes only how many requests from an already-approved batch can be in flight; it does
+not change this count or reserve extra calls. Keep paid providers at the sequential default
+of `1` while establishing a rate-limit budget, then use at most `2` only if the provider's
+account limits and retry capacity allow it.
 
 ## 3. Inspect a successful run with `--stats`
 

@@ -71,7 +71,10 @@ Harvesting first, then executing, buys three things:
 - **Deduplication.** All values a query will judge are known before backend calls, so
   identical judgements collapse to one decision.
 - **Backend-level scheduling.** Resolve hands the backend the distinct judgement set. The
-  local daemon can process bounded-parallel requests while preserving result ordering.
+  local daemon and configured OpenAI-compatible, Anthropic, or Ollama backends can process
+  bounded-parallel requests while preserving result ordering. Provider concurrency defaults
+  to sequential (`1`); it applies only inside this already-reserved batch. A whole-batch
+  transport failure cancels queued and in-flight siblings and yields no partial batch.
 - **Reproducibility of structure.** Execute is a pure function of input plus resolved
   semantic judgements, so jq output shaping remains stable.
 

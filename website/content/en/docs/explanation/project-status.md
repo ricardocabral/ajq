@@ -44,9 +44,12 @@ Further streaming optimizations remain planned.
   local engine and default model; `ajq models list|pull|use` manages larger pinned catalog
   models.
 - **Additional backends** — Ollama, OpenAI, OpenRouter, and Anthropic (`--cloud`) are
-  registered with structured-output constraints and provider-specific credential rules.
+  registered with structured-output constraints, provider-specific credential rules, and
+  bounded ordered batch concurrency. Provider requests remain sequential by default;
+  explicit OpenAI-compatible/Anthropic concurrency is capped at two and Ollama at four.
 - **Config and cost controls** — backend/model/base-url selection, TOML config, env vars,
-  `--max-calls`, and `--stats` are shipped. Paid backends default to a 100-call cap.
+  `--backend-concurrency`, `--max-calls`, and `--stats` are shipped. Paid backends default
+  to a 100-call cap.
 - **Persistent judgement cache** — successful semantic judgements are stored under
   `<cache>/judgements/`, can be bypassed with `--no-cache`, inspected with
   `ajq cache status`, and removed with `ajq cache clear`.
