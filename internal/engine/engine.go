@@ -56,9 +56,12 @@ func normalizedWindowBytes(windowBytes int64) (int64, error) {
 type ExecutionMode string
 
 const (
-	ExecutionModePureJQ             ExecutionMode = "pure-jq"
+	// ExecutionModePureJQ reports deterministic jq execution without semantic work.
+	ExecutionModePureJQ ExecutionMode = "pure-jq"
+	// ExecutionModeThreePhaseWindowed reports supported semantic execution in input windows.
 	ExecutionModeThreePhaseWindowed ExecutionMode = "three-phase-windowed"
-	ExecutionModeInterleaved        ExecutionMode = "interleaved"
+	// ExecutionModeInterleaved reports semantic execution that cannot use three phases.
+	ExecutionModeInterleaved ExecutionMode = "interleaved"
 )
 
 // RunStats summarizes per-run accounting. InputFrames counts frames read from
