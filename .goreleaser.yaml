@@ -98,6 +98,8 @@ release:
   # Finalize the draft only after the Windows MSI and replacement checksums exist.
   draft: true
   prerelease: auto
+  # Draft retries replace only deterministic assets; workflow rejects published releases first.
+  replace_existing_artifacts: true
   mode: replace
   header: |
     ## ajq {{ .Tag }}

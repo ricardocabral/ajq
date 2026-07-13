@@ -63,6 +63,10 @@ foreach ($needle in @(
     'release ZIP must contain root LICENSE',
     'gh release download $env:RELEASE_TAG --pattern $env:ZIP_ASSET --dir stage',
     'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.',
+    'uses: azure/trusted-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba # v2.0.0',
+    'refusing to replace assets on published release',
+    'replacing deterministic assets on existing draft',
+    'name: Publish Homebrew cask after release finalization',
     'gh release edit "$RELEASE_TAG" --draft=false',
     'dist/*.msi'
 )) {
@@ -74,7 +78,11 @@ foreach ($credential in @('AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SE
 if ($workflow.IndexOf('name: Build Windows x64 MSI') -ge $workflow.IndexOf('name: Finalize checksums, attest, and publish')) {
     throw 'MSI finalization must run after MSI upload'
 }
+if ($workflow.IndexOf('name: Finalize checksums, attest, and publish') -ge $workflow.IndexOf('name: Publish Homebrew cask after release finalization')) {
+    throw 'Homebrew publication must wait for successful MSI finalization'
+}
 if ($goreleaser -notmatch '(?m)^\s*draft:\s*true\s*$') { throw 'GoReleaser must create a draft until MSI finalization succeeds' }
+if ($goreleaser -notmatch '(?m)^\s*replace_existing_artifacts:\s*true\s*$') { throw 'GoReleaser must replace deterministic assets on draft retries' }
 if ($workflow -notmatch "release-dry-run:\s*\r?\n\s*name: GoReleaser snapshot dry-run\s*\r?\n\s*if: github.event_name == 'pull_request'") {
     throw 'PR path must remain snapshot-only'
 }
