@@ -49,14 +49,19 @@ function Invoke-MsiExec([string[]]$Arguments, [string]$Description) {
     if ($process.ExitCode -notin @(0, 3010)) { throw "$Description failed with Windows Installer exit $($process.ExitCode)" }
 }
 function Assert-ExactOutput([string]$Path, [string[]]$Arguments, [string]$Input, [string]$Expected, [string]$Description) {
-    $psi = [Diagnostics.ProcessStartInfo]::new($Path)
+    # Match the proven package-manager harness: a parameterless start info
+    # avoids Windows treating the executable path as a command line, and drain
+    # stderr concurrently while copying byte-exact stdout.
+    $psi = [Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $Path
     $psi.UseShellExecute = $false; $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
     foreach ($argument in $Arguments) { [void]$psi.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::new(); $process.StartInfo = $psi; [void]$process.Start()
     $process.StandardInput.Write($Input); $process.StandardInput.Close()
-    $stdout = $process.StandardOutput.BaseStream
-    $memory = [IO.MemoryStream]::new(); $stdout.CopyTo($memory); $process.WaitForExit()
-    if ($process.ExitCode -ne 0) { throw "$Description failed: $($process.StandardError.ReadToEnd())" }
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+    $memory = [IO.MemoryStream]::new(); $process.StandardOutput.BaseStream.CopyTo($memory); $process.WaitForExit()
+    $stderr = $stderrTask.GetAwaiter().GetResult()
+    if ($process.ExitCode -ne 0) { throw "$Description failed: $stderr" }
     $actual = [Convert]::ToBase64String($memory.ToArray())
     $expected = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Expected))
     if ($actual -cne $expected) { throw "$Description did not produce exact expected bytes (actual base64: $actual; expected base64: $expected)" }
