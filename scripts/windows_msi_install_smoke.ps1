@@ -2,7 +2,8 @@
 param(
     [Parameter(Mandatory = $true)][string]$Tag,
     [Parameter(Mandatory = $true)][string]$MsiPath,
-    [string]$ExpectedSha256
+    [string]$ExpectedSha256,
+    [string]$ExpectedBinarySha256
 )
 
 Set-StrictMode -Version Latest
@@ -48,10 +49,14 @@ function Invoke-MsiExec([string[]]$Arguments, [string]$Description) {
     $process = Start-Process -FilePath msiexec.exe -ArgumentList $Arguments -Wait -PassThru -NoNewWindow
     if ($process.ExitCode -notin @(0, 3010)) { throw "$Description failed with Windows Installer exit $($process.ExitCode)" }
 }
+function Get-ByteEvidence([byte[]]$Bytes) {
+    $sha256 = [Security.Cryptography.SHA256]::HashData($Bytes)
+    return "bytes=$($Bytes.Length) sha256=$([Convert]::ToHexString($sha256))"
+}
 function Assert-ExactOutput([string]$Path, [string[]]$Arguments, [string]$Input, [string]$Expected, [string]$Description) {
-    # Match the proven package-manager harness: a parameterless start info
-    # avoids Windows treating the executable path as a command line, and drain
-    # stderr concurrently while copying byte-exact stdout.
+    # ArgumentList preserves each argv element exactly. Record only byte lengths
+    # and hashes so a failed CI run distinguishes invocation/input/capture faults
+    # without exposing arbitrary environment-derived command content.
     $psi = [Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $Path
     $psi.UseShellExecute = $false; $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
@@ -61,10 +66,15 @@ function Assert-ExactOutput([string]$Path, [string[]]$Arguments, [string]$Input,
     $stderrTask = $process.StandardError.ReadToEndAsync()
     $memory = [IO.MemoryStream]::new(); $process.StandardOutput.BaseStream.CopyTo($memory); $process.WaitForExit()
     $stderr = $stderrTask.GetAwaiter().GetResult()
-    if ($process.ExitCode -ne 0) { throw "$Description failed: $stderr" }
-    $actual = [Convert]::ToBase64String($memory.ToArray())
-    $expected = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Expected))
-    if ($actual -cne $expected) { throw "$Description did not produce exact expected bytes (actual base64: $actual; expected base64: $expected)" }
+    $actualBytes = $memory.ToArray()
+    $expectedBytes = [Text.Encoding]::UTF8.GetBytes($Expected)
+    $argumentEvidence = ($Arguments | ForEach-Object { Get-ByteEvidence ([Text.Encoding]::UTF8.GetBytes($_)) }) -join ', '
+    $evidence = "path=$Path; argv=[$argumentEvidence]; stdin=$(Get-ByteEvidence ([Text.Encoding]::UTF8.GetBytes($Input))); stdout=$(Get-ByteEvidence $actualBytes); stderr=$(Get-ByteEvidence ([Text.Encoding]::UTF8.GetBytes($stderr)))"
+    if ($process.ExitCode -ne 0) { throw "$Description failed (exit=$($process.ExitCode); $evidence)" }
+    $actual = [Convert]::ToBase64String($actualBytes)
+    $expected = [Convert]::ToBase64String($expectedBytes)
+    if ($actual -cne $expected) { throw "$Description did not produce exact expected bytes ($evidence; actual base64: $actual; expected base64: $expected)" }
+    Write-Output "$Description evidence: $evidence"
     return $actual
 }
 
@@ -74,6 +84,9 @@ try {
     Invoke-MsiExec @('/i', $MsiPath, '/qn', '/norestart') 'silent MSI install'
     $installed = $true
     if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "MSI did not install ajq at $executable" }
+    $installedBinaryHash = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($ExpectedBinarySha256 -and $installedBinaryHash -cne $ExpectedBinarySha256.ToUpperInvariant()) { throw "installed ajq.exe SHA-256 does not match WiX source binary (installed=$installedBinaryHash expected=$($ExpectedBinarySha256.ToUpperInvariant()))" }
+    Write-Output "Windows MSI installed ajq.exe SHA-256: $installedBinaryHash"
     $userPath = (Get-ItemProperty -LiteralPath 'HKCU:\Environment' -Name Path -ErrorAction SilentlyContinue).Path
     if ($userPath -notmatch [regex]::Escape($installDirectory)) { throw 'MSI did not own the per-user PATH entry' }
     New-Item -ItemType Directory -Path $temp | Out-Null

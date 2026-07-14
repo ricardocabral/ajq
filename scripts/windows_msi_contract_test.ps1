@@ -151,10 +151,10 @@ if ($goreleaser -notmatch '(?m)^\s*replace_existing_artifacts:\s*true\s*$') { th
 if ($workflow -notmatch "release-dry-run:\s*\r?\n\s*name: GoReleaser snapshot dry-run\s*\r?\n\s*if: github.event_name == 'pull_request'") {
     throw 'PR path must remain snapshot-only'
 }
-foreach ($needle in @('Get-FileHash', 'ProductVersion', 'ProductCode', 'msiexec.exe', "Programs\ajq", 'Join-Path $installDirectory ''ajq.exe''', '$psi.FileName = $Path', 'ReadToEndAsync', 'installed mock query', 'MSI uninstall left installation directory', 'MSI uninstall left its per-user PATH entry behind')) {
+foreach ($needle in @('Get-FileHash', 'ExpectedBinarySha256', 'installed ajq.exe SHA-256', 'ProductVersion', 'ProductCode', 'msiexec.exe', "Programs\ajq", 'Join-Path $installDirectory ''ajq.exe''', '$psi.FileName = $Path', '$psi.ArgumentList.Add($argument)', 'Get-ByteEvidence', 'ReadToEndAsync', 'installed mock query', 'MSI uninstall left installation directory', 'MSI uninstall left its per-user PATH entry behind')) {
     if (-not $installerSmoke.Contains($needle)) { throw "MSI install smoke is missing $needle" }
 }
-foreach ($needle in @('name: Build and silently smoke-test a local MSI', 'dotnet tool install --global wix --version 4.0.5', './scripts/windows_msi_install_smoke.ps1 -Tag v0.0.0')) {
+foreach ($needle in @('name: Build and silently smoke-test a local MSI', 'dotnet tool install --global wix --version 4.0.5', '$binaryHash = (Get-FileHash -LiteralPath stage/ajq.exe -Algorithm SHA256).Hash', '-ExpectedBinarySha256 $binaryHash', './scripts/windows_msi_install_smoke.ps1 -Tag v0.0.0')) {
     if (-not $ciWorkflow.Contains($needle)) { throw "Windows CI local MSI verifier is missing $needle" }
 }
 if ($packageSmoke.Contains('Microsoft\WinGet\Links\ajq.exe') -or -not $packageSmoke.Contains("Programs\ajq\ajq.exe")) { throw 'package manager smoke must use the WiX install location, not portable aliases' }
