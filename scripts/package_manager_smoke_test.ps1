@@ -24,6 +24,7 @@ if (-not (Test-Path -LiteralPath $env:AJQ_CONFIG -PathType Leaf)) { exit 42 }
 $bytes = if ($Args[0] -eq '--version') {
     [System.Text.Encoding]::UTF8.GetBytes($env:AJQ_VERSION_OUTPUT)
 } else {
+    if (($Args -join "`0") -cne "--backend`0mock`0-c`0.[] | select(.msg =~ `"refund`") | .id") { exit 44 }
     $received = [Console]::In.ReadToEnd()
     if ($received -cne $env:AJQ_EXPECTED_INPUT) { exit 43 }
     [System.Text.Encoding]::UTF8.GetBytes($env:QUERY_OUTPUT)

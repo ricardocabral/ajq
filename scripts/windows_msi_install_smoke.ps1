@@ -74,7 +74,7 @@ function Assert-ExactOutput([string]$Path, [string[]]$Arguments, [string]$Standa
     $actual = [Convert]::ToBase64String($actualBytes)
     $expected = [Convert]::ToBase64String($expectedBytes)
     if ($actual -cne $expected) { throw "$Description did not produce exact expected bytes ($evidence; actual base64: $actual; expected base64: $expected)" }
-    Write-Output "$Description evidence: $evidence"
+    Write-Host "$Description evidence: $evidence"
     return $actual
 }
 
