@@ -202,7 +202,11 @@ run_local_live_smoke() {
 
 run "standard tests" make test
 run "lint" make lint
-run "shell scripts lint" shellcheck scripts/install.sh scripts/install_test.sh scripts/release_smoke.sh
+run "shell scripts lint" shellcheck scripts/install.sh scripts/install_test.sh scripts/release_smoke.sh \
+  scripts/release_publish_preflight.sh scripts/release_publish_preflight_test.sh \
+  scripts/release_finalize_contract.sh scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh
+run "release publication preflight tests" scripts/release_publish_preflight_test.sh
+run "package-manager smoke tests" scripts/package_manager_smoke_test.sh
 run_discovery_smoke
 run_mock_smoke
 run_local_provision_check

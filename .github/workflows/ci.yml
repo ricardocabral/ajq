@@ -80,6 +80,96 @@ jobs:
           shellcheck scripts/install.sh scripts/install_test.sh
           scripts/install_test.sh
 
+  package-manager-scripts:
+    name: Package-manager shell checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Go for actionlint
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate package-manager scripts and workflows
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck scripts/release_publish_preflight.sh scripts/release_publish_preflight_test.sh \
+            scripts/release_finalize_contract.sh scripts/package_manager_smoke.sh \
+            scripts/package_manager_smoke_test.sh scripts/release_smoke.sh scripts/release_workflow_test.sh
+          scripts/release_publish_preflight_test.sh
+          scripts/package_manager_smoke_test.sh
+          scripts/release_workflow_test.sh
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
+            .github/workflows/ci.yml .github/workflows/release.yml \
+            .github/workflows/winget.yml .github/workflows/package-manager-smoke.yml
+
+  package-manager-powershell:
+    name: Package-manager PowerShell checks
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Test WinGet helpers and smoke script
+        shell: pwsh
+        run: |
+          ./scripts/winget_release_preflight_test.ps1
+          ./scripts/package_manager_smoke_test.ps1
+          ./scripts/windows_msi_contract_test.ps1
+
+  windows-msi-install:
+    name: Build and silently smoke-test a local MSI
+    runs-on: windows-latest
+    needs:
+      - package-manager-powershell
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build a local versioned Windows binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path stage | Out-Null
+          go build -trimpath -ldflags '-s -w -X github.com/ricardocabral/ajq/internal/version.Version=0.0.0' -o stage/ajq.exe ./cmd/ajq
+          Copy-Item LICENSE stage/LICENSE
+
+      - name: Resolve local MSI contract and install WiX
+        id: contract
+        shell: pwsh
+        run: |
+          ./scripts/windows_msi_contract.ps1 -Tag v0.0.0 -OutputPath $env:GITHUB_OUTPUT
+          dotnet tool install --global wix --version 4.0.5
+          wix --version
+
+      - name: Build and smoke-test local MSI without release side effects
+        shell: pwsh
+        env:
+          MSI_VERSION: ${{ steps.contract.outputs.version }}
+          PRODUCT_CODE: ${{ steps.contract.outputs.product_code }}
+          PACKAGE_CODE: ${{ steps.contract.outputs.package_code }}
+          MSI_ASSET: ${{ steps.contract.outputs.msi_asset }}
+        run: |
+          $out = "stage/$env:MSI_ASSET"
+          wix build build/windows/ajq.wxs -arch x64 `
+            -d "Version=$env:MSI_VERSION" `
+            -d "ProductCode=$env:PRODUCT_CODE" `
+            -d "BinarySource=$PWD/stage/ajq.exe" `
+            -d "LicenseSource=$PWD/stage/LICENSE" -o $out
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/windows_msi_finalize.ps1 -MsiPath $out -PackageCode $env:PACKAGE_CODE
+          $hash = (Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash
+          $binaryHash = (Get-FileHash -LiteralPath stage/ajq.exe -Algorithm SHA256).Hash
+          ./scripts/windows_msi_install_smoke.ps1 -Tag v0.0.0 -MsiPath $out -ExpectedSha256 $hash -ExpectedBinarySha256 $binaryHash
+
   test:
     name: Unit tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

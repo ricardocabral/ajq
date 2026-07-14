@@ -38,6 +38,13 @@ Release archives are named like:
 - `ajq_<version>_Linux_x86_64.tar.gz`
 - `ajq_<version>_Windows_x86_64.zip`
 
+### Windows MSI and WinGet status
+
+Windows MSI packaging is implemented and CI-validated, including an installed-binary
+semantic smoke test, but the MSI is **not released**. ajq is also **not currently
+available through WinGet**. Use the published Windows ZIP until TP-077 publishes the
+MSI and Microsoft validation, merge, and a public clean-install smoke check pass.
+
 ## Verify a download
 
 Checksum verification and provenance verification are separate checks. The install
@@ -122,18 +129,16 @@ The document includes `ready`, engine/model presence and local paths, and ordere
 not download assets, start a daemon, or contact a backend. `--json` is valid only
 with `--check`; use `ajq provision` separately to install the requested assets.
 
-## Homebrew status
+## Package-manager status
 
-The release pipeline publishes a Homebrew cask to the public
-[`ricardocabral/tap`](https://github.com/ricardocabral/homebrew-tap) tap.
-After the first release is published, install ajq with:
-
-```bash
-brew install --cask ricardocabral/tap/ajq
-```
+Package-manager publication automation is implemented, but availability is only
+claimed after its published artifact passes the required external verification. In
+particular, the Windows MSI and WinGet channel remain unavailable until TP-077
+publishes the MSI and Microsoft validation, merge, and a public clean-install smoke
+check pass.
 
 The install script, manual release archives, and source builds remain available for
-systems where Homebrew is not the preferred installer.
+systems where a package manager is not the preferred installer.
 
 ## Next steps
 

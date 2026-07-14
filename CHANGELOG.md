@@ -32,6 +32,13 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 - Added byte-budgeted semantic NDJSON windows with `--window-bytes`,
   `AJQ_WINDOW_BYTES`, and TOML `window_bytes` configuration, plus window-mode
   statistics for configured budgets, formed windows, and oversized records.
+- Added guarded Homebrew and WinGet publication automation and repeatable
+  clean-install smoke checks. Channel availability remains contingent on the
+  corresponding external package-manager verification.
+- Implemented and CI-validated Windows MSI packaging, including installed-binary
+  semantic smoke coverage and cleanup verification. The MSI is not released and
+  WinGet is not available: TP-077 must first publish it, then Microsoft validation,
+  merge, and a public clean-install smoke check must pass.
 - Added a Diataxis how-to for making ajq available to coding agents through
   project guidance, including JSON-routing, safe semantic-validation, and
   cache-handling instructions.
