@@ -53,7 +53,7 @@ function Get-ByteEvidence([byte[]]$Bytes) {
     $sha256 = [Security.Cryptography.SHA256]::HashData($Bytes)
     return "bytes=$($Bytes.Length) sha256=$([Convert]::ToHexString($sha256))"
 }
-function Assert-ExactOutput([string]$Path, [string[]]$Arguments, [string]$Input, [string]$Expected, [string]$Description) {
+function Assert-ExactOutput([string]$Path, [string[]]$Arguments, [string]$StandardInput, [string]$Expected, [string]$Description) {
     # ArgumentList preserves each argv element exactly. Record only byte lengths
     # and hashes so a failed CI run distinguishes invocation/input/capture faults
     # without exposing arbitrary environment-derived command content.
@@ -62,14 +62,14 @@ function Assert-ExactOutput([string]$Path, [string[]]$Arguments, [string]$Input,
     $psi.UseShellExecute = $false; $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
     foreach ($argument in $Arguments) { [void]$psi.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::new(); $process.StartInfo = $psi; [void]$process.Start()
-    $process.StandardInput.Write($Input); $process.StandardInput.Close()
+    $process.StandardInput.Write($StandardInput); $process.StandardInput.Close()
     $stderrTask = $process.StandardError.ReadToEndAsync()
     $memory = [IO.MemoryStream]::new(); $process.StandardOutput.BaseStream.CopyTo($memory); $process.WaitForExit()
     $stderr = $stderrTask.GetAwaiter().GetResult()
     $actualBytes = $memory.ToArray()
     $expectedBytes = [Text.Encoding]::UTF8.GetBytes($Expected)
     $argumentEvidence = ($Arguments | ForEach-Object { Get-ByteEvidence ([Text.Encoding]::UTF8.GetBytes($_)) }) -join ', '
-    $evidence = "path=$Path; argv=[$argumentEvidence]; stdin=$(Get-ByteEvidence ([Text.Encoding]::UTF8.GetBytes($Input))); stdout=$(Get-ByteEvidence $actualBytes); stderr=$(Get-ByteEvidence ([Text.Encoding]::UTF8.GetBytes($stderr)))"
+    $evidence = "path=$Path; argv=[$argumentEvidence]; stdin=$(Get-ByteEvidence ([Text.Encoding]::UTF8.GetBytes($StandardInput))); stdout=$(Get-ByteEvidence $actualBytes); stderr=$(Get-ByteEvidence ([Text.Encoding]::UTF8.GetBytes($stderr)))"
     if ($process.ExitCode -ne 0) { throw "$Description failed (exit=$($process.ExitCode); $evidence)" }
     $actual = [Convert]::ToBase64String($actualBytes)
     $expected = [Convert]::ToBase64String($expectedBytes)

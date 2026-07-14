@@ -9,14 +9,15 @@ $ErrorActionPreference = 'Stop'
 if ($Tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw "tag must be vX.Y.Z, got $Tag" }
 $version = $Tag.Substring(1)
 
-function Invoke-ProgramToFile([string]$Path, [string[]]$Arguments, [string]$Input, [string]$OutputPath) {
+function Invoke-ProgramToFile([string]$Path, [string[]]$Arguments, [string]$StandardInput, [string]$OutputPath) {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.UseShellExecute = $false
     $startInfo.RedirectStandardInput = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
     if ([System.IO.Path]::GetExtension($Path) -eq '.ps1') {
-        $startInfo.FileName = (Get-Command pwsh -CommandType Application -ErrorAction Stop).Source
+        $pwsh = Get-Command pwsh -CommandType Application -ErrorAction Stop | Select-Object -First 1
+        $startInfo.FileName = $pwsh.Source
         [void]$startInfo.ArgumentList.Add('-NoProfile')
         [void]$startInfo.ArgumentList.Add('-File')
         [void]$startInfo.ArgumentList.Add($Path)
@@ -28,7 +29,7 @@ function Invoke-ProgramToFile([string]$Path, [string[]]$Arguments, [string]$Inpu
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
     [void]$process.Start()
-    $process.StandardInput.Write($Input)
+    $process.StandardInput.Write($StandardInput)
     $process.StandardInput.Close()
     $stderrTask = $process.StandardError.ReadToEndAsync()
     $file = [System.IO.File]::Open($OutputPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)

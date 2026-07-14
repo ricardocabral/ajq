@@ -24,7 +24,8 @@ if (-not (Test-Path -LiteralPath $env:AJQ_CONFIG -PathType Leaf)) { exit 42 }
 $bytes = if ($Args[0] -eq '--version') {
     [System.Text.Encoding]::UTF8.GetBytes($env:AJQ_VERSION_OUTPUT)
 } else {
-    $input | Out-Null
+    $received = [Console]::In.ReadToEnd()
+    if ($received -cne $env:AJQ_EXPECTED_INPUT) { exit 43 }
     [System.Text.Encoding]::UTF8.GetBytes($env:QUERY_OUTPUT)
 }
 [Console]::OpenStandardOutput().Write($bytes, 0, $bytes.Length)
@@ -39,6 +40,7 @@ $bytes = if ($Args[0] -eq '--version') {
         $env:WINGET_FAIL_OPERATION = if ($mode -like 'fail-*') { $mode.Substring(5) } else { '' }
         $env:WINGET_ABSENT = if ($mode -eq 'absent') { '1' } else { '' }
         $env:AJQ_VERSION_OUTPUT = if ($mode -eq 'version-output') { "ajq 1.2.3 suffix`n" } else { "ajq 1.2.3`n" }
+        $env:AJQ_EXPECTED_INPUT = "[{`"id`":1,`"msg`":`"refund request`"},{`"id`":2,`"msg`":`"shipping update`"}]`n"
         $env:QUERY_OUTPUT = switch ($mode) {
             'query' { "2`n" }
             'query-crlf' { "1`r`n" }
@@ -88,5 +90,5 @@ $bytes = if ($Args[0] -eq '--version') {
     Write-Host 'package-manager smoke PowerShell tests passed'
 } finally {
     Remove-Item -Recurse -Force -ErrorAction Ignore -LiteralPath $temp
-    'WINGET_LOG', 'WINGET_BIN', 'AJQ_PACKAGE_EXECUTABLE', 'WINGET_VERSION', 'WINGET_FAIL_OPERATION', 'WINGET_ABSENT', 'AJQ_VERSION_OUTPUT', 'QUERY_OUTPUT' | ForEach-Object { Remove-Item "Env:$_" -ErrorAction Ignore }
+    'WINGET_LOG', 'WINGET_BIN', 'AJQ_PACKAGE_EXECUTABLE', 'WINGET_VERSION', 'WINGET_FAIL_OPERATION', 'WINGET_ABSENT', 'AJQ_VERSION_OUTPUT', 'AJQ_EXPECTED_INPUT', 'QUERY_OUTPUT' | ForEach-Object { Remove-Item "Env:$_" -ErrorAction Ignore }
 }
