@@ -89,6 +89,7 @@ try {
     Write-Output "Windows MSI installed ajq.exe SHA-256: $installedBinaryHash"
     $userPath = (Get-ItemProperty -LiteralPath 'HKCU:\Environment' -Name Path -ErrorAction SilentlyContinue).Path
     if ($userPath -notmatch [regex]::Escape($installDirectory)) { throw 'MSI did not own the per-user PATH entry' }
+    Write-Output 'Windows MSI per-user PATH ownership verified'
     New-Item -ItemType Directory -Path $temp | Out-Null
     $env:HOME = Join-Path $temp 'home'; $env:XDG_CONFIG_HOME = Join-Path $temp 'config'; $env:AJQ_CONFIG = Join-Path $temp 'ajq.toml'; $env:AJQ_CACHE_DIR = Join-Path $temp 'cache'
     New-Item -ItemType File -Path $env:AJQ_CONFIG | Out-Null
@@ -104,5 +105,6 @@ try {
     if (Test-Path -LiteralPath $installDirectory) { throw "MSI uninstall left installation directory: $installDirectory" }
     $userPath = (Get-ItemProperty -LiteralPath 'HKCU:\Environment' -Name Path -ErrorAction SilentlyContinue).Path
     if ($userPath -match [regex]::Escape($installDirectory)) { throw 'MSI uninstall left its per-user PATH entry behind' }
+    Write-Output 'Windows MSI silent uninstall removed install directory and per-user PATH entry'
 }
 Write-Output "Windows MSI install smoke passed for $Tag"
