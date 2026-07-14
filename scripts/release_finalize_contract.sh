@@ -28,26 +28,24 @@ expected_assets() {
 validate_asset_manifest() {
   local asset_names_file=$1 version=$2
   local -a expected actual
-  mapfile -t expected < <(expected_assets "$version" | LC_ALL=C sort)
-  mapfile -t actual < <(grep -E '^ajq_.*\.(tar\.gz|zip|msi)$' "$asset_names_file" | LC_ALL=C sort || true)
+  mapfile -t expected < <({ expected_assets "$version"; printf '%s\n' checksums.txt; } | LC_ALL=C sort)
+  mapfile -t actual < <(LC_ALL=C sort "$asset_names_file")
   if ! diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}"); then
-    printf 'draft release assets must exactly match the expected archive/MSI allowlist\n' >&2
+    printf 'draft release assets must exactly match the expected archive/MSI/checksum allowlist\n' >&2
     return 1
   fi
 }
 
 validate_assets() {
   local dist_dir=$1 version=$2
-  local manifest
-  manifest=$(mktemp)
-  find "$dist_dir" -maxdepth 1 -type f \( -name 'ajq_*.tar.gz' -o -name 'ajq_*.zip' -o -name 'ajq_*.msi' \) -exec basename {} \; >"$manifest"
-  if ! validate_asset_manifest "$manifest" "$version"; then
-    rm -f "$manifest"
+  local -a expected actual
+  mapfile -t expected < <(expected_assets "$version" | LC_ALL=C sort)
+  mapfile -t actual < <(find "$dist_dir" -maxdepth 1 -type f \( -name 'ajq_*.tar.gz' -o -name 'ajq_*.zip' -o -name 'ajq_*.msi' \) -exec basename {} \; | LC_ALL=C sort)
+  if ! diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}"); then
+    printf 'draft release assets must exactly match the expected archive/MSI allowlist\n' >&2
     return 1
   fi
-  rm -f "$manifest"
 
-  local -a expected
   mapfile -t expected < <(expected_assets "$version" | LC_ALL=C sort)
   local asset count
   for asset in "${expected[@]}"; do
@@ -71,13 +69,32 @@ write_checksums() {
   )
 }
 
-attestation_subjects() {
-  local dist_dir=$1 version=$2 asset
-  validate_assets "$dist_dir" "$version"
-  [ -f "$dist_dir/checksums.txt" ] || {
+validate_checksum_manifest() {
+  local dist_dir=$1 version=$2
+  local manifest="$dist_dir/checksums.txt"
+  local -a expected actual
+  [ -f "$manifest" ] || {
     printf 'checksums.txt must exist before provenance subjects are generated\n' >&2
     return 1
   }
+  if ! awk 'NF != 2 || $1 !~ /^[[:xdigit:]]{64}$/ { exit 1 } { print $2 }' "$manifest" >"$manifest.asset-names"; then
+    rm -f "$manifest.asset-names"
+    printf 'checksums.txt must contain only SHA-256 filename entries\n' >&2
+    return 1
+  fi
+  mapfile -t expected < <(expected_assets "$version" | LC_ALL=C sort)
+  mapfile -t actual < <(LC_ALL=C sort "$manifest.asset-names")
+  rm -f "$manifest.asset-names"
+  if ! diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}"); then
+    printf 'checksums.txt must contain exactly one entry for every expected archive/MSI\n' >&2
+    return 1
+  fi
+}
+
+attestation_subjects() {
+  local dist_dir=$1 version=$2 asset
+  validate_assets "$dist_dir" "$version"
+  validate_checksum_manifest "$dist_dir" "$version"
   (
     cd "$dist_dir"
     sha256sum --check --strict checksums.txt >/dev/null
