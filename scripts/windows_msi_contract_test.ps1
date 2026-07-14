@@ -6,6 +6,7 @@ $contract = Join-Path $repoRoot 'scripts/windows_msi_contract.ps1'
 $wix = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'build/windows/ajq.wxs')
 $workflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
 $goreleaser = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.goreleaser.yaml')
+$releaseFinalizeContract = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/release_finalize_contract.sh')
 $msiFinalizer = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/windows_msi_finalize.ps1')
 $peMachine = Join-Path $repoRoot 'scripts/windows_pe_machine.ps1'
 $installerSmoke = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/windows_msi_install_smoke.ps1')
@@ -110,24 +111,18 @@ foreach ($needle in @(
     'gh release download $env:RELEASE_TAG --pattern $env:ZIP_ASSET --dir stage',
     'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.',
     'uses: azure/trusted-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba # v2.0.0',
-    'refusing to replace assets on published release',
-    'replacing deterministic assets on existing draft',
+    'scripts/release_finalize_contract.sh release-rerun-guard',
     'name: Publish Homebrew cask after release finalization',
     'Build-ReproducibleMsi',
     'windows_msi_finalize.ps1 -MsiPath $out -PackageCode $env:PACKAGE_CODE',
     'same verified inputs produced different unsigned MSI bytes',
-    'expected_assets=(',
-    'draft release must contain exactly one %s',
-    'draft release assets must exactly match the expected archive/MSI allowlist',
-    'mapfile -t downloaded_assets',
-    'ajq_${RELEASE_VERSION}_Darwin_arm64.tar.gz',
-    'ajq_${RELEASE_VERSION}_Darwin_x86_64.tar.gz',
-    'ajq_${RELEASE_VERSION}_Linux_arm64.tar.gz',
-    'ajq_${RELEASE_VERSION}_Linux_x86_64.tar.gz',
-    'ajq_${RELEASE_VERSION}_Windows_x86_64.zip',
-    'ajq_${RELEASE_VERSION}_Windows_x86_64.msi',
+    'scripts/release_finalize_contract.sh validate-asset-manifest',
+    'scripts/release_finalize_contract.sh validate-assets',
+    'scripts/release_finalize_contract.sh write-checksums',
+    'scripts/release_finalize_contract.sh attestation-subjects',
+    'id: provenance_subjects',
+    'subject-path: ${{ steps.provenance_subjects.outputs.subjects }}',
     'gh release edit "$RELEASE_TAG" --draft=false',
-    'dist/ajq_${{ needs.validate-release.outputs.version }}_Windows_x86_64.msi',
     'name: Verify draft MSI installation before publication',
     './scripts/windows_msi_install_smoke.ps1 -Tag $env:RELEASE_TAG -MsiPath $msi -ExpectedSha256 $hash'
 )) {
@@ -137,7 +132,10 @@ foreach ($credential in @('AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SE
     if (-not $workflow.Contains($credential)) { throw "Trusted Signing credential gate omits $credential" }
 }
 if ($workflow.Contains('dist/*.tar.gz') -or $workflow.Contains('dist/*.zip') -or $workflow.Contains('dist/*.msi')) {
-    throw 'provenance must attest only the explicit final asset allowlist'
+    throw 'provenance must not attest a globbed asset set'
+}
+foreach ($needle in @('draft release assets must exactly match the expected archive/MSI allowlist', 'refusing to replace assets on published release', 'release lookup returned malformed draft status', 'attestation-subjects', 'sha256sum --check --strict')) {
+    if (-not $releaseFinalizeContract.Contains($needle)) { throw "release finalizer contract is missing required guard: $needle" }
 }
 if ($workflow.IndexOf('name: Build Windows x64 MSI') -ge $workflow.IndexOf('name: Verify draft MSI installation before publication') -or $workflow.IndexOf('name: Verify draft MSI installation before publication') -ge $workflow.IndexOf('name: Finalize checksums, attest, and publish')) {
     throw 'draft MSI verifier must run after build/upload and before finalization'

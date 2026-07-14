@@ -13,6 +13,7 @@ name: Release
       - .github/workflows/winget.yml
       - .github/workflows/package-manager-smoke.yml
       - Makefile
+      - scripts/release_finalize_contract.sh
       - scripts/install.sh
       - scripts/install_test.sh
       - scripts/release_smoke.sh
@@ -125,7 +126,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y shellcheck
           shellcheck scripts/install.sh scripts/install_test.sh scripts/release_smoke.sh \
             scripts/release_publish_preflight.sh scripts/release_publish_preflight_test.sh \
-            scripts/release_workflow_test.sh scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh
+            scripts/release_finalize_contract.sh scripts/release_workflow_test.sh \
+            scripts/package_manager_smoke.sh scripts/package_manager_smoke_test.sh
           scripts/install_test.sh
           scripts/release_publish_preflight_test.sh
           scripts/release_workflow_test.sh
@@ -191,16 +193,9 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
-        run: |
-          set -euo pipefail
-          if is_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
-            [ "$is_draft" = true ] || {
-              printf 'refusing to replace assets on published release %s\n' "$RELEASE_TAG" >&2
-              exit 1
-            }
-            printf 'replacing deterministic assets on existing draft %s\n' "$RELEASE_TAG"
-          fi
+        run: scripts/release_finalize_contract.sh release-rerun-guard "$RELEASE_TAG"
 
       - name: Run GoReleaser to draft release
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
@@ -412,46 +407,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' > dist/.release-asset-names
+          scripts/release_finalize_contract.sh validate-asset-manifest dist/.release-asset-names "$RELEASE_VERSION"
           gh release download "$RELEASE_TAG" --dir dist \
             --pattern 'ajq_*.tar.gz' \
             --pattern 'ajq_*.zip' \
             --pattern 'ajq_*.msi'
-          expected_assets=(
-            "ajq_${RELEASE_VERSION}_Darwin_arm64.tar.gz"
-            "ajq_${RELEASE_VERSION}_Darwin_x86_64.tar.gz"
-            "ajq_${RELEASE_VERSION}_Linux_arm64.tar.gz"
-            "ajq_${RELEASE_VERSION}_Linux_x86_64.tar.gz"
-            "ajq_${RELEASE_VERSION}_Windows_x86_64.zip"
-            "ajq_${RELEASE_VERSION}_Windows_x86_64.msi"
-          )
-          mapfile -t downloaded_assets < <(find dist -maxdepth 1 -type f \( -name 'ajq_*.tar.gz' -o -name 'ajq_*.zip' -o -name 'ajq_*.msi' \) -printf '%f\n' | LC_ALL=C sort)
-          if ! diff -u <(printf '%s\n' "${expected_assets[@]}" | LC_ALL=C sort) <(printf '%s\n' "${downloaded_assets[@]}"); then
-            printf 'draft release assets must exactly match the expected archive/MSI allowlist\n' >&2
-            exit 1
-          fi
+          scripts/release_finalize_contract.sh validate-assets dist "$RELEASE_VERSION"
 
       - name: Regenerate final checksums including MSI
         shell: bash
         env:
           RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
-        run: |
-          set -euo pipefail
-          cd dist
-          expected_assets=(
-            "ajq_${RELEASE_VERSION}_Darwin_arm64.tar.gz"
-            "ajq_${RELEASE_VERSION}_Darwin_x86_64.tar.gz"
-            "ajq_${RELEASE_VERSION}_Linux_arm64.tar.gz"
-            "ajq_${RELEASE_VERSION}_Linux_x86_64.tar.gz"
-            "ajq_${RELEASE_VERSION}_Windows_x86_64.zip"
-            "ajq_${RELEASE_VERSION}_Windows_x86_64.msi"
-          )
-          for asset in "${expected_assets[@]}"; do
-            [ "$(find . -maxdepth 1 -type f -name "$asset" -printf x | wc -c | tr -d ' ')" = 1 ] || {
-              printf 'draft release must contain exactly one %s\n' "$asset" >&2
-              exit 1
-            }
-          done
-          printf '%s\n' "${expected_assets[@]}" | LC_ALL=C sort | xargs sha256sum > checksums.txt
+        run: scripts/release_finalize_contract.sh write-checksums dist "$RELEASE_VERSION"
 
       - name: Replace draft checksum asset
         shell: bash
@@ -460,17 +428,22 @@ jobs:
           RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
         run: gh release upload "$RELEASE_TAG" dist/checksums.txt --clobber
 
+      - name: Generate exact provenance subjects
+        id: provenance_subjects
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          {
+            printf 'subjects<<EOF\n'
+            scripts/release_finalize_contract.sh attestation-subjects dist "$RELEASE_VERSION"
+            printf 'EOF\n'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Attest final release provenance
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
-          subject-path: |
-            dist/ajq_${{ needs.validate-release.outputs.version }}_Darwin_arm64.tar.gz
-            dist/ajq_${{ needs.validate-release.outputs.version }}_Darwin_x86_64.tar.gz
-            dist/ajq_${{ needs.validate-release.outputs.version }}_Linux_arm64.tar.gz
-            dist/ajq_${{ needs.validate-release.outputs.version }}_Linux_x86_64.tar.gz
-            dist/ajq_${{ needs.validate-release.outputs.version }}_Windows_x86_64.zip
-            dist/ajq_${{ needs.validate-release.outputs.version }}_Windows_x86_64.msi
-            dist/checksums.txt
+          subject-path: ${{ steps.provenance_subjects.outputs.subjects }}
 
       - name: Publish complete draft release
         shell: bash
