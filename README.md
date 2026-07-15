@@ -56,19 +56,23 @@ Run `ajq provision` once before using `--backend local`; then the same semantic 
 
 ## Install
 
-Use the release script for supported prebuilt archives, a manual release
-archive, or Go source:
+Use the published Homebrew cask, the release script for supported prebuilt archives,
+a manual release archive, or Go source:
 
 ```bash
+brew install --cask ricardocabral/tap/ajq
 curl -fsSL https://raw.githubusercontent.com/ricardocabral/ajq/main/scripts/install.sh | sh
 # manual download (including the current Windows ZIP): https://github.com/ricardocabral/ajq/releases/latest
 go install github.com/ricardocabral/ajq/cmd/ajq@latest
 ```
 
-Windows MSI packaging is implemented and CI-validated, but no MSI has been released
-and ajq is not available through WinGet. Windows users should use the published ZIP
-until TP-077 publishes the MSI and Microsoft validation, merge, and a public
-clean-install smoke check pass.
+The release workflow publishes the Homebrew cask to the public
+[`ricardocabral/tap`](https://github.com/ricardocabral/homebrew-tap) tap.
+
+Windows MSI packaging is implemented and CI-validated, but the MSI is not yet
+released. ajq is not available through WinGet; it remains unavailable until a future
+MSI release completes Microsoft validation and merge and has public clean-install
+smoke evidence. Windows users should use the published ZIP in the meantime.
 
 ### Coding-agent skill
 

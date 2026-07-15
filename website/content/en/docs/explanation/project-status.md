@@ -54,10 +54,11 @@ Further streaming optimizations remain planned. The iterative-harvest experiment
   `<cache>/judgements/`, can be bypassed with `--no-cache`, inspected with
   `ajq cache status`, and removed with `ajq cache clear`.
 - **Release packaging** — GoReleaser builds checksummed archives and the install script
-  verifies `checksums.txt`. Windows MSI packaging is implemented and CI-validated, but
-  no MSI is released and WinGet is unavailable. TP-077 must publish the MSI before
-  Microsoft validation, merge, and a public clean-install smoke check can establish
-  availability.
+  verifies `checksums.txt`. The release workflow publishes the Homebrew cask to the
+  public [`ricardocabral/tap`](https://github.com/ricardocabral/homebrew-tap) tap.
+  Windows MSI packaging is implemented and CI-validated, but the MSI is not yet
+  released. WinGet remains unavailable until a future MSI release completes Microsoft
+  validation and merge and has public clean-install smoke evidence.
 
 ## Roadmap
 
@@ -72,7 +73,7 @@ polish.
 | **2 — Local inference** | `llama-server` backend, daemon lifecycle, GBNF/schema constraints, provisioning. | ✅ Shipped |
 | **3 — Backends & cloud** | Ollama, OpenAI/OpenRouter, Anthropic, config/env selection, cost controls. | ✅ Shipped |
 | **4 — Scale & chunking** | Byte-budgeted complete-frame windows and explicit `--stream` low-latency inline execution for supported semantic streams, persistent cache, and bounded local parallelism are shipped. The iterative-harvest experiment is [an internal-only no-go](../iterative-harvest-evaluation/): it has no user flag and does not change the default executor. Further streaming optimizations remain planned. | 🟡 Partial |
-| **5 — Polish & distribution** | Models subcommand, release archives/install script, and Homebrew tap publishing are shipped. Windows MSI packaging is implemented but remains unreleased, and WinGet is unavailable pending TP-077 publication plus Microsoft validation, merge, and public clean-install smoke; standalone build, GPU auto-detect, richer vocabulary, and additional package managers remain planned. | 🟡 Partial |
+| **5 — Polish & distribution** | Models subcommand, release archives/install script, and the Homebrew cask published to the public `ricardocabral/tap` tap are shipped. Windows MSI packaging is implemented and CI-validated but remains unreleased; WinGet is unavailable until a future MSI release completes Microsoft validation and merge and has public clean-install smoke evidence. Standalone build, GPU auto-detect, richer vocabulary, and additional package managers remain planned. | 🟡 Partial |
 
 ## Follow along
 
