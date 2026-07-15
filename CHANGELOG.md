@@ -57,6 +57,8 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Fixed
 
+- Restored the published Homebrew cask install command and public tap guidance while
+  keeping the unreleased MSI and unavailable WinGet status distinct.
 - Semantic cache entries now distinguish `--base-url` endpoints, preventing
   cached judgements from one compatible deployment being reused by another
   deployment serving a model with the same name.

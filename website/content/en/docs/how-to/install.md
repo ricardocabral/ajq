@@ -26,6 +26,15 @@ Pin a version or install directory if needed:
 AJQ_VERSION=v0.1.0 AJQ_INSTALL_DIR="$HOME/bin" sh scripts/install.sh
 ```
 
+## Install with Homebrew
+
+The release workflow publishes the ajq cask to the public
+[`ricardocabral/tap`](https://github.com/ricardocabral/homebrew-tap) tap:
+
+```bash
+brew install --cask ricardocabral/tap/ajq
+```
+
 ## Install from a release archive
 
 Download the archive for your platform from
@@ -41,9 +50,10 @@ Release archives are named like:
 ### Windows MSI and WinGet status
 
 Windows MSI packaging is implemented and CI-validated, including an installed-binary
-semantic smoke test, but the MSI is **not released**. ajq is also **not currently
-available through WinGet**. Use the published Windows ZIP until TP-077 publishes the
-MSI and Microsoft validation, merge, and a public clean-install smoke check pass.
+semantic smoke test, but the MSI is **not yet released**. ajq is **not available
+through WinGet**; it remains unavailable until a future MSI release completes
+Microsoft validation and merge and has public clean-install smoke evidence. Use the
+published Windows ZIP in the meantime.
 
 ## Verify a download
 
@@ -131,14 +141,13 @@ with `--check`; use `ajq provision` separately to install the requested assets.
 
 ## Package-manager status
 
-Package-manager publication automation is implemented, but availability is only
-claimed after its published artifact passes the required external verification. In
-particular, the Windows MSI and WinGet channel remain unavailable until TP-077
-publishes the MSI and Microsoft validation, merge, and a public clean-install smoke
-check pass.
+The Homebrew cask is available from the public `ricardocabral/tap` tap. Windows MSI
+packaging is implemented and CI-validated, but the MSI is not yet released. WinGet
+remains unavailable until a future MSI release completes Microsoft validation and
+merge and has public clean-install smoke evidence.
 
-The install script, manual release archives, and source builds remain available for
-systems where a package manager is not the preferred installer.
+The install script, manual release archives, and Go-source installation remain
+available when Homebrew is not the preferred installer.
 
 ## Next steps
 
