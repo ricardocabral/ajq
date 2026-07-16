@@ -86,6 +86,7 @@ printf '%s\n' "$publish_homebrew_job" | grep -Fq 'name: Check out release tag' |
   printf 'Homebrew publication must check out the tagged source for its preflight script\n' >&2
   exit 1
 }
+# shellcheck disable=SC2016 # The literal workflow expression must not expand in this test.
 printf '%s\n' "$publish_homebrew_job" | grep -Fq 'ref: ${{ needs.validate-release.outputs.ref }}' || {
   printf 'Homebrew publication must check out the validated release revision\n' >&2
   exit 1

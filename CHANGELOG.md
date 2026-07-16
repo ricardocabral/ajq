@@ -18,6 +18,13 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-16
+
+### Fixed
+
+- Fixed a release CI ShellCheck finding in the Homebrew publication workflow
+  regression test.
+
 ## [0.1.4] - 2026-07-16
 
 ### Fixed
