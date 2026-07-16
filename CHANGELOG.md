@@ -18,6 +18,13 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-07-16
+
+### Fixed
+
+- Fixed Homebrew cask publication by checking out the tagged source before
+  running its publication preflight.
+
 ## [0.1.3] - 2026-07-16
 
 ### Fixed

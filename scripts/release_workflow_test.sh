@@ -81,6 +81,15 @@ grep -Fq 'name: Publish Homebrew cask after release finalization' "$workflow" ||
   printf 'Release workflow must defer Homebrew upload until MSI finalization\n' >&2
   exit 1
 }
+publish_homebrew_job=$(sed -n '/^  publish-homebrew-cask:/,$p' "$workflow")
+printf '%s\n' "$publish_homebrew_job" | grep -Fq 'name: Check out release tag' || {
+  printf 'Homebrew publication must check out the tagged source for its preflight script\n' >&2
+  exit 1
+}
+printf '%s\n' "$publish_homebrew_job" | grep -Fq 'ref: ${{ needs.validate-release.outputs.ref }}' || {
+  printf 'Homebrew publication must check out the validated release revision\n' >&2
+  exit 1
+}
 grep -Fq 'args: release --clean' "$workflow" || {
   printf 'Release workflow must retain clean GoReleaser publication\n' >&2
   exit 1
