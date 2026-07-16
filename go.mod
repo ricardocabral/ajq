@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/anthropics/anthropic-sdk-go v1.56.0
+	github.com/anthropics/anthropic-sdk-go v1.57.0
 	github.com/itchyny/gojq v0.12.19
 	github.com/spf13/cobra v1.10.2
 )
