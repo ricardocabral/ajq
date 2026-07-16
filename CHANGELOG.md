@@ -35,10 +35,6 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 - Added guarded Homebrew and WinGet publication automation and repeatable
   clean-install smoke checks. Channel availability remains contingent on the
   corresponding external package-manager verification.
-- Implemented and CI-validated Windows MSI packaging, including installed-binary
-  semantic smoke coverage and cleanup verification. The MSI is not released and
-  WinGet is not available: TP-077 must first publish it, then Microsoft validation,
-  merge, and a public clean-install smoke check must pass.
 - Added a Diataxis how-to for making ajq available to coding agents through
   project guidance, including JSON-routing, safe semantic-validation, and
   cache-handling instructions.
@@ -47,18 +43,12 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   package includes an optional `npx plugins` adapter for Claude Code and Cursor.
 - Documented plugin installation, fresh-workspace verification, CI provisioning,
   and the explicit mock → explain → capped-backend safety workflow.
-- Opt-in real local-inference benchmark runs can now write versioned JSON reports with the
-  actual GGUF SHA-256, runtime and source revision, optional hardware label, and measured
-  workload details.
 - Added the first reviewed fresh-session `none` versus `local-guidance` routing baseline for
   Codex GPT-5. It is recorded as one paired observation, not a general discovery-rate claim.
 - Added a bounded classification recipe for webhook events emitted as NDJSON.
-- Documented reproducible evidence for the non-default iterative-harvest prototype: it remains unavailable to users after a no-go decision caused by strict error-contract divergence and no-prune fake-overhead thresholds.
 
 ### Fixed
 
-- Restored the published Homebrew cask install command and public tap guidance while
-  keeping the unreleased MSI and unavailable WinGet status distinct.
 - Semantic cache entries now distinguish `--base-url` endpoints, preventing
   cached judgements from one compatible deployment being reused by another
   deployment serving a model with the same name.
