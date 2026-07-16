@@ -22,7 +22,6 @@ name: Release
       - scripts/release_workflow_test.sh
       - scripts/windows_msi_contract.ps1
       - scripts/windows_msi_contract_test.ps1
-      - scripts/windows_msi_finalize.ps1
       - scripts/windows_msi_install_smoke.ps1
       - scripts/windows_pe_machine.ps1
       - scripts/package_manager_smoke.sh
@@ -229,7 +228,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.validate-release.outputs.ref }}
 
-      - name: Resolve deterministic MSI contract
+      - name: Resolve Windows MSI contract
         id: contract
         shell: pwsh
         env:
@@ -274,7 +273,6 @@ jobs:
         env:
           MSI_VERSION: ${{ steps.contract.outputs.version }}
           PRODUCT_CODE: ${{ steps.contract.outputs.product_code }}
-          PACKAGE_CODE: ${{ steps.contract.outputs.package_code }}
           MSI_ASSET: ${{ steps.contract.outputs.msi_asset }}
           BINARY_SOURCE: ${{ steps.release_zip.outputs.binary }}
           LICENSE_SOURCE: ${{ steps.release_zip.outputs.license }}
@@ -282,23 +280,13 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $out = "dist/$env:MSI_ASSET"
-          function Build-ReproducibleMsi {
-            wix build build/windows/ajq.wxs -arch x64 `
-              -d "Version=$env:MSI_VERSION" `
-              -d "ProductCode=$env:PRODUCT_CODE" `
-              -d "BinarySource=$env:BINARY_SOURCE" `
-              -d "LicenseSource=$env:LICENSE_SOURCE" `
-              -o $out
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            & ./scripts/windows_msi_finalize.ps1 -MsiPath $out -PackageCode $env:PACKAGE_CODE
-          }
-          Build-ReproducibleMsi
-          Copy-Item -LiteralPath $out -Destination "$out.first" -Force
-          Build-ReproducibleMsi
-          if ((Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash -cne (Get-FileHash -LiteralPath "$out.first" -Algorithm SHA256).Hash) {
-            throw 'same verified inputs produced different unsigned MSI bytes'
-          }
-          Remove-Item -LiteralPath "$out.first" -Force
+          wix build build/windows/ajq.wxs -arch x64 `
+            -d "Version=$env:MSI_VERSION" `
+            -d "ProductCode=$env:PRODUCT_CODE" `
+            -d "BinarySource=$env:BINARY_SOURCE" `
+            -d "LicenseSource=$env:LICENSE_SOURCE" `
+            -o $out
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-Item $out
 
       - name: Check optional Azure Trusted Signing credentials

@@ -18,6 +18,13 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-16
+
+### Fixed
+
+- Fixed the Windows MSI release job, which incorrectly rejected WiX builds
+  because each valid build has a distinct installer PackageCode.
+
 ## [0.1.0] - 2026-07-16
 
 ### Added

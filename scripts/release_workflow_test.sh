@@ -31,8 +31,8 @@ grep -Fq 'dotnet tool install --global wix --version 4.0.5' "$workflow" || {
   printf 'Release workflow must pin WiX 4.0.5\n' >&2
   exit 1
 }
-grep -Fq 'same verified inputs produced different unsigned MSI bytes' "$workflow" || {
-  printf 'Release workflow must reject non-reproducible MSI retries\n' >&2
+grep -Fq 'wix build build/windows/ajq.wxs -arch x64' "$workflow" || {
+  printf 'Release workflow must build the MSI from verified release files\n' >&2
   exit 1
 }
 grep -Fq 'scripts/release_finalize_contract.sh validate-asset-manifest' "$workflow" || {

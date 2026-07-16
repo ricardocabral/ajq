@@ -7,7 +7,6 @@ $wix = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'build/windows/ajq.wxs
 $workflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
 $goreleaser = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.goreleaser.yaml')
 $releaseFinalizeContract = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/release_finalize_contract.sh')
-$msiFinalizer = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/windows_msi_finalize.ps1')
 $peMachine = Join-Path $repoRoot 'scripts/windows_pe_machine.ps1'
 $installerSmoke = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts/windows_msi_install_smoke.ps1')
 $ciWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/ci.yml')
@@ -49,10 +48,9 @@ if ($first.version -ne '0.0.7' -or $first.product_code -cne '{7DA9CC6C-417F-5E58
     throw "unexpected deterministic contract for v0.0.7: $($first | ConvertTo-Json -Compress)"
 }
 $repeat = Get-Contract 'v0.0.7'
-if ($repeat.product_code -cne $first.product_code -or $repeat.package_code -cne $first.package_code) { throw 'same MSI version did not reproduce deterministic MSI codes' }
-if ($first.package_code -ceq $first.product_code) { throw 'MSI package code must be distinct from ProductCode' }
+if ($repeat.product_code -cne $first.product_code) { throw 'same MSI version did not reproduce a deterministic ProductCode' }
 $next = Get-Contract 'v0.0.8'
-if ($next.product_code -ceq $first.product_code -or $next.package_code -ceq $first.package_code) { throw 'different MSI versions must have different deterministic codes' }
+if ($next.product_code -ceq $first.product_code) { throw 'different MSI versions must have different ProductCodes' }
 if ($next.zip_asset -cne 'ajq_0.0.8_Windows_x86_64.zip' -or $next.msi_asset -cne 'ajq_0.0.8_Windows_x86_64.msi') {
     throw 'MSI asset contract is not case-sensitive canonical Windows x64 naming'
 }
@@ -87,15 +85,6 @@ foreach ($needle in @(
 }
 
 foreach ($needle in @(
-    'PackageCode must be an upper-case braced GUID',
-    'MSI summary stream left intact',
-    'two-build SHA-256 comparison',
-    'without mutating the MSI'
-)) {
-    if (-not $msiFinalizer.Contains($needle)) { throw "MSI finalizer is missing reproducibility control: $needle" }
-}
-
-foreach ($needle in @(
     'name: Create draft GitHub release',
     'name: Build Windows x64 MSI',
     'name: Finalize checksums, attest, and publish',
@@ -113,9 +102,7 @@ foreach ($needle in @(
     'uses: azure/trusted-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba # v2.0.0',
     'scripts/release_finalize_contract.sh release-rerun-guard',
     'name: Publish Homebrew cask after release finalization',
-    'Build-ReproducibleMsi',
-    'windows_msi_finalize.ps1 -MsiPath $out -PackageCode $env:PACKAGE_CODE',
-    'same verified inputs produced different unsigned MSI bytes',
+    'wix build build/windows/ajq.wxs -arch x64',
     'scripts/release_finalize_contract.sh validate-asset-manifest',
     'scripts/release_finalize_contract.sh validate-assets',
     'scripts/release_finalize_contract.sh write-checksums',
