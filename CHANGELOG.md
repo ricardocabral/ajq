@@ -18,6 +18,13 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-16
+
+### Fixed
+
+- Fixed draft MSI verification permissions so the release workflow can download
+  and install-smoke its private draft asset before publication.
+
 ## [0.1.1] - 2026-07-16
 
 ### Fixed

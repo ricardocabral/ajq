@@ -343,7 +343,10 @@ jobs:
       - validate-release
       - release-windows-msi
     permissions:
-      contents: read
+      # Draft releases are intentionally private until their MSI is installed
+      # and smoke-tested. GitHub exposes draft assets only to a token with
+      # release write access, even when the job only downloads them.
+      contents: write
     steps:
       - name: Check out release tag
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5

@@ -128,6 +128,9 @@ if ($workflow.IndexOf('name: Build Windows x64 MSI') -ge $workflow.IndexOf('name
     throw 'draft MSI verifier must run after build/upload and before finalization'
 }
 if ($workflow -notmatch 'finalize-release:[\s\S]*?verify-draft-windows-msi') { throw 'finalization must require successful draft MSI verification' }
+if ($workflow -notmatch 'verify-draft-windows-msi:[\s\S]*?permissions:\s*\r?\n\s*contents:\s*write[\s\S]*?steps:') {
+    throw 'draft MSI verification must have permission to download private draft assets'
+}
 if ($workflow.IndexOf('name: Finalize checksums, attest, and publish') -ge $workflow.IndexOf('name: Publish Homebrew cask after release finalization')) {
     throw 'Homebrew publication must wait for successful MSI finalization'
 }
