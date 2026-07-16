@@ -389,6 +389,11 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - name: Check out release tag
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ needs.validate-release.outputs.ref }}
+
       - name: Download all promoted draft assets
         shell: bash
         env:

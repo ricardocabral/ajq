@@ -18,6 +18,13 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-16
+
+### Fixed
+
+- Fixed release finalization by checking out the tagged source before retrieving
+  draft assets, regenerating checksums, and publishing.
+
 ## [0.1.2] - 2026-07-16
 
 ### Fixed
