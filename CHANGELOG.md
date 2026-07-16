@@ -18,6 +18,8 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-16
+
 ### Added
 
 - Added bounded provider batch concurrency through `--backend-concurrency`,
