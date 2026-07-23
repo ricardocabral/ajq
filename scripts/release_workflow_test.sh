@@ -69,7 +69,7 @@ grep -Fq 'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.
   printf 'Release workflow must retain the credential-safe unsigned MSI warning\n' >&2
   exit 1
 }
-grep -Fq 'azure/trusted-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba # v2.0.0' "$workflow" || {
+grep -Fq 'azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0' "$workflow" || {
   printf 'Release workflow must SHA-pin Azure Trusted Signing\n' >&2
   exit 1
 }
