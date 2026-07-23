@@ -41,8 +41,8 @@ The fields you'll budget against:
 | `mock_judge_batches` | How many backend batch calls the mock estimate path used. |
 | `static_call_sites` | Number of semantic call sites in the query, not input size. |
 
-`post_dedup_judgements` is the number to compare with `--max-calls`. Paid backends default
-to a 100-call cap; local, Ollama, and mock default to unlimited.
+`post_dedup_judgements` is the number to compare with `--max-calls`. See the [backends
+reference](../../reference/backends/#paid-backend-defaults) for backend-specific defaults.
 
 ## Turn the estimate into a cap
 

@@ -47,8 +47,9 @@ printf '[{"id":1,"msg":"card declined at checkout"},{"id":2,"msg":"profile photo
   | ajq --cloud --max-calls 10 -c '.[] | select(.msg =~ "payment failure") | {id, msg}'
 ```
 
-Paid backends default to a 100-call cap. Setting a smaller `--max-calls` while you tune a
-query makes accidental large runs fail before crossing your budget.
+See the [backends reference](../../reference/backends/#paid-backend-defaults) for default
+caps. Setting a smaller `--max-calls` while you tune a query makes accidental large runs
+fail before crossing your budget.
 
 ## Estimate, cap, and cache the work
 

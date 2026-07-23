@@ -19,9 +19,10 @@ printf '{"a":1}\n' | ajq -c '.a + 1'
 
 ## NDJSON / JSON Lines
 
-A stream of top-level JSON values (one per line, or concatenated) is processed **one frame
-at a time** — each value flows through the query independently, and results are emitted as
-they're produced:
+A stream of top-level JSON values (one per line, or concatenated) is framed as independent
+input values. Pure-jq and planner-required inline semantic queries process and emit one
+frame at a time. Supported three-phase semantic queries use the byte-budgeted windows
+described below, so their output may wait for the current window to resolve:
 
 ```bash
 printf '{"a":1}\n{"a":2}\n' | ajq -c '.a, (.a + 10)'
@@ -31,7 +32,7 @@ printf '{"a":1}\n{"a":2}\n' | ajq -c '.a, (.a + 10)'
 # 12
 ```
 
-There's no whole-stream buffering in this mode, so it handles inputs larger than memory.
+There is no whole-stream buffering, so all of these modes handle inputs larger than memory.
 
 ### Semantic NDJSON windows
 

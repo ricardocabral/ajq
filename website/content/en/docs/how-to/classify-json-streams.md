@@ -31,18 +31,21 @@ Expected output with the mock backend:
 `sem_classify` returns exactly one of the labels from the call site. Keep labels short,
 mutually exclusive, and stable because they become part of your output contract.
 
-## Classify NDJSON one record at a time
+## Classify NDJSON without whole-stream buffering
 
-ajq processes newline-delimited JSON as independent input frames, so it can classify
-streams without buffering the whole input:
+ajq processes newline-delimited JSON as independent input frames, so it can classify streams
+without buffering the whole input. The default supported semantic path may resolve several
+frames in a byte-budgeted window; use `--stream` when each frame needs the lowest possible
+first-result latency.
 
 ```bash
 printf '{"id":1,"text":"billing question"}\n{"id":2,"text":"bug report"}\n' \
   | ajq --backend mock -c '{id, route: sem_classify(.text; "billing"; "bug"; "feature")}'
 ```
 
-This emits one compact JSON object per input record, which is convenient for queues,
-logs, and shell pipelines.
+This emits one compact JSON object per input record, in input order, which is convenient for
+queues, logs, and shell pipelines. See [Process an NDJSON stream](../process-ndjson/) for
+the windowing and `--stream` trade-offs.
 
 ## Route webhook events with bounded labels
 
@@ -74,8 +77,8 @@ printf '{"id":1,"text":"billing question"}\n{"id":2,"text":"bug report"}\n' \
       -c '{id, route: sem_classify(.text; "billing"; "bug"; "feature")}'
 ```
 
-For paid backends, keep `--max-calls` at or below your budget. Paid/cloud backends also
-have a default 100-call guardrail when you do not set one explicitly.
+For paid backends, keep `--max-calls` at or below your budget. Backend-specific defaults
+are listed in the [backends reference](../../reference/backends/#paid-backend-defaults).
 
 ## Account for repeated values and cache hits
 

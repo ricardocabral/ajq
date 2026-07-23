@@ -3,104 +3,66 @@ title: "Write a semantic filter"
 linkTitle: "Semantic filter"
 weight: 3
 description: >
-  Use fuzzy =~ predicates and bounded semantic functions in jq pipelines.
+  A concise operator guide for fuzzy predicates and bounded semantic filters.
 ---
 
-Use a semantic filter when literal matching with `test()` or `==` is too brittle. The
-examples below use `--backend mock` so you can verify the command shape without a model or
-API key; switch to `--backend local`, `--cloud`, or another backend for real judgement.
+Use a semantic filter when literal matching with `test()` or `==` is too brittle. For a
+complete problem-first walkthrough, including mock validation, real backends, estimates,
+and cache behavior, see [Filter JSON by meaning](../filter-json-by-meaning/).
 
-## Fuzzy match with `=~`
+## Core forms
 
-The `=~` operator asks the backend whether a value matches a description. Use it inside
-`select`:
+The `=~` operator asks the selected backend whether a value matches a description. Use it
+inside `select`:
+
+```jq
+select(.feedback =~ "urgent")
+```
+
+It desugars to `sem_match(.feedback; "urgent")`. Negate it with `!~`:
+
+```jq
+select(.feedback !~ "urgent")
+```
+
+In raw-input mode, each line is `.` and the implicit-value form is convenient:
 
 ```bash
-printf '[{"id":1,"feedback":"urgent"},{"id":2,"feedback":"other"}]' \
-  | ajq --backend mock -c '.[] | select(.feedback =~ "urgent") | .id'
+producer | ajq --backend mock -R -r 'select(. =~ "stack trace")'
 ```
 
-Output with the mock backend:
+For bounded routing, use `sem_classify` with the labels in the query:
 
-```text
-1
+```jq
+{route: sem_classify(.text; "billing"; "bug"; "feature")}
 ```
 
-`.feedback =~ "urgent"` desugars to `sem_match(.feedback; "urgent")`. Negate with `!~`:
+The result is exactly one of those labels. The full classification recipe is in
+[Classify JSON and NDJSON streams](../classify-json-streams/).
 
-```bash
-printf '[{"id":1,"feedback":"urgent"},{"id":2,"feedback":"other"}]' \
-  | ajq --backend mock -c '.[] | select(.feedback !~ "urgent") | .id'
-```
+## Execution limits
 
-## Match raw log lines
+`sem_match` and `sem_classify` are shipped across semantic execution contexts. The
+unbounded value operators have narrower contracts: `sem_score` is supported as a
+`sort_by(...)` key and in gated interleaved fallback, `sem_norm` as a `group_by(...)` key
+and in gated fallback, while standalone `sem_extract` and `sem_redact` fail loudly in
+three-phase execution. The [semantic functions reference](../../reference/semantic-functions/)
+is the canonical availability table.
 
-In raw-input mode, each input line is `.`:
+## Before a real run
 
-```bash
-printf 'panic stack trace\nok\n' \
-  | ajq --backend mock -R -r 'select(. =~ "stack trace")'
-```
+Select a backend explicitly. Use `--backend mock` to validate query shape without a model
+or network, then use `--explain` with representative input before a real run. Set a finite
+`--max-calls` cap and use `--stats` when you need run accounting; see [Control semantic
+costs](../control-costs/).
 
-Output:
-
-```text
-panic stack trace
-```
-
-## Classify into fixed labels
-
-`sem_classify(value; "a"; "b"; …)` returns exactly one of the labels you provide:
-
-```bash
-printf '{"id":1,"text":"billing question"}' \
-  | ajq --backend mock -c '{id, route: sem_classify(.text; "billing"; "bug"; "feature")}'
-```
-
-Output with the mock backend:
-
-```json
-{"id":1,"route":"billing"}
-```
-
-Use a fixed label set when downstream jq should route records deterministically by shape.
-
-## Stay with shipped execution shapes
-
-The current executor fully supports predicate matching (`=~` / `sem_match`) and bounded
-classification (`sem_classify`). Unbounded value operators have narrower contracts in
-0.0.1:
-
-- Use `sort_by(sem_score(...))` when you need a semantic score as a sort key.
-- Use `group_by(sem_norm(...))` when you need semantic normalization as a grouping key.
-- Score or normalization values that feed a pruning gate may run through interleaved
-  fallback instead of the three-phase harvest path.
-- Standalone `sem_extract(...)` and `sem_redact(...)` currently report unsupported in
-  three-phase execution.
-
-For production filters, prefer `sem_match` or `sem_classify` unless you specifically need
-one of the limited score/normalization shapes above.
-
-## Check the plan first
-
-Before running a semantic query on a paid or local model backend, inspect the estimate:
-
-```bash
-printf '[{"feedback":"urgent"},{"feedback":"urgent"},{"feedback":"other"}]' \
-  | ajq --explain '.[] | select(.feedback =~ "urgent") | .feedback'
-```
-
-Then use [Control semantic costs](../control-costs/) to set a cap and inspect stats.
-
-## Account for the persistent cache
-
-Successful semantic judgements are cached by op/spec/model/value. A second run over the
-same values may skip backend calls and report cache hits. Use [Manage the judgement
-cache](../manage-the-cache/) when you need to inspect, bypass, or clear those entries.
+Successful judgements use the persistent cache by default. Use `--no-cache` when a
+one-off or confidential workflow must bypass cache reads and writes; see [Manage the
+judgement cache](../manage-the-cache/).
 
 ## Related
 
-- [Filter JSON by meaning](../filter-json-by-meaning/) — problem-first recipe for fuzzy record selection.
-- [Classify JSON and NDJSON streams](../classify-json-streams/) — bounded labels with `sem_classify`.
-- [Semantic functions reference](../../reference/semantic-functions/) — shipped function forms and current limitations.
-- [Backends reference](../../reference/backends/) — choose a real backend.
+- [Filter JSON by meaning](../filter-json-by-meaning/) — complete fuzzy-filter workflow.
+- [Classify JSON and NDJSON streams](../classify-json-streams/) — bounded labels.
+- [Semantic functions reference](../../reference/semantic-functions/) — forms and availability.
+- [Backends reference](../../reference/backends/) — backend requirements and defaults.

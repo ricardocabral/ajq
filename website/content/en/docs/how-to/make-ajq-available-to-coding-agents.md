@@ -54,55 +54,26 @@ Before an ajq semantic run:
    reads and writes must both be bypassed.
 ```
 
-This guide intentionally does not prescribe a particular agent, plugin, or MCP distribution
-mechanism. Use the project's existing instruction surface until ajq selects supported delivery
-paths through its [agent-skill distribution research](https://github.com/ricardocabral/ajq/issues/6).
+This guide focuses on project guidance rather than installation. For the supported Codex
+marketplace and optional Claude Code/Cursor adapter, see [Install the ajq coding-agent
+skill](../install-agent-plugin/).
 
 ## 3. Validate the guidance with safe commands
 
-Use the mock backend to confirm that the agent can find ajq and form a semantic query without
-model, network, or API-key access:
+Run the built-in discovery and example commands to confirm that the agent can find ajq and
+understand its safe semantic surface:
 
 ```bash
-printf '[{"id":1,"message":"refund requested"},{"id":2,"message":"profile updated"}]' \
-  | ajq --backend mock -c '.[] | select(.message =~ "refund request") | .id'
+ajq capabilities --json
+ajq examples semantic-filter
 ```
 
-The output is:
+The semantic examples use `--backend mock`, so they require no model, network, or API key.
+For the complete mock → explain → capped real-backend workflow, use [Use ajq safely from
+coding agents](../agent-safe-semantic-workflow/). That page also covers `--stats`,
+`--no-cache`, and the current operator limits.
 
-```json
-1
-```
-
-Then use representative, non-confidential input to inspect the plan before authorizing a
-model-backed run:
-
-```bash
-printf '[{"message":"refund requested"},{"message":"profile updated"}]' \
-  | ajq --backend mock --explain '.[] | select(.message =~ "refund request") | .message'
-```
-
-`--explain` reports the semantic call site and estimated judgements without executing the
-query against a model backend. The mock backend checks query shape; it does not evaluate a
-query's semantic quality on a production model.
-
-## 4. Make real model use deliberate
-
-After reviewing the plan and input scope, name the real backend and a finite call cap in the
-command. For confidential or one-off input, add `--no-cache`:
-
-```bash
-# Requires a provisioned local backend. The backend, cap, and cache choice are explicit.
-printf '[{"message":"refund requested"},{"message":"profile updated"}]' \
-  | ajq --backend local --max-calls 10 --no-cache \
-      -c '.[] | select(.message =~ "refund request") | .message'
-```
-
-`--no-cache` disables persistent cache reads and writes; it is not a call limit and does not
-replace the data-handling review required for the selected backend. For cloud or other remote
-backends, follow your organization's data policy before sending confidential input.
-
-## 5. Verify the agent can make the right choice
+## 4. Verify the agent can make the right choice
 
 Ask the agent to propose, without executing it, a command for each of these tasks:
 
@@ -111,8 +82,9 @@ Ask the agent to propose, without executing it, a command for each of these task
 3. Route records into the fixed labels `billing`, `bug`, and `account`.
 
 It should choose `jq` for the first task, and ajq's explicit semantic matching or bounded
-classification for the other two. Before a real semantic run, its proposed command should
-name a backend and include a finite `--max-calls` value.
+classification for the other two. Before a real semantic run, follow the [agent-safe
+semantic workflow](../agent-safe-semantic-workflow/) rather than repeating its command
+sequence in project guidance.
 
 ## Related
 
@@ -122,5 +94,5 @@ name a backend and include a finite `--max-calls` value.
 - [CLI reference](../../reference/cli/) — capabilities, flags, subcommands, and exit behavior.
 - [Semantic functions reference](../../reference/semantic-functions/) — shipped semantic
   functions and their current limits.
-- [Agent-skill distribution research](https://github.com/ricardocabral/ajq/issues/6) — work
-  to select supported distribution paths for agent guidance.
+- [Install the ajq coding-agent skill](../install-agent-plugin/) — supported plugin delivery
+  paths for Codex, Claude Code, and Cursor.

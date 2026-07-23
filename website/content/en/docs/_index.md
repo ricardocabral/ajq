@@ -16,10 +16,12 @@ Everything you need to understand, evaluate, and use **ajq**.
 
 {{% pageinfo color="primary" %}}
 **ajq is usable today.** The deterministic jq spine, semantic planning and execution,
-local inference (`--backend local`/`mock`), Ollama/OpenAI-compatible/Anthropic backends,
+local inference (`--backend local`), the deterministic mock backend, Ollama/OpenAI-compatible/Anthropic backends,
 cost controls, persistent judgement cache, local asset provisioning, model management, and
 release archives with a checksum-verifying install script are shipped. Scale-out/windowing
-remains a roadmap item. For the full picture, see
+is shipped for supported semantic streams, with `--stream` available when first-frame
+latency matters more than window-wide batching. Further streaming optimizations remain
+planned. For the full picture, see
 [Project status](explanation/project-status/).
 {{% /pageinfo %}}
 

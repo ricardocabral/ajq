@@ -10,26 +10,10 @@ Use this workflow before running semantic queries on a paid backend.
 
 ## 1. Estimate calls with `--explain`
 
-Run the query with representative input and `--explain`:
-
-```bash
-printf '[{"msg":"urgent"},{"msg":"other"}]' \
-  | ajq --explain '.[] | select(.msg =~ "urgent") | .msg'
-```
-
-Read `post_dedup_judgements` in the estimate block:
-
-```text
-estimates:
-  estimate_status: available
-  static_call_sites: 1
-  input_frames: 1
-  harvested_judgements: 2
-  post_dedup_judgements: 2
-```
-
-That number is the count to budget against. Repeated values are deduplicated before the
-backend is called.
+Start with [Estimate model calls before running](../estimate-model-calls/) for the
+representative-input command and the meaning of `post_dedup_judgements`. Budget against
+that field: repeated judgements are deduplicated before backend calls, while a later real
+run may have additional persistent-cache hits.
 
 ## 2. Add a hard cap with `--max-calls`
 
@@ -47,8 +31,8 @@ With two distinct judgements and a cap of one, the run fails safely:
 ajq: error: query ".[] | select(.msg =~ \"urgent\") | .msg" runtime error in frame 1: max calls cap exceeded: cap 1, run needs 2 post-dedup backend judgements; aborting before issuing backend call 2.
 ```
 
-Paid backends (`anthropic`, `openai`, and `openrouter`) default to `--max-calls 100`.
-Use `--max-calls 0` only when you intentionally want no cap. `--backend-concurrency`
+See the [backends reference](../../reference/backends/#paid-backend-defaults) for default
+caps. Use `--max-calls 0` only when you intentionally want no cap. `--backend-concurrency`
 changes only how many requests from an already-approved batch can be in flight; it does
 not change this count or reserve extra calls. Keep paid providers at the sequential default
 of `1` while establishing a rate-limit budget, then use at most `2` only if the provider's
@@ -70,7 +54,9 @@ The data still goes to standard output:
 "urgent"
 ```
 
-The stats show harvested work, post-dedup backend calls, cache hits, and elapsed time:
+The stats show harvested work, post-dedup backend calls, cache hits, and elapsed time. The
+full field contract is in the [CLI reference](../../reference/cli/); this page focuses on
+the budgeting workflow:
 
 ```text
 ajq stats:

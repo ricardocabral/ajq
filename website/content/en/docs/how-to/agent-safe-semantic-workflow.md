@@ -75,9 +75,9 @@ printf '[{"msg":"refund requested"},{"msg":"profile updated"}]' \
 ```
 
 `--max-calls` is the hard budget. `--stats` reports harvested judgements, post-dedup
-backend calls, cache hits, and elapsed time on stderr after a successful run. Paid/cloud
-backends default to a 100-call cap, but agents should still set an explicit cap for the
-current task.
+backend calls, cache hits, and elapsed time on stderr after a successful run. Agents should
+set an explicit cap for the current task; backend defaults are listed in the [backends
+reference](../../reference/backends/#paid-backend-defaults).
 
 ## 5. Reuse or bypass the cache deliberately
 

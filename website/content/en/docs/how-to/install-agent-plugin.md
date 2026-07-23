@@ -63,7 +63,8 @@ codex plugin list
 Installing the skill does not select a semantic backend or grant access to a
 model. The skill begins with `ajq capabilities --json`, `--backend mock`, and
 `--explain`; any real backend still needs an explicit choice and finite
-`--max-calls` value.
+`--max-calls` value. See [Use ajq safely from coding agents](../agent-safe-semantic-workflow/)
+for the canonical execution workflow.
 
 ## Optional adapter for Claude Code and Cursor
 
@@ -82,7 +83,5 @@ what the adapter finds without installing it:
 npx plugins discover ricardocabral/ajq
 ```
 
-After installing through either path, use the skill's workflow: capabilities,
-mock, explain, then an explicitly capped real backend. See the
-[agent-safe semantic workflow](../agent-safe-semantic-workflow/) for commands
-and current operator limits.
+After installing through either path, use the skill's workflow described in
+[Use ajq safely from coding agents](../agent-safe-semantic-workflow/).

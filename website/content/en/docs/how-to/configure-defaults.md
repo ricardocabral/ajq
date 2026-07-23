@@ -32,13 +32,14 @@ For a one-off location, set `AJQ_CONFIG` to an explicit file path.
 
 ## 2. Add semantic defaults
 
-Recognized keys are:
+Use the keys described in the [configuration reference](../../reference/configuration/).
+For a small deterministic starting point:
 
 ```toml
-backend = "local"              # mock, local, ollama, openai, openrouter, anthropic
+backend = "local"
 model = "qwen2.5-1.5b"
 base_url = "http://127.0.0.1:8081"
-max_calls = 100                 # 0 = unlimited
+max_calls = 100
 no_cache = false
 ```
 
@@ -61,12 +62,9 @@ With `max_calls = 1`, that example stops before making the second distinct judge
 
 ## 3. Override a default when needed
 
-Precedence is:
-
-1. Command-line flags
-2. `AJQ_*` environment variables
-3. `config.toml`
-4. Backend defaults
+Flags and environment variables override the file for one command or shell session. The
+complete precedence and environment-variable table lives in the [configuration
+reference](../../reference/configuration/).
 
 A flag wins for one command:
 
@@ -95,7 +93,8 @@ export OPENROUTER_API_KEY="sk-or-..."
 ```
 
 If a config file contains credential-looking keys such as `api_key`, `apikey`, or `token`,
-ajq rejects it:
+ajq rejects it. See the [API-key policy](../../reference/configuration/#api-key-policy) for
+the complete rule:
 
 ```text
 ajq: error: config key "api_key" looks like a credential; API keys are env-only

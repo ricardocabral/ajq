@@ -43,26 +43,9 @@ changing cache identity or the run-global `--max-calls` cap. See
 
 ## Examples
 
-```bash
-# Single JSON value
-printf '{"a":1}\n' | ajq -c '.a + 1'
-# 2
-
-# NDJSON, processed independently per frame
-printf '{"a":1}\n{"a":2}\n' | ajq -c '.a, (.a + 10)'
-# 1
-# 11
-# 2
-# 12
-
-# Null input — build output from scratch
-printf '{"ignored":true}\n' | ajq -n -c '{generated: true}'
-# {"generated":true}
-
-# Raw input + raw output
-printf 'error: disk full\n' | ajq -R -r 'ascii_upcase'
-# ERROR: DISK FULL
-```
+For runnable examples covering JSON, NDJSON, raw lines, and null input, see
+[Process an NDJSON stream](../../how-to/process-ndjson/). This page keeps the framing and
+formatting contract; the how-to owns the task-oriented command examples.
 
 ## Related
 

@@ -30,8 +30,8 @@ script cannot match:
 
 1. **Tiny context per decision.** The model sees one field value at a time, not the whole
    record and not your prompt scaffolding. A small (~1.5B-parameter) local model is enough
-   to decide "does this text read as angry?". That's what makes a local-by-default,
-   no-API-key tool viable.
+   to decide "does this text read as angry?". That's what makes an explicitly selected,
+   provisionable local backend viable without an API key.
 
 2. **Cost scales with fuzzy decisions, not input size.** You pay for the number of
    distinct judgements, not the number of bytes or rows. A 10,000-row file with lots of
@@ -49,13 +49,14 @@ ajq does **not** fork the jq grammar. Semantic operators are registered as ordin
 functions through gojq's `WithFunction` seam, so gojq parses and drives them natively:
 
 ```go
-gojq.WithFunction("sem_match", 2, 2, func(input any, args []any) any { … })
+gojq.WithFunction("sem_match", 1, 2, func(input any, args []any) any { … })
 ```
 
 The only surface syntax ajq adds is a thin, jq-aware desugaring of the infix `=~` / `!~`
-operators into `sem_match(...)` calls. Everything else — composing `sem_*` inside
-`select`, `sort_by`, `group_by`, `|=`, arithmetic, `reduce` — comes for free, because it's
-just jq.
+operators into `sem_match(...)` calls. The jq parser can compose `sem_*` inside `select`,
+`sort_by`, `group_by`, `|=`, arithmetic, and `reduce`, but execution support is deliberately
+shape-constrained. See the [semantic functions reference](../../reference/semantic-functions/)
+for the currently supported contexts and loud failures.
 
 This was a deliberate, empirically-tested decision. gojq's existing grammar already
 expresses every real scenario, so a custom grammar would add no expressiveness while

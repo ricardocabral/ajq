@@ -6,9 +6,10 @@ description: >
   Run semantic queries against Anthropic, OpenAI, or OpenRouter.
 ---
 
-Use a cloud backend when you want hosted inference instead of the local
-`llama-server` backend. Each provider needs an API key in the environment; ajq does not
-read API keys from `config.toml`.
+Use a cloud backend when you want hosted inference instead of the local `llama-server`
+backend. This page is a provider setup recipe; see the [backends reference](../../reference/backends/)
+for canonical model, URL, credential, concurrency, and call-cap requirements. Each provider
+needs an API key in the environment; ajq does not read API keys from `config.toml`.
 
 ## Use Anthropic Claude
 
@@ -25,8 +26,8 @@ read API keys from `config.toml`.
      | ajq --cloud --model haiku '.msg =~ "urgent"'
    ```
 
-   `--cloud` is the same as `--backend anthropic`. If you omit `--model`, ajq uses
-   `claude-haiku-4-5`. The shipped aliases are `haiku`, `sonnet`, and `opus`.
+   `--cloud` is the same as `--backend anthropic`. Model aliases and the default model are
+   listed in the [backends reference](../../reference/backends/#anthropic).
 
 3. If the key is missing, ajq stops before contacting the provider:
 
@@ -71,12 +72,11 @@ read API keys from `config.toml`.
      | ajq --backend openrouter --model openai/gpt-4o-mini '.msg =~ "urgent"'
    ```
 
-   OpenRouter uses `https://openrouter.ai/api/v1` by default.
+   OpenRouter uses its documented default API root; see the [backends reference](../../reference/backends/#openai-and-openrouter).
 
 ## Keep a spending guardrail
 
-Paid backends (`anthropic`, `openai`, and `openrouter`) default to a 100-judgement cap.
-Lower it while testing:
+Lower the call cap while testing:
 
 ```bash
 ajq --cloud --max-calls 10 '.[] | select(.msg =~ "urgent")'
