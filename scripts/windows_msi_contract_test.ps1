@@ -99,7 +99,7 @@ foreach ($needle in @(
     'LICENSE_SOURCE: ${{ steps.release_zip.outputs.license }}',
     'gh release download $env:RELEASE_TAG --pattern $env:ZIP_ASSET --dir stage',
     'Trusted Signing credentials are incomplete; producing an UNSIGNED MSI.',
-    'uses: azure/trusted-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba # v2.0.0',
+    'uses: azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0',
     'scripts/release_finalize_contract.sh release-rerun-guard',
     'name: Publish Homebrew cask after release finalization',
     'wix build build/windows/ajq.wxs -arch x64',
