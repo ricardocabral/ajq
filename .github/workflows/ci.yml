@@ -9,6 +9,12 @@ name: CI
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_platform_validation:
+        description: Run the paid macOS and Windows compatibility and packaging checks
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -102,12 +108,14 @@ jobs:
           scripts/release_publish_preflight_test.sh
           scripts/package_manager_smoke_test.sh
           scripts/release_workflow_test.sh
+          scripts/ci_workflow_test.sh
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
             .github/workflows/ci.yml .github/workflows/release.yml \
             .github/workflows/winget.yml .github/workflows/package-manager-smoke.yml
 
   package-manager-powershell:
     name: Package-manager PowerShell checks
+    if: inputs.run_platform_validation == true
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -122,6 +130,7 @@ jobs:
 
   windows-msi-install:
     name: Build and silently smoke-test a local MSI
+    if: inputs.run_platform_validation == true
     runs-on: windows-latest
     needs:
       - package-manager-powershell
@@ -176,8 +185,6 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
-          - windows-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5
@@ -224,6 +231,29 @@ jobs:
           name: coverage.out
           path: coverage.out
           if-no-files-found: error
+
+  platform-validation:
+    name: Platform compatibility tests (${{ matrix.os }})
+    if: inputs.run_platform_validation == true
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run unit tests
+        run: go test -count=1 -shuffle=on ./...
 
   security:
     name: Security checks
