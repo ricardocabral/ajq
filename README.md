@@ -66,13 +66,14 @@ curl -fsSL https://raw.githubusercontent.com/ricardocabral/ajq/main/scripts/inst
 go install github.com/ricardocabral/ajq/cmd/ajq@latest
 ```
 
-The release workflow publishes the Homebrew cask to the public
-[`ricardocabral/tap`](https://github.com/ricardocabral/homebrew-tap) tap.
+The Homebrew cask in the public
+[`ricardocabral/tap`](https://github.com/ricardocabral/homebrew-tap) tap is verified.
 
-Windows MSI packaging is implemented and CI-validated, but the MSI is not yet
-released. ajq is not available through WinGet; it remains unavailable until a future
-MSI release completes Microsoft validation and merge and has public clean-install
-smoke evidence. Windows users should use the published ZIP in the meantime.
+The `RicardoCabral.ajq` WinGet manifest repair has passed Microsoft validation, but
+is pending Microsoft merge and source propagation. No Windows package-manager
+installation is verified yet: do not rely on `winget install` until the merged package
+has passed its Windows clean-install smoke. Windows users should use the published ZIP
+in the meantime.
 
 ### Coding-agent skill
 

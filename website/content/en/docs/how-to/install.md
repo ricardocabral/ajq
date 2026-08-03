@@ -28,8 +28,8 @@ AJQ_VERSION=v0.1.0 AJQ_INSTALL_DIR="$HOME/bin" sh scripts/install.sh
 
 ## Install with Homebrew
 
-The release workflow publishes the ajq cask to the public
-[`ricardocabral/tap`](https://github.com/ricardocabral/homebrew-tap) tap:
+The ajq cask in the public
+[`ricardocabral/tap`](https://github.com/ricardocabral/homebrew-tap) tap is verified:
 
 ```bash
 brew install --cask ricardocabral/tap/ajq
@@ -47,13 +47,13 @@ Release archives are named like:
 - `ajq_<version>_Linux_x86_64.tar.gz`
 - `ajq_<version>_Windows_x86_64.zip`
 
-### Windows MSI and WinGet status
+### Windows and WinGet status
 
-Windows MSI packaging is implemented and CI-validated, including an installed-binary
-semantic smoke test, but the MSI is **not yet released**. ajq is **not available
-through WinGet**; it remains unavailable until a future MSI release completes
-Microsoft validation and merge and has public clean-install smoke evidence. Use the
-published Windows ZIP in the meantime.
+The `RicardoCabral.ajq` WinGet manifest repair has passed Microsoft validation, but
+is pending Microsoft merge and source propagation. No Windows package-manager
+installation is verified yet: do not rely on `winget install` until the merged package
+has passed its Windows clean-install smoke. Use the published Windows ZIP in the
+meantime.
 
 ## Verify a download
 
@@ -141,10 +141,11 @@ with `--check`; use `ajq provision` separately to install the requested assets.
 
 ## Package-manager status
 
-The Homebrew cask is available from the public `ricardocabral/tap` tap. Windows MSI
-packaging is implemented and CI-validated, but the MSI is not yet released. WinGet
-remains unavailable until a future MSI release completes Microsoft validation and
-merge and has public clean-install smoke evidence.
+The Homebrew cask is verified in the public `ricardocabral/tap` tap. The
+`RicardoCabral.ajq` WinGet manifest repair has passed Microsoft validation but remains
+pending Microsoft merge and source propagation. No Windows package-manager
+installation is verified until the merged package passes its Windows clean-install
+smoke.
 
 The install script, manual release archives, and Go-source installation remain
 available when Homebrew is not the preferred installer.
