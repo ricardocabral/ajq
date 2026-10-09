@@ -3,6 +3,10 @@ title: "Privacy policy"
 description: "How ajq, its coding-agent skill, and its documentation handle data."
 ---
 
+{{% blocks/section color="white" %}}
+
+# Privacy policy
+
 Last updated: October 9, 2026.
 
 This policy covers the open-source ajq command-line tool, the ajq coding-agent
@@ -73,3 +77,5 @@ ajq does not set a separate retention period for them.
 For questions about ajq's data handling, use the
 [project issue tracker](https://github.com/ricardocabral/ajq/issues).
 Changes to this policy will be published on this page with an updated date.
+
+{{% /blocks/section %}}
