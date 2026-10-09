@@ -9,6 +9,14 @@ Use ajq when a JSON or NDJSON task needs fuzzy semantic matching or assigning a
 value to a small, fixed set of labels. Keep ordinary jq work in jq: it remains
 byte-deterministic and never contacts an AI backend.
 
+## Prerequisites
+
+This skill requires shell access and an installed `ajq` executable. Check with
+`command -v ajq` before running the workflow. If shell access or the executable
+is unavailable, explain what is missing and link the
+[installation guide](https://ricardocabral.github.io/ajq/docs/how-to/install/).
+Do not report a command as executed when you could not run it.
+
 ## Before choosing ajq
 
 - Use ordinary jq for exact fields, structural transforms, arithmetic, sorting,
@@ -50,7 +58,7 @@ byte-deterministic and never contacts an AI backend.
      | ajq --explain '.[] | select(.msg =~ "refund request") | .msg'
    ```
 
-5. Only after approval, choose an explicit backend and finite `--max-calls`
+5. Once the user has authorized model use, choose an explicit backend and finite `--max-calls`
    cap. Use `--stats` to report the actual work. Never put an API key in a
    command, prompt, or repository file:
 
@@ -60,6 +68,19 @@ byte-deterministic and never contacts an AI backend.
          -c '.[] | select(.msg =~ "refund request") | .msg'
    ```
 
+For bounded classification, supply the labels in the query. This NDJSON example
+uses the same no-network mock backend:
+
+```bash
+printf '{"id":1,"text":"billing question"}\n{"id":2,"text":"bug report"}\n' \
+  | ajq --backend mock -c '{id, route: sem_classify(.text; "billing"; "bug"; "feature")}'
+```
+
+Report the actual output and relevant plan or stats. Identify mock results as
+execution-shape checks, not real semantic judgments. If a command fails, report
+the error and correct the query or explain the missing prerequisite.
+
 Use `--no-cache` for sensitive or one-off values when cache reads and writes
-are inappropriate. For all details and backend-specific setup, see the
-repository's agent-safe workflow documentation.
+are inappropriate. For backend-specific setup and data-handling controls, see
+the [agent-safe workflow](https://ricardocabral.github.io/ajq/docs/how-to/agent-safe-semantic-workflow/)
+and [privacy policy](https://ricardocabral.github.io/ajq/privacy/).

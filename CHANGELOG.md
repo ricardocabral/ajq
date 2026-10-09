@@ -18,6 +18,17 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ## [Unreleased]
 
+### Added
+
+- Added a website privacy policy covering local processing, optional cloud
+  backends, cached judgments, and the coding-agent skill.
+
+### Changed
+
+- Prepared the ajq coding-agent plugin for directory submission with listing
+  icons, support and privacy links, explicit CLI prerequisites, and a bounded
+  classification example.
+
 ## [0.1.5] - 2026-07-16
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "name": "ajq",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Safe semantic jq workflows for JSON and NDJSON filtering and bounded classification.",
   "author": {
     "name": "Ricardo Niederberger Cabral",

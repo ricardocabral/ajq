@@ -56,7 +56,7 @@ disableKinds = ["taxonomy", "term"]
 # ---------------------------------------------------------------------------
 [params]
   copyright = "The ajq Authors"
-  privacy_policy = ""
+  privacy_policy = "https://ricardocabral.github.io/ajq/privacy/"
   archived_version = false
   version = "v0.1"
   url_latest_version = "https://ricardocabral.github.io/ajq/"
