@@ -46,6 +46,8 @@ PLATFORMS := \
 # Tool versions resolved lazily so targets that don't need them stay fast.
 GO           := go
 GOLANGCI_LINT := golangci-lint
+# Keep aligned with .golangci.yml and the CI/release workflow pins.
+GOLANGCI_LINT_VERSION := 2.9.0
 GORELEASER    := goreleaser
 
 # Coverage output file (gitignored).
@@ -211,9 +213,11 @@ vet: ## Run go vet
 	$(GO) vet ./...
 
 .PHONY: lint
-lint: ## Run golangci-lint (install: https://golangci-lint.run)
+lint: ## Run the pinned golangci-lint (see CONTRIBUTING.md)
 	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { \
 		echo "golangci-lint not found; install from https://golangci-lint.run" >&2; exit 1; }
+	@test "$$($(GOLANGCI_LINT) version --short)" = "$(GOLANGCI_LINT_VERSION)" || { \
+		echo "make lint requires golangci-lint v$(GOLANGCI_LINT_VERSION); see CONTRIBUTING.md" >&2; exit 1; }
 	$(GOLANGCI_LINT) run ./...
 
 .PHONY: tidy

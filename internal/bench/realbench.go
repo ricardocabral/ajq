@@ -143,7 +143,7 @@ func fileExists(path string) bool {
 	if strings.TrimSpace(path) == "" {
 		return false
 	}
-	info, err := os.Stat(path)
+	info, err := os.Stat(path) // #nosec G703 -- Read-only check of an operator-selected local benchmark asset; paths outside the cache are intentional.
 	if err != nil {
 		return false
 	}

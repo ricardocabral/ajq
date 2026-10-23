@@ -21,7 +21,7 @@ func runConformance(t *testing.T, maxConcurrency int, opts ...conformance.Option
 	t.Helper()
 	server := conformance.NewScriptedServer(t, conformance.ProtocolOpenAI)
 	conformance.Run(t, func(serverURL string) backend.Backend {
-		return &Backend{
+		return &Backend{ // #nosec G101 -- Synthetic test credential sent only to the scripted loopback server; APIKeyEnv is an environment-variable name.
 			BaseURL:        serverURL + "/v1",
 			APIKey:         "test-key",
 			APIKeyEnv:      "OPENAI_API_KEY",

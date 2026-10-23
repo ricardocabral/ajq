@@ -25,6 +25,9 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
 
 ### Changed
 
+- Required lint checks now enforce golangci-lint v2.9.0, matching CI and release
+  checks. Contributor guidance records Go compatibility and the disposition of
+  seven newer gosec warnings, with narrow annotations for reviewed boundaries.
 - Prepared the ajq coding-agent plugin for directory submission with listing
   icons, support and privacy links, explicit CLI prerequisites, and a bounded
   classification example.

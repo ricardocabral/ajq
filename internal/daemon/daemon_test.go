@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -16,6 +17,30 @@ import (
 	"testing"
 	"time"
 )
+
+func TestDefaultStarterPreservesArguments(t *testing.T) {
+	args := []string{"model with spaces.gguf", "$(exit 23)", "; exit 24", "one'two", `"three"`, "", "--flag=value"}
+	if os.Getenv("AJQ_TEST_STARTER_CHILD") == "1" {
+		if len(os.Args) < 3 || !reflect.DeepEqual(os.Args[3:], args) {
+			t.Fatalf("child argv = %q, want literal arguments %q", os.Args, args)
+		}
+		return
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AJQ_TEST_STARTER_CHILD", "1")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	proc, err := defaultStarter(ctx, executable, append([]string{"-test.run=^TestDefaultStarterPreservesArguments$", "--"}, args...))
+	if err != nil {
+		t.Fatalf("start child: %v", err)
+	}
+	if err := proc.Wait(); err != nil {
+		t.Fatalf("child did not receive literal arguments: %v", err)
+	}
+}
 
 // fakeProcess is a controllable processHandle for tests.
 type fakeProcess struct {

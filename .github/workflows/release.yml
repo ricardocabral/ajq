@@ -118,7 +118,9 @@ jobs:
           version: v2.9.0
 
       - name: Run lint
-        run: make lint
+        run: |
+          bash scripts/lint_test.sh
+          make lint
 
       - name: Check package-manager scripts and workflows
         run: |

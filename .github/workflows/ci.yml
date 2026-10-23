@@ -109,6 +109,7 @@ jobs:
           scripts/package_manager_smoke_test.sh
           scripts/release_workflow_test.sh
           scripts/ci_workflow_test.sh
+          bash scripts/lint_test.sh
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 \
             .github/workflows/ci.yml .github/workflows/release.yml \
             .github/workflows/winget.yml .github/workflows/package-manager-smoke.yml

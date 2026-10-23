@@ -11,6 +11,64 @@ Thanks for helping improve `ajq`.
 - Run `make lint` before opening a pull request; it uses the repository `.golangci.yml` config and must stay clean alongside `make test`.
 - GitHub Actions workflows are pinned to commit SHAs; Dependabot keeps action pins and dependency manifests current.
 
+## Reproducible lint checks
+
+The required lint version is **golangci-lint v2.9.0**, with **Go 1.26.4** from
+`go.mod`. Use this pair for required checks even if a newer Go or linter is on
+your `PATH`. `make lint` rejects other linter versions before analysis. CI and
+release checks use the same pin; changing it is a separate reviewed tooling
+upgrade. Keep `Makefile`, `.golangci.yml`, and both workflow pins aligned.
+
+Download the v2.9.0 archive for your platform from the
+[official release](https://github.com/golangci/golangci-lint/releases/tag/v2.9.0)
+and install Go 1.26.4 before running checks. For a separately installed linter:
+
+```bash
+GOTOOLCHAIN=go1.26.4 make lint GOLANGCI_LINT=/path/to/golangci-lint
+bash scripts/lint_test.sh
+```
+
+Tool installation may require network access; verification with installed tools
+and cached Go modules needs no cloud credentials or model assets.
+
+The v2.9.0 release binary is built with Go 1.26.0 and supports the module's Go
+1.26 language version. The exact Go 1.26.4 / v2.9.0 pair was verified clean for
+[issue #101](https://github.com/ricardocabral/ajq/issues/101). Per the
+[upstream compatibility policy](https://golangci-lint.run/docs/welcome/faq/),
+the linter must support the Go version used to analyze the project. A newer
+local Go toolchain can require a linter upgrade even when `go.mod` is unchanged.
+In particular, v2.13.2 built with Go 1.27.0 could not decode this workstation's
+Go 1.27.3 export data; use the declared toolchain instead of treating those
+typechecking errors as source defects.
+
+### Newer gosec review (#101)
+
+At base `851b5c6`, v2.9.0 with Go 1.26.4 reported zero findings.
+Separately, v2.13.2 (built with Go 1.27.0), analyzing with Go 1.26.10,
+reported the seven findings below. These are contextual false positives;
+review found no untrusted remote input crossing these boundaries.
+
+| Rule | Location | Classification and disposition |
+| --- | --- | --- |
+| G101 | `internal/backend/oai/conformance_test.go`, backend literal | Synthetic credential for a scripted loopback server; environment field holds a variable name. Narrow G101 annotation. |
+| G101 | `internal/backend/oai/oai_test.go`, `baseBackend` | Synthetic credential used by `httptest`, with bearer-header assertions. Narrow G101 annotation. |
+| G101 | `internal/backend/oai/live_conformance_test.go`, backend literal | Environment-variable name, not a credential value. The actual credential comes from the environment in an opt-in test. Narrow G101 annotation. |
+| G703 | `internal/bench/realbench.go`, `fileExists` | Read-only stat of an operator-selected local asset. External asset paths are intentional; annotate G703 and test explicit paths, missing files, and directories. |
+| G703 | `internal/daemon/config.go`, `defaultFileExists` | Read-only stat of an operator-selected engine path. Config/env overrides intentionally allow files outside the cache; annotate G703 and test discovery with real files. |
+| G703 | `internal/cli/models_test.go`, invalid-config fixture | The test sets the environment path to its own temporary directory. Write through the local path variable to make ownership explicit. Existing assertions check that diagnostics hide the synthetic secret sentinel. |
+| G204 | `internal/daemon/daemon.go`, `defaultStarter` | The operator trusts the engine selected through local config/env, validated bundle metadata, legacy cache, or PATH. Separate argv elements go directly to `exec.CommandContext`; annotate G204 and verify literal arguments with a real child process. |
+
+No security rule is disabled globally. Do not restrict explicit local overrides
+to the cache or rewrite argv to silence a heuristic. Downloaded archives and
+recorded bundle paths retain their separate containment validation and negative
+traversal tests. Local config, environment, cache, and PATH must be controlled by
+the operator choosing to run the engine.
+
+To compare a newer analyzer, invoke its binary directly with a supported Go
+toolchain (`golangci-lint version` records the build version). Keep that result
+separate from the required `make lint` gate and review any new findings before
+updating the pin.
+
 ## Pull requests
 
 - Explain the user-visible change and why it is needed.

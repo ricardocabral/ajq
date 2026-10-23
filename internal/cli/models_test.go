@@ -108,8 +108,9 @@ func TestModelsListJSONContract(t *testing.T) {
 	})
 	t.Run("unknown active hides config error", func(t *testing.T) {
 		const sentinel = "models-json-secret-sentinel"
-		t.Setenv("AJQ_CONFIG", filepath.Join(t.TempDir(), "bad.toml"))
-		if err := os.WriteFile(os.Getenv("AJQ_CONFIG"), []byte("api_key = \""+sentinel+"\"\nmodel = ["), 0o600); err != nil {
+		configPath := filepath.Join(t.TempDir(), "bad.toml")
+		t.Setenv("AJQ_CONFIG", configPath)
+		if err := os.WriteFile(configPath, []byte("api_key = \""+sentinel+"\"\nmodel = ["), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		stdout, stderr, err := runCLIForModelsTest("", nil, "models", "list", "--json")

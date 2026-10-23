@@ -3,12 +3,42 @@ package bench_test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ricardocabral/ajq/internal/bench"
 )
+
+func TestDetectRealAssetsExplicitLocalPaths(t *testing.T) {
+	dir := t.TempDir()
+	asset := filepath.Join(dir, "custom asset")
+	if err := os.WriteFile(asset, []byte("local fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(bench.EnvRealServer, asset)
+	for _, tc := range []struct {
+		name string
+		path string
+		want bool
+	}{
+		{name: "file outside cache", path: asset, want: true},
+		{name: "missing", path: filepath.Join(dir, "missing")},
+		{name: "directory", path: dir},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(bench.EnvRealModel, tc.path)
+			cfg, available, reason := bench.DetectRealAssets()
+			if available != tc.want || cfg.ServerBinaryPath != asset || cfg.ModelPath != tc.path {
+				t.Fatalf("detected %+v, available=%v, reason=%q", cfg, available, reason)
+			}
+			if !available && reason == "" {
+				t.Fatal("missing asset must have a reason")
+			}
+		})
+	}
+}
 
 // TestDetectRealAssetsIsSafe verifies asset detection never panics and returns
 // a clear reason when assets are absent. It runs in every environment.
