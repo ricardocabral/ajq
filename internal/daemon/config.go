@@ -148,7 +148,7 @@ type lookPathFunc func(name string) (string, error)
 
 // defaultFileExists is the production fileExists implementation.
 func defaultFileExists(path string) bool {
-	info, err := os.Stat(path)
+	info, err := os.Stat(path) // #nosec G703 -- Read-only check of a local engine path selected by operator config/env or cache discovery; no storage sandbox is intended.
 	if err != nil {
 		return false
 	}

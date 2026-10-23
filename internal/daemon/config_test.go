@@ -135,6 +135,36 @@ func TestDiscoverPrecedenceConfigOverride(t *testing.T) {
 	}
 }
 
+func TestDiscoverExplicitLocalFile(t *testing.T) {
+	t.Setenv(EnvServerBinary, "")
+	dir := t.TempDir()
+	engine := filepath.Join(dir, "custom engine")
+	if err := os.WriteFile(engine, []byte("local fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		path string
+		want bool
+	}{
+		{name: "file outside cache", path: engine, want: true},
+		{name: "missing", path: filepath.Join(dir, "missing")},
+		{name: "directory", path: dir},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := Config{ServerBinaryPath: tc.path, CacheDir: t.TempDir()}
+			got, err := (Discoverer{}).DiscoverServerBinary(cfg)
+			if tc.want {
+				if err != nil || got != tc.path {
+					t.Fatalf("explicit engine = %q, %v; want %q", got, err, tc.path)
+				}
+			} else if !IsServerBinaryNotFound(err) {
+				t.Fatalf("unusable engine = %q, %v; want not found", got, err)
+			}
+		})
+	}
+}
+
 func TestDiscoverPrecedenceEnvOverConfigMissing(t *testing.T) {
 	t.Setenv(EnvServerBinary, "/env/llama-server")
 	existing := map[string]bool{"/env/llama-server": true}

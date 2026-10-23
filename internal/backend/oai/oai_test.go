@@ -53,7 +53,7 @@ func newFakeOpenAI(t *testing.T, handler func(int, http.ResponseWriter, *http.Re
 }
 
 func baseBackend(srv *httptest.Server) *Backend {
-	return &Backend{
+	return &Backend{ // #nosec G101 -- Synthetic test credential sent only to httptest; APIKeyEnv is an environment-variable name.
 		BaseURL:    srv.URL + "/v1/",
 		APIKey:     "test-key",
 		APIKeyEnv:  "OPENAI_API_KEY",

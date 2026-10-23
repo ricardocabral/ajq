@@ -215,7 +215,7 @@ func (m *Manager) applyDefaults() {
 // defaultStarter spawns the server with os/exec, binding localhost only and
 // never invoking a shell.
 func defaultStarter(ctx context.Context, path string, args []string) (processHandle, error) {
-	cmd := exec.CommandContext(ctx, path, args...)
+	cmd := exec.CommandContext(ctx, path, args...) // #nosec G204 -- Engine executable is selected by operator config/env, validated bundle metadata, or local cache/PATH; argv is passed without a shell.
 	// Explicitly avoid shell interpretation: exec.Command does not use a shell.
 	if err := cmd.Start(); err != nil {
 		return nil, err

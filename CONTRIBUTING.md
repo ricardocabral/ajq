@@ -8,8 +8,26 @@ Thanks for helping improve `ajq`.
 - Add or update tests for behavior changes.
 - New or changed semantic backends must invoke `internal/backend/conformance` so the cross-backend schema-invariance contract stays enforced.
 - Document relevant local validation before opening a pull request.
-- Run `make lint` before opening a pull request; it uses the repository `.golangci.yml` config and must stay clean alongside `make test`.
 - GitHub Actions workflows are pinned to commit SHAs; Dependabot keeps action pins and dependency manifests current.
+
+## Local checks
+
+Use the Go version in `go.mod` and the golangci-lint version pinned in
+`.golangci.yml`. Install the matching linter from its
+[official releases](https://github.com/golangci/golangci-lint/releases).
+`make lint` rejects mismatched versions.
+
+Before opening a pull request, run:
+
+```bash
+make fmt
+make test
+make lint
+```
+
+For concurrency, cache, daemon, or backend changes, also run `make test-race`.
+To use a separately installed linter, pass
+`GOLANGCI_LINT=/path/to/golangci-lint` to `make lint`.
 
 ## Pull requests
 

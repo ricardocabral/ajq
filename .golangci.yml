@@ -1,5 +1,5 @@
 # golangci-lint version: v2.9.0
-# Keep this in sync with the golangci/golangci-lint-action version in CI.
+# Keep this in sync with Makefile and the CI/release workflow version pins.
 version: "2"
 
 linters:

@@ -21,5 +21,5 @@ func TestOpenAIBackendLiveConformance(t *testing.T) {
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
 	}
-	conformance.RunLiveSmoke(t, &Backend{BaseURL: baseURL, APIKey: apiKey, APIKeyEnv: "OPENAI_API_KEY", Model: model})
+	conformance.RunLiveSmoke(t, &Backend{BaseURL: baseURL, APIKey: apiKey, APIKeyEnv: "OPENAI_API_KEY", Model: model}) // #nosec G101 -- APIKeyEnv names an environment variable; the opt-in live credential is read from the environment above.
 }
