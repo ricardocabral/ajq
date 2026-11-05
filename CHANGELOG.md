@@ -32,6 +32,12 @@ changes. Use the standard section names `Added`, `Changed`, `Deprecated`,
   icons, support and privacy links, explicit CLI prerequisites, and a bounded
   classification example.
 
+### Fixed
+
+- Restored compatibility with gojq v0.12.20 by checking every `reduce` and
+  `foreach` destructuring alternative during semantic planning and generator
+  safety checks.
+
 ## [0.1.5] - 2026-07-16
 
 ### Fixed

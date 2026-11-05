@@ -2,6 +2,7 @@ package plan
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/itchyny/gojq"
@@ -360,10 +361,10 @@ func termContainsGate(t *gojq.Term, funcGates map[string]bool) bool {
 	if t.Try != nil && (queryContainsGateWithFuncs(t.Try.Body, funcGates) || queryContainsGateWithFuncs(t.Try.Catch, funcGates)) {
 		return true
 	}
-	if t.Reduce != nil && (queryContainsGateWithFuncs(t.Reduce.Query, funcGates) || patternContainsGate(t.Reduce.Pattern, funcGates) || queryContainsGateWithFuncs(t.Reduce.Start, funcGates) || queryContainsGateWithFuncs(t.Reduce.Update, funcGates)) {
+	if t.Reduce != nil && (queryContainsGateWithFuncs(t.Reduce.Query, funcGates) || slices.ContainsFunc(t.Reduce.Patterns, func(p *gojq.Pattern) bool { return patternContainsGate(p, funcGates) }) || queryContainsGateWithFuncs(t.Reduce.Start, funcGates) || queryContainsGateWithFuncs(t.Reduce.Update, funcGates)) {
 		return true
 	}
-	if t.Foreach != nil && (queryContainsGateWithFuncs(t.Foreach.Query, funcGates) || patternContainsGate(t.Foreach.Pattern, funcGates) || queryContainsGateWithFuncs(t.Foreach.Start, funcGates) || queryContainsGateWithFuncs(t.Foreach.Update, funcGates) || queryContainsGateWithFuncs(t.Foreach.Extract, funcGates)) {
+	if t.Foreach != nil && (queryContainsGateWithFuncs(t.Foreach.Query, funcGates) || slices.ContainsFunc(t.Foreach.Patterns, func(p *gojq.Pattern) bool { return patternContainsGate(p, funcGates) }) || queryContainsGateWithFuncs(t.Foreach.Start, funcGates) || queryContainsGateWithFuncs(t.Foreach.Update, funcGates) || queryContainsGateWithFuncs(t.Foreach.Extract, funcGates)) {
 		return true
 	}
 	if t.Label != nil && queryContainsGateWithFuncs(t.Label.Body, funcGates) {
@@ -607,14 +608,18 @@ func (b *builder) walkTerm(t *gojq.Term) {
 	case gojq.TermTypeReduce:
 		if t.Reduce != nil {
 			b.walkQuery(t.Reduce.Query)
-			b.walkPattern(t.Reduce.Pattern)
+			for _, pattern := range t.Reduce.Patterns {
+				b.walkPattern(pattern)
+			}
 			b.walkQuery(t.Reduce.Start)
 			b.walkQuery(t.Reduce.Update)
 		}
 	case gojq.TermTypeForeach:
 		if t.Foreach != nil {
 			b.walkQuery(t.Foreach.Query)
-			b.walkPattern(t.Foreach.Pattern)
+			for _, pattern := range t.Foreach.Patterns {
+				b.walkPattern(pattern)
+			}
 			b.walkQuery(t.Foreach.Start)
 			b.walkQuery(t.Foreach.Update)
 			b.walkQuery(t.Foreach.Extract)
