@@ -462,6 +462,10 @@ func TestThreePhaseRejectsOrderSensitiveGeneratorContexts(t *testing.T) {
 		`if all(sem_match(.gate; "yes"); .) then sem_match(.a; "x") else sem_match(.b; "y") end`,
 		`while(sem_match(.gate; "yes"); .)`,
 		`reduce sem_match(.gate; "yes") as $x (false; . or $x)`,
+		`reduce .[] as $v ?// {(first(.)): $v} (0; .) | sem_match("yes")`,
+		`foreach .[] as $v ?// {(first(.)): $v} (0; .; .) | sem_match("yes")`,
+		`[reduce .[] as $v ?// {(sem_match("yes")): $v} (0; .)]`,
+		`[foreach .[] as $v ?// {(sem_match("yes")): $v} (0; .; .)]`,
 		`([sem_classify(.x; "a"; "b")] | .[0]) == "b"`,
 		`if ([(sem_classify(.x; "a"; "b"))] | .[0]) == "b" then sem_match(.a; "x") else sem_match(.b; "y") end`,
 		`def g: sem_match(.gate; "yes"); if ([g] | length) == 2 then sem_match(.a; "x") else sem_match(.b; "y") end`,
@@ -532,5 +536,36 @@ func TestExecutePureJQDoesNotCallBackend(t *testing.T) {
 	}
 	if len(be.batches) != 0 {
 		t.Fatalf("pure jq called backend %d times", len(be.batches))
+	}
+}
+
+func TestExecutePureJQAlternativePatterns(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{"reduce", `reduce .[] as [$v] ?// {value: $v} (0; . + $v)`, "6\n"},
+		{"foreach", `foreach .[] as [$v] ?// {value: $v} (0; . + $v; .)`, "1\n3\n6\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			be := &recordingBackend{}
+			var stdout bytes.Buffer
+			_, err := Execute(context.Background(), strings.NewReader(`[[1],{"value":2},[3]]`), &stdout, Options{
+				Query:     tc.query,
+				InputMode: input.ModeAuto,
+				Output:    output.Options{Compact: true},
+				Backend:   be,
+			})
+			if err != nil {
+				t.Fatalf("Execute returned error: %v", err)
+			}
+			if stdout.String() != tc.want {
+				t.Fatalf("stdout = %q, want %q", stdout.String(), tc.want)
+			}
+			if len(be.batches) != 0 {
+				t.Fatalf("pure jq called backend %d times", len(be.batches))
+			}
+		})
 	}
 }

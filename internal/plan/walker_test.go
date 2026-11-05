@@ -27,6 +27,8 @@ func TestWalkerCoverage(t *testing.T) {
 		{"label body", `label $out | sem_match("x")`, 1},
 		{"user defined function body", `def tagged: sem_match("x"); tagged`, 1},
 		{"reduce destructuring pattern", `reduce .[] as {(sem_match("x")): $v} (0; .)`, 1},
+		{"reduce alternative patterns", `reduce .[] as {(sem_match("first")): $v} ?// {(sem_match("second")): $v} (0; .)`, 2},
+		{"foreach alternative patterns", `foreach .[] as {(sem_match("first")): $v} ?// {(sem_match("second")): $v} (0; .; .)`, 2},
 		{"foreach destructuring pattern", `foreach .[] as {(sem_match("x")): $v} (0; .; .)`, 1},
 	}
 	for _, tt := range tests {
@@ -60,5 +62,22 @@ func TestWalkerUnsupportedDiagnostics(t *testing.T) {
 	// recovered.
 	if diags[0].Source.Expression == "" || diags[0].Source.HasRange {
 		t.Fatalf("diagnostic source = %#v", diags[0].Source)
+	}
+}
+
+func TestWalkerAlternativePatternGates(t *testing.T) {
+	for _, query := range []string{
+		`def gate: reduce .[] as $v ?// {(select(. == "a")): $v} (0; .); sem_classify("a"; "b") | gate`,
+		`def gate: foreach .[] as $v ?// {(select(. == "a")): $v} (0; .; .); sem_classify("a"; "b") | gate`,
+	} {
+		t.Run(query, func(t *testing.T) {
+			p, diagnostics := Build(query)
+			if len(diagnostics) != 0 {
+				t.Fatalf("Build diagnostics = %#v", diagnostics)
+			}
+			if len(p.Semantic) != 1 || !p.Semantic[0].Gated {
+				t.Fatalf("semantic nodes = %#v, want one gated classification", p.Semantic)
+			}
+		})
 	}
 }
