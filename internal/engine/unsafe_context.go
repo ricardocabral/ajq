@@ -1,6 +1,10 @@
 package engine
 
-import "github.com/itchyny/gojq"
+import (
+	"slices"
+
+	"github.com/itchyny/gojq"
+)
 
 func hasUnsafeGeneratorContext(src string) (bool, error) {
 	query, err := gojq.Parse(src)
@@ -84,11 +88,11 @@ func termHasUnsafeGeneratorContext(t *gojq.Term) bool {
 			return true
 		}
 	case gojq.TermTypeReduce:
-		if t.Reduce != nil && (queryContainsSemanticFunc(t.Reduce.Query) || queryContainsSemanticFunc(t.Reduce.Start) || queryContainsSemanticFunc(t.Reduce.Update) || queryHasUnsafeGeneratorContext(t.Reduce.Query) || patternHasUnsafeGeneratorContext(t.Reduce.Pattern) || queryHasUnsafeGeneratorContext(t.Reduce.Start) || queryHasUnsafeGeneratorContext(t.Reduce.Update)) {
+		if t.Reduce != nil && (queryContainsSemanticFunc(t.Reduce.Query) || queryContainsSemanticFunc(t.Reduce.Start) || queryContainsSemanticFunc(t.Reduce.Update) || queryHasUnsafeGeneratorContext(t.Reduce.Query) || slices.ContainsFunc(t.Reduce.Patterns, patternHasUnsafeGeneratorContext) || queryHasUnsafeGeneratorContext(t.Reduce.Start) || queryHasUnsafeGeneratorContext(t.Reduce.Update)) {
 			return true
 		}
 	case gojq.TermTypeForeach:
-		if t.Foreach != nil && (queryContainsSemanticFunc(t.Foreach.Query) || queryContainsSemanticFunc(t.Foreach.Start) || queryContainsSemanticFunc(t.Foreach.Update) || queryContainsSemanticFunc(t.Foreach.Extract) || queryHasUnsafeGeneratorContext(t.Foreach.Query) || patternHasUnsafeGeneratorContext(t.Foreach.Pattern) || queryHasUnsafeGeneratorContext(t.Foreach.Start) || queryHasUnsafeGeneratorContext(t.Foreach.Update) || queryHasUnsafeGeneratorContext(t.Foreach.Extract)) {
+		if t.Foreach != nil && (queryContainsSemanticFunc(t.Foreach.Query) || queryContainsSemanticFunc(t.Foreach.Start) || queryContainsSemanticFunc(t.Foreach.Update) || queryContainsSemanticFunc(t.Foreach.Extract) || queryHasUnsafeGeneratorContext(t.Foreach.Query) || slices.ContainsFunc(t.Foreach.Patterns, patternHasUnsafeGeneratorContext) || queryHasUnsafeGeneratorContext(t.Foreach.Start) || queryHasUnsafeGeneratorContext(t.Foreach.Update) || queryHasUnsafeGeneratorContext(t.Foreach.Extract)) {
 			return true
 		}
 	case gojq.TermTypeLabel:
@@ -159,9 +163,9 @@ func termContainsSemanticFunc(t *gojq.Term) bool {
 	case gojq.TermTypeTry:
 		return t.Try != nil && (queryContainsSemanticFunc(t.Try.Body) || queryContainsSemanticFunc(t.Try.Catch))
 	case gojq.TermTypeReduce:
-		return t.Reduce != nil && (queryContainsSemanticFunc(t.Reduce.Query) || patternContainsSemanticFunc(t.Reduce.Pattern) || queryContainsSemanticFunc(t.Reduce.Start) || queryContainsSemanticFunc(t.Reduce.Update))
+		return t.Reduce != nil && (queryContainsSemanticFunc(t.Reduce.Query) || slices.ContainsFunc(t.Reduce.Patterns, patternContainsSemanticFunc) || queryContainsSemanticFunc(t.Reduce.Start) || queryContainsSemanticFunc(t.Reduce.Update))
 	case gojq.TermTypeForeach:
-		return t.Foreach != nil && (queryContainsSemanticFunc(t.Foreach.Query) || patternContainsSemanticFunc(t.Foreach.Pattern) || queryContainsSemanticFunc(t.Foreach.Start) || queryContainsSemanticFunc(t.Foreach.Update) || queryContainsSemanticFunc(t.Foreach.Extract))
+		return t.Foreach != nil && (queryContainsSemanticFunc(t.Foreach.Query) || slices.ContainsFunc(t.Foreach.Patterns, patternContainsSemanticFunc) || queryContainsSemanticFunc(t.Foreach.Start) || queryContainsSemanticFunc(t.Foreach.Update) || queryContainsSemanticFunc(t.Foreach.Extract))
 	case gojq.TermTypeLabel:
 		return t.Label != nil && queryContainsSemanticFunc(t.Label.Body)
 	case gojq.TermTypeQuery:
